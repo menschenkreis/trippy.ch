@@ -18,7 +18,18 @@
     <div class="exp-info">
       <span class="tag">webgl · fractal · julia set</span>
       <h1>Fractal Dreams</h1>
-      <p>Gently evolving Julia set fractals bathed in DMT-inspired colors. Touch or move your cursor to guide the morphing. Breathe and watch infinity unfold.</p>
+      <p>Gently evolving Julia set fractals bathed in DMT-inspired colors. Touch to guide the morphing and watch infinity unfold.</p>
+      <button class="exp-details-toggle" onclick="this.classList.toggle('is-open');this.nextElementSibling.classList.toggle('is-open')">
+        learn more <span class="chevron">▼</span>
+      </button>
+      <div class="exp-details">
+        <div class="exp-details-inner">
+          <h2>Interpretation</h2>
+          <p>Fractals are the geometry of nature — found in ferns, river deltas, lightning bolts, and, some would say, the fabric of consciousness itself. The Julia set is a particular family of fractals where a simple mathematical rule, repeated endlessly, produces structures of staggering complexity. This piece lets that rule drift slowly over time, so the fractal morphs through an endless sequence of forms — each one a frozen moment from an infinite landscape. The DMT-inspired palette of deep indigos, electric magentas, and shimmering golds mirrors the visual language often reported in breakthrough psychedelic experiences: geometric, self-similar, and alive with color.</p>
+          <h2>How it's done</h2>
+          <p>A "Julia set" works by taking a point on screen and applying a simple rule over and over: square it, add a fixed number, repeat. Depending on the starting point, this either spirals away to infinity or stays bounded — and the boundary between those two behaviors is the fractal. The "fixed number" (called the Julia constant) determines the shape. In this experiment, that constant slowly drifts in a circle, which is why the fractal morphs continuously. Each pixel is colored based on how many iterations it took to escape — and those iteration counts are mapped to colors from a DMT-inspired palette. Your touch shifts the constant slightly, letting you steer the shape. Like the plasma, this runs entirely on your GPU as a fragment shader at 60 fps.</p>
+        </div>
+      </div>
     </div>
     <a href="https://github.com/menschenkreis/trippy.ch" class="exp-source" target="_blank" rel="noopener">view source ↗</a>
   </div>

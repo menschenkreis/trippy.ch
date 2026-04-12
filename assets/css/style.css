@@ -456,6 +456,70 @@ footer a:hover { color: var(--pink); }
   color: var(--purple);
 }
 
+/* Experiment Details Toggle */
+.exp-details-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--fg-muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 0.4rem 1rem;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: border-color 0.3s, color 0.3s, var(--transition-colors);
+  backdrop-filter: blur(8px);
+  margin-top: 1rem;
+}
+.exp-details-toggle:hover {
+  border-color: var(--violet);
+  color: var(--fg);
+}
+.exp-details-toggle .chevron {
+  display: inline-block;
+  transition: transform 0.3s ease;
+  font-size: 0.7rem;
+}
+.exp-details-toggle.is-open .chevron {
+  transform: rotate(180deg);
+}
+
+.exp-details {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.5s ease, opacity 0.4s ease;
+  opacity: 0;
+}
+.exp-details.is-open {
+  max-height: 600px;
+  opacity: 1;
+}
+.exp-details-inner {
+  padding-top: 1.5rem;
+  max-width: 520px;
+}
+.exp-details-inner h2 {
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--teal);
+  margin-bottom: 0.5rem;
+  transition: var(--transition-colors);
+}
+.exp-details-inner h2:not(:first-child) {
+  margin-top: 1.5rem;
+}
+.exp-details-inner p {
+  color: var(--fg-muted);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  transition: var(--transition-colors);
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .scroll-hint { animation: none; }
