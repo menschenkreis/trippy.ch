@@ -40,11 +40,9 @@ mat2 rot(float a){ float s=sin(a),c=cos(a); return mat2(c,-s,s,c); }
 
 // ── Menger Sponge SDF ───────────────────────────────────────────────────
 // Based on the iterative cross-removal approach
-float sdCross(vec3 p, float s) {
-  float a = max(abs(p.x), abs(p.y)) - s;
-  float b = max(abs(p.y), abs(p.z)) - s;
-  float c = max(abs(p.z), abs(p.x)) - s;
-  return min(a, min(b, c));
+float sdBox(vec3 p, vec3 b) {
+  vec3 q = abs(p) - b;
+  return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
 }
 
 float mengerSponge(vec3 p, int iterations) {
@@ -62,11 +60,6 @@ float mengerSponge(vec3 p, int iterations) {
     d = max(d, c2);
   }
   return d;
-}
-
-float sdBox(vec3 p, vec3 b) {
-  vec3 q = abs(p) - b;
-  return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
 }
 
 // ── Scene SDF ───────────────────────────────────────────────────────────
@@ -179,7 +172,7 @@ void main() {
     vec3 n = getNormal(p);
     float ao = calcAO(p, n);
 
-    // Fractal iteration colouring — how deep in the sponge structure
+    // Fractal iteration colouring
     float iterCol = 0.0;
     vec3 pp = p;
     float ss = 1.0;
@@ -187,7 +180,10 @@ void main() {
       vec3 a = mod(pp * ss, 2.0) - 1.0;
       ss *= 3.0;
       vec3 r = abs(1.0 - 3.0 * abs(a));
-      float cd = (min(max(r.x, r.y), min(r.y, r.z), min(r.z, r.x)) - 1.0) / ss;
+      float da = max(r.x, r.y);
+      float db = max(r.y, r.z);
+      float dc = max(r.z, r.x);
+      float cd = (min(da, min(db, dc)) - 1.0) / ss;
       iterCol += max(0.0, -cd * ss) * 0.3;
     }
 
