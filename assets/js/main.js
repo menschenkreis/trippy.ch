@@ -2,64 +2,64 @@
 (function () {
   const themes = [
     {
-      name: 'Cosmic Purple',
-      bg: '#1a0a2e', bgLight: '#2d1b4e', fg: '#e8e0f5', fgMuted: '#a89ec7',
-      purple: '#7c3aed', teal: '#2dd4bf', pink: '#ec4899', violet: '#a855f7',
-      glow: 'rgba(124,58,237,0.4)', tealGlow: 'rgba(45,212,191,0.3)', pinkGlow: 'rgba(236,72,153,0.3)'
+      name: 'Cosmic Purple',  // electric violet · neon cyan · hot magenta
+      bg: '#0d0520', bgLight: '#1a0a35', fg: '#f0e8ff', fgMuted: '#9b80c8',
+      purple: '#9b1dff', teal: '#00ffcc', pink: '#ff0099', violet: '#bf40ff',
+      glow: 'rgba(155,29,255,0.5)', tealGlow: 'rgba(0,255,204,0.4)', pinkGlow: 'rgba(255,0,153,0.4)'
     },
     {
-      name: 'Ocean Depths',
-      bg: '#0a1628', bgLight: '#0f2038', fg: '#d0f0f0', fgMuted: '#6b9fa8',
-      purple: '#0e7490', teal: '#22d3ee', pink: '#f97316', violet: '#06b6d4',
-      glow: 'rgba(6,182,212,0.4)', tealGlow: 'rgba(34,211,238,0.3)', pinkGlow: 'rgba(249,115,22,0.3)'
+      name: 'Ocean Depths',   // electric blue · neon mint · blazing orange
+      bg: '#040d1a', bgLight: '#071828', fg: '#d0f0ff', fgMuted: '#4d90aa',
+      purple: '#0055ff', teal: '#00ffaa', pink: '#ff5500', violet: '#0099ff',
+      glow: 'rgba(0,85,255,0.5)', tealGlow: 'rgba(0,255,170,0.4)', pinkGlow: 'rgba(255,85,0,0.4)'
     },
     {
-      name: 'Northern Lights',
-      bg: '#071a12', bgLight: '#0f2d1e', fg: '#d0ffe0', fgMuted: '#6bba8a',
-      purple: '#10b981', teal: '#34d399', pink: '#8b5cf6', violet: '#22d3ee',
-      glow: 'rgba(16,185,129,0.4)', tealGlow: 'rgba(52,211,153,0.3)', pinkGlow: 'rgba(139,92,246,0.3)'
+      name: 'Northern Lights', // neon green · electric sky · vivid purple
+      bg: '#050f08', bgLight: '#091a10', fg: '#d0ffe8', fgMuted: '#4daa70',
+      purple: '#00ff77', teal: '#00ccff', pink: '#cc00ff', violet: '#00ffaa',
+      glow: 'rgba(0,255,119,0.5)', tealGlow: 'rgba(0,204,255,0.4)', pinkGlow: 'rgba(204,0,255,0.4)'
     },
     {
-      name: 'Solar Flare',
-      bg: '#1a0e05', bgLight: '#2d1b0a', fg: '#fff3e0', fgMuted: '#b88a60',
-      purple: '#f59e0b', teal: '#fb923c', pink: '#ef4444', violet: '#fbbf24',
-      glow: 'rgba(245,158,11,0.4)', tealGlow: 'rgba(251,146,60,0.3)', pinkGlow: 'rgba(239,68,68,0.3)'
+      name: 'Solar Flare',    // electric gold · fire red · deep blue
+      bg: '#150a00', bgLight: '#261300', fg: '#fff5d0', fgMuted: '#c8943d',
+      purple: '#ffcc00', teal: '#ff2200', pink: '#0044ff', violet: '#ffaa00',
+      glow: 'rgba(255,204,0,0.5)', tealGlow: 'rgba(255,34,0,0.4)', pinkGlow: 'rgba(0,68,255,0.4)'
     },
     {
-      name: 'Nebula',
-      bg: '#150520', bgLight: '#220d35', fg: '#f0e0ff', fgMuted: '#9a7bbf',
-      purple: '#a855f7', teal: '#6366f1', pink: '#ec4899', violet: '#c084fc',
-      glow: 'rgba(168,85,247,0.4)', tealGlow: 'rgba(99,102,241,0.3)', pinkGlow: 'rgba(236,72,153,0.3)'
+      name: 'Nebula',         // neon violet · shocking pink · electric cyan
+      bg: '#0a0015', bgLight: '#150025', fg: '#f5e0ff', fgMuted: '#9955cc',
+      purple: '#cc00ff', teal: '#ff0077', pink: '#00ffff', violet: '#dd44ff',
+      glow: 'rgba(204,0,255,0.5)', tealGlow: 'rgba(255,0,119,0.4)', pinkGlow: 'rgba(0,255,255,0.4)'
     },
     {
-      name: 'Forest Trip',
-      bg: '#0a1a0a', bgLight: '#152d15', fg: '#e0f5e0', fgMuted: '#6ba86b',
-      purple: '#65a30d', teal: '#84cc16', pink: '#d97706', violet: '#a3e635',
-      glow: 'rgba(101,163,13,0.4)', tealGlow: 'rgba(132,204,22,0.3)', pinkGlow: 'rgba(217,119,6,0.3)'
+      name: 'Acid Trip',      // pure magenta · acid yellow · electric cyan
+      bg: '#0a0a00', bgLight: '#141400', fg: '#ffffe0', fgMuted: '#aaaa40',
+      purple: '#ff00ff', teal: '#ffff00', pink: '#00ffff', violet: '#ff44ff',
+      glow: 'rgba(255,0,255,0.5)', tealGlow: 'rgba(255,255,0,0.4)', pinkGlow: 'rgba(0,255,255,0.4)'
     },
     {
-      name: 'Void',
-      bg: '#050208', bgLight: '#0f0a1a', fg: '#d0cce0', fgMuted: '#6b6580',
-      purple: '#4c1d95', teal: '#7c3aed', pink: '#a78bfa', violet: '#8b5cf6',
-      glow: 'rgba(76,29,149,0.4)', tealGlow: 'rgba(124,58,237,0.3)', pinkGlow: 'rgba(167,139,250,0.3)'
+      name: 'Blood Moon',     // crimson · neon orange · electric purple
+      bg: '#120005', bgLight: '#200008', fg: '#ffe0e8', fgMuted: '#cc4455',
+      purple: '#ff0033', teal: '#ff8800', pink: '#8800ff', violet: '#ff2255',
+      glow: 'rgba(255,0,51,0.5)', tealGlow: 'rgba(255,136,0,0.4)', pinkGlow: 'rgba(136,0,255,0.4)'
     },
     {
-      name: 'Candyland',
-      bg: '#1a0a1a', bgLight: '#2d1535', fg: '#ffe0f5', fgMuted: '#b86ba8',
-      purple: '#e879f9', teal: '#22d3ee', pink: '#f472b6', violet: '#f0abfc',
-      glow: 'rgba(232,121,249,0.4)', tealGlow: 'rgba(34,211,238,0.3)', pinkGlow: 'rgba(244,114,182,0.3)'
+      name: 'Glacier',        // ice cyan · pure white-blue · neon rose
+      bg: '#020d14', bgLight: '#041822', fg: '#e0f8ff', fgMuted: '#5599bb',
+      purple: '#00ddff', teal: '#aaeeff', pink: '#ff0088', violet: '#44ddff',
+      glow: 'rgba(0,221,255,0.5)', tealGlow: 'rgba(170,238,255,0.4)', pinkGlow: 'rgba(255,0,136,0.4)'
     },
     {
-      name: 'Midnight Jazz',
-      bg: '#0a0e1a', bgLight: '#151a30', fg: '#f5f0e0', fgMuted: '#8a8570',
-      purple: '#d4a017', teal: '#b8860b', pink: '#fbbf24', violet: '#eab308',
-      glow: 'rgba(212,160,23,0.4)', tealGlow: 'rgba(184,134,11,0.3)', pinkGlow: 'rgba(251,191,36,0.3)'
+      name: 'Radioactive',    // lime green · neon amber · hot magenta
+      bg: '#050f00', bgLight: '#0a1a00', fg: '#efffcc', fgMuted: '#88bb33',
+      purple: '#44ff00', teal: '#ffaa00', pink: '#ff00cc', violet: '#88ff00',
+      glow: 'rgba(68,255,0,0.5)', tealGlow: 'rgba(255,170,0,0.4)', pinkGlow: 'rgba(255,0,204,0.4)'
     },
     {
-      name: 'Desert Mirage',
-      bg: '#1a120a', bgLight: '#2d2015', fg: '#f5e8d0', fgMuted: '#a89070',
-      purple: '#c2410c', teal: '#ea580c', pink: '#7c3aed', violet: '#a855f7',
-      glow: 'rgba(194,65,12,0.4)', tealGlow: 'rgba(234,88,12,0.3)', pinkGlow: 'rgba(124,58,237,0.3)'
+      name: 'Deep Space',     // indigo · neon pink · electric mint
+      bg: '#04000f', bgLight: '#08001e', fg: '#e8e0ff', fgMuted: '#6644aa',
+      purple: '#4400ff', teal: '#ff00cc', pink: '#00ffaa', violet: '#6622ff',
+      glow: 'rgba(68,0,255,0.5)', tealGlow: 'rgba(255,0,204,0.4)', pinkGlow: 'rgba(0,255,170,0.4)'
     }
   ];
 
