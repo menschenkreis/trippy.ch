@@ -126,33 +126,12 @@
       text-shadow: 0 0 30px rgba(124,58,237,0.5);
       margin: 0 0 0.4rem;
     }
-    .depth-bar-wrap {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-top: 0.3rem;
-    }
-    .depth-bar-label {
-      font-size: 0.6rem;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: rgba(255,255,255,0.25);
-      white-space: nowrap;
-    }
-    .depth-bar-track {
-      width: 80px;
-      height: 3px;
-      background: rgba(255,255,255,0.08);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .depth-bar-fill {
-      height: 100%;
-      width: 0%;
-      border-radius: 2px;
-      background: linear-gradient(90deg, var(--teal,#2dd4bf), var(--purple,#7c3aed));
-      transition: width 0.3s ease, opacity 0.3s;
-      box-shadow: 0 0 6px var(--teal-glow, rgba(45,212,191,0.4));
+    .depth-hud {
+      font-size: 0.72rem;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 0.05em;
+      transition: color 0.5s;
     }
 
     /* ── Back link ─────────────────────────────────────────── */
@@ -309,12 +288,7 @@
   <div class="bottom-left">
     <div class="exp-tag">webgl · julia set · fractal</div>
     <h1 class="exp-title">Fractal Dreams</h1>
-    <div class="depth-bar-wrap">
-      <span class="depth-bar-label" id="depth-label">surface</span>
-      <div class="depth-bar-track">
-        <div class="depth-bar-fill" id="depth-fill"></div>
-      </div>
-    </div>
+    <div class="depth-hud" id="depth-hud">zoom ×1.0</div>
   </div>
 
   <!-- Info panel overlay -->
@@ -354,24 +328,23 @@
   <script src="../assets/js/fractal-dreams.js"></script>
   <script src="../assets/js/main.js"></script>
   <script>
-    // ── Depth bar ────────────────────────────────────────────────────────────
+    // ── Depth HUD ────────────────────────────────────────────────────────────
     (function () {
-      const fill  = document.getElementById('depth-fill');
-      const label = document.getElementById('depth-label');
-      if (!fill || !label) return;
-      // Max representable depth before float precision breaks (~1e-12)
-      const MAX_LOG = Math.log(3.0 / 1e-12); // ~27.6
-      const LEVELS  = ['surface','shallow','deep','deeper','abyss','void'];
+      const hud = document.getElementById('depth-hud');
+      if (!hud) return;
+      // Poll zoom from the shader module — expose it via a global
       setInterval(() => {
         const z = window._fractalZoom;
         if (z == null) return;
-        const logDepth = Math.log(3.0 / Math.max(z, 1e-14));
-        const pct = Math.min(100, (logDepth / MAX_LOG) * 100);
-        fill.style.width = pct + '%';
-        // Label by band
-        const idx = Math.min(LEVELS.length - 1, Math.floor(pct / (100 / LEVELS.length)));
-        label.textContent = LEVELS[idx];
-      }, 150);
+        const mag = 3.0 / z;
+        let label;
+        if (mag < 1000) label = `zoom ×${mag.toFixed(1)}`;
+        else if (mag < 1e6) label = `zoom ×${(mag/1000).toFixed(2)}K`;
+        else if (mag < 1e9) label = `zoom ×${(mag/1e6).toFixed(2)}M`;
+        else if (mag < 1e12) label = `zoom ×${(mag/1e9).toFixed(2)}G`;
+        else label = `zoom ×${mag.toExponential(2)}`;
+        hud.textContent = label;
+      }, 200);
     })();
 
     // ── Reset button

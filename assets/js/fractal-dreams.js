@@ -156,7 +156,7 @@ void main(){
   if(iter < mi){
     // Smooth iteration count (continuous colouring)
     float sl = iter - log2(log2(dot(z,z))) + 4.0;
-    float phase = fract(sl * 0.006 + t * 0.003 + audioPhase * 0.08 + morphEnergy * 0.10);
+    float phase = fract(sl * 0.012 + t * 0.006 + audioPhase * 0.12 + morphEnergy * 0.15);
 
     // Three-colour palette
     vec3 pal;
@@ -379,8 +379,9 @@ void main(){
       const now = Date.now();
       const dx = t1.clientX - lastTapX, dy = t1.clientY - lastTapY;
       if (now - lastTapTime < DBL_TAP_MS && Math.hypot(dx, dy) < DBL_TAP_PX) {
-        // Double-tap: zoom in 2× at tap point — no morph burst (it distracts)
+        // Double-tap: zoom in 2× at tap point
         zoomToPoint(t1.clientX, t1.clientY, 0.5);
+        targetMorphEnergy += 0.6;
         lastTapTime = 0;
       } else {
         lastTapTime = now;
@@ -565,17 +566,7 @@ void main(){
       // Slow zoom — follows boundary depth naturally
       tzoom *= Math.pow(0.9967, dt * 60);
       tlogZoom = Math.log(Math.max(tzoom, 1e-14));
-      // At extreme depth, gracefully zoom out rather than teleporting
-      if (tzoom < 1e-8) {
-        // Reverse zoom direction — let easing carry us back to surface naturally
-        tzoom    = 3.0;
-        tlogZoom = Math.log(3.0);
-        // Gently steer back to centre without hard snap
-        tcx = tcx * 0.5 + (-0.5) * 0.5;
-        tcy = tcy * 0.5 + (0.0)  * 0.5;
-        driftVx = 0; driftVy = 0;
-        lastSampleTs = -9999;
-      }
+      if (tzoom < 1e-8) { tzoom = 3.0; tlogZoom = Math.log(3.0); tcx = -0.5; tcy = 0.0; driftVx = 0; driftVy = 0; lastSampleTs = -9999; }
     }
 
     // ── Inertia ──────────────────────────────────────────────────────────────
