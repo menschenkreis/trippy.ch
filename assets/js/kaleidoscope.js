@@ -78,18 +78,25 @@
     // ── Tunnel UV — polar coordinates with depth ──────────────────────
     vec3 tunnelUv(vec2 uv, float t, vec2 m) {
       float r = length(uv);
-      // Hyperbolic depth: 1/r gives infinite tunnel, log adds non-Euclidean compression
       float depth = log(1.0 + 0.8 / max(r, 0.0001));
       float angle = atan(uv.y, uv.x);
-      // Mouse steers the tunnel
-      angle += (m.x) * 0.5;
-      depth += (m.y) * 0.3;
-      // Forward flight — time drives depth
+      angle += m.x * 0.6;
+      depth += m.y * 0.35;
       depth += t * 0.15;
-      // Geodesic spiral — twist increases with depth (hyperbolic!)
-      float twist = depth * 0.6 + 0.2 * sin(depth * 0.5);
+      // Morphing twist — multiple sine waves for organic feel
+      float twist = depth * 0.5
+        + 0.3 * sin(depth * 0.4 + t * 0.2)
+        + 0.15 * sin(depth * 0.9 - t * 0.15)
+        + 0.1 * cos(depth * 1.5 + t * 0.3);
       angle += twist;
       return vec3(angle, depth, r);
+    }
+
+    // Smooth morphing between fold counts
+    float morphFolds(vec2 p, float n1, float n2, float blend) {
+      vec2 k1 = kaleidoscope(p, n1);
+      vec2 k2 = kaleidoscope(p, n2);
+      return mix(length(k1), length(k2), blend);
     }
 
     void main() {
@@ -104,69 +111,107 @@
       float depth = td.y;
       float screenR = td.z;
 
-      // Unwrap angle + depth into 2D for kaleidoscope
+      // Unwrap into 2D
       vec2 p = vec2(cos(angle), sin(angle)) * depth;
 
-      // ── Kaleidoscope fold on tunnel walls ────────────────────────────
+      // ── Morphing kaleidoscope fold ───────────────────────────────────
       float n = u_folds;
-      vec2 kp = kaleidoscope(p, n);
-      // Second fold pass
-      kp = kaleidoscope(kp * 1.3 + vec2(t * 0.02, 0.0), max(n - 1.0, 2.0));
+      // Slowly morph fold count between n and n+1
+      float morphPhase = sin(t * 0.12) * 0.5 + 0.5; // 0..1
+      float nNext = n + 1.0;
+      vec2 kp1 = kaleidoscope(p, n);
+      vec2 kp2 = kaleidoscope(p, nNext);
+      vec2 kp = mix(kp1, kp2, smoothstep(0.3, 0.7, morphPhase));
+      // Second fold pass — also morphs
+      vec2 kp1b = kaleidoscope(kp * 1.3 + vec2(t * 0.025, 0.0), max(n - 1.0, 2.0));
+      vec2 kp2b = kaleidoscope(kp * 1.3 + vec2(t * 0.025, 0.0), max(n, 3.0));
+      kp = mix(kp1b, kp2b, smoothstep(0.3, 0.7, morphPhase));
 
-      // ── Domain warping — layered along the tunnel ───────────────────
-      float warpScale = 1.5 + 0.5 * sin(depth * 0.3); // walls breathe
+      // ── Heavy domain warping — 3 layers, evolving ──────────────────
+      float warpScale = 1.5 + 0.6 * sin(depth * 0.3 + t * 0.2);
+      float warpScale2 = 2.0 + 0.8 * cos(depth * 0.2 - t * 0.15);
+
       vec2 q = vec2(
-        fbm(kp * warpScale + t * 0.06 + u_seed),
-        fbm(kp * warpScale + vec2(5.2, 1.3) + t * 0.05 + u_seed)
+        fbm(kp * warpScale + t * 0.08 + u_seed),
+        fbm(kp * warpScale + vec2(5.2, 1.3) + t * 0.07 + u_seed)
       );
       vec2 rr = vec2(
-        fbm(kp * warpScale + q * 3.0 + vec2(1.7, 9.2) + t * 0.03),
-        fbm(kp * warpScale + q * 3.0 + vec2(8.3, 2.8) + t * 0.04)
+        fbm(kp * warpScale2 + q * 3.5 + vec2(1.7, 9.2) + t * 0.05),
+        fbm(kp * warpScale2 + q * 3.5 + vec2(8.3, 2.8) + t * 0.06)
       );
-      float f = fbm(kp * warpScale + rr * 2.0);
+      // Third warp layer for extra trippiness
+      vec2 ss = vec2(
+        fbm(kp * warpScale * 0.7 + rr * 2.5 + vec2(3.1, 7.4) + t * 0.04),
+        fbm(kp * warpScale * 0.7 + rr * 2.5 + vec2(6.7, 2.1) + t * 0.03)
+      );
+      float f = fbm(kp * warpScale + rr * 2.5 + ss * 1.5);
 
-      // ── Colour: ominous ember tunnel ────────────────────────────────
-      vec3 col = vec3(0.01, 0.004, 0.001);
+      // ── Evolving colour: ember that breathes ────────────────────────
+      vec3 col = vec3(0.012, 0.005, 0.002);
 
-      // Main ember glow
-      float ember = pow(f, 1.6) * 1.4;
-      col += u_col1 * ember;
+      // Slow colour cycling — hues shift over time
+      float colourShift = sin(t * 0.08) * 0.5 + 0.5;
+      vec3 c1 = mix(u_col1, u_col3, colourShift * 0.3);
+      vec3 c2 = mix(u_col2, u_col1, colourShift * 0.25);
 
-      // Hot cracks in the walls
-      float cracks = pow(max(f - 0.4, 0.0) * 3.5, 1.2);
-      col += u_col2 * cracks * 0.9;
+      // Main glow
+      float ember = pow(f, 1.4) * 1.6;
+      col += c1 * ember;
 
-      // Depth-based heat — deeper = more intense
-      float depthHeat = 0.5 + 0.5 * sin(depth * 0.7);
-      col += u_col3 * depthHeat * 0.15;
+      // Hot cracks
+      float cracks = pow(max(f - 0.35, 0.0) * 3.0, 1.1);
+      col += c2 * cracks;
 
-      // Fold lines glow like magma veins
-      float edgeDist = length(kp - kaleidoscope(kp + vec2(0.001, 0.0), n));
-      float veinGlow = 0.06 / (edgeDist + 0.01);
-      col += u_col2 * veinGlow * 0.6;
+      // Pulsing depth heat
+      float depthHeat = 0.5 + 0.5 * sin(depth * 0.7 + t * 0.25);
+      col += u_col3 * depthHeat * 0.2;
 
-      // Speed lines — streaks rushing past
-      float streaks = abs(sin(depth * 8.0 + angle * 2.0));
-      streaks = pow(streaks, 8.0) * 0.12;
-      col += u_col1 * streaks;
+      // Morphing fold-line glow
+      float edgeDist = length(kp - mix(
+        kaleidoscope(kp + vec2(0.001, 0.0), n),
+        kaleidoscope(kp + vec2(0.001, 0.0), nNext),
+        smoothstep(0.3, 0.7, morphPhase)
+      ));
+      float veinGlow = 0.07 / (edgeDist + 0.008);
+      col += c2 * veinGlow * 0.7;
 
-      // Central glow — the "light at the end"
-      float centerGlow = 0.04 / max(screenR, 0.001);
-      col += vec3(0.6, 0.08, 0.01) * min(centerGlow, 1.5) * 0.15;
+      // Speed streaks with depth variation
+      float streakFreq = 6.0 + 4.0 * sin(depth * 0.3 + t * 0.1);
+      float streaks = abs(sin(depth * streakFreq + angle * 3.0));
+      streaks = pow(streaks, 6.0) * 0.15;
+      col += c1 * streaks;
 
-      // Radial vignette — tunnel edges dark
-      col *= 1.0 - 0.4 * pow(screenR, 2.0);
+      // Morphing ring pulses — concentric rings that breathe
+      float rings = sin(depth * 4.0 - t * 0.6) * 0.5 + 0.5;
+      rings = pow(rings, 4.0) * 0.12;
+      col += c2 * rings;
 
-      // Fog with depth — far walls dimmer
-      float fog = exp(-depth * 0.08);
-      col *= 0.4 + 0.6 * fog;
+      // Central glow
+      float centerGlow = 0.05 / max(screenR, 0.001);
+      vec3 centerCol = mix(vec3(0.6, 0.08, 0.01), vec3(0.9, 0.3, 0.05), sin(t * 0.15) * 0.5 + 0.5);
+      col += centerCol * min(centerGlow, 1.8) * 0.18;
+
+      // Vignette
+      col *= 1.0 - 0.35 * pow(screenR, 2.0);
+
+      // Depth fog with pulsing
+      float fog = exp(-depth * 0.06 + 0.15 * sin(t * 0.2));
+      col *= 0.45 + 0.55 * clamp(fog, 0.0, 1.0);
+
+      // Chromatic aberration — subtle colour fringing
+      float aberration = 0.003 * screenR;
+      float fR = fbm((kp + vec2(aberration, 0.0)) * warpScale + rr * 2.5);
+      float fB = fbm((kp - vec2(aberration, 0.0)) * warpScale + rr * 2.5);
+      col.r += c1.r * pow(fR, 1.4) * 0.15;
+      col.b += c1.b * pow(fB, 1.4) * 0.15;
 
       // Film grain
       col += (hash(uv * u_res + fract(t * 100.0)) - 0.5) * 0.012;
 
-      // Tone mapping
-      col = pow(col, vec3(1.05));
-      col = col / (col + 0.3);
+      // Tone mapping — slightly more contrast
+      col = pow(max(col, vec3(0.0)), vec3(1.0));
+      col = col / (col + 0.28);
+      col = pow(col, vec3(0.95)); // slight gamma lift
 
       gl_FragColor = vec4(col, 1.0);
     }
