@@ -69,7 +69,7 @@
   function screenToFractal(px, py) {
     const minSide = Math.min(window.innerWidth, window.innerHeight);
     const fx = cx + (px - window.innerWidth  * 0.5) * (zoom / minSide);
-    const fy = cy - (py - window.innerHeight * 0.5) * (zoom / minSide);
+    const fy = cy + (py - window.innerHeight * 0.5) * (zoom / minSide);
     return [fx, fy];
   }
 
@@ -304,9 +304,9 @@ void main(){
       const fxDelta = dx * (tzoom / minSide);
       const fyDelta = dy * (tzoom / minSide);
       tcx -= fxDelta;
-      tcy += fyDelta;
+      tcy -= fyDelta;
       cx  -= fxDelta;
-      cy  += fyDelta;
+      cy  -= fyDelta;
       // Track velocity for inertia (exponential smoothing)
       dragVelX = dragVelX * 0.6 + dx * 0.4;
       dragVelY = dragVelY * 0.6 + dy * 0.4;
@@ -328,7 +328,7 @@ void main(){
     if (speed > 2) {
       // dragVel is pixels per ~16ms frame, convert to per-second
       vx = -(dragVelX / minSide) * zoom * 60;
-      vy =  (dragVelY / minSide) * zoom * 60;
+      vy = -(dragVelY / minSide) * zoom * 60;
     }
   });
 
@@ -397,8 +397,8 @@ void main(){
       const minSide = Math.min(window.innerWidth, window.innerHeight);
       const fxD = dx * (tzoom / minSide);
       const fyD = dy * (tzoom / minSide);
-      tcx -= fxD; tcy += fyD;
-      cx  -= fxD; cy  += fyD;
+      tcx -= fxD; tcy -= fyD;
+      cx  -= fxD; cy  -= fyD;
       touchVelX = touchVelX * 0.6 + dx * 0.4;
       touchVelY = touchVelY * 0.6 + dy * 0.4;
       lastTouchX = touch.clientX; lastTouchY = touch.clientY;
@@ -421,9 +421,9 @@ void main(){
       const dy = midY - lastPinchMidY;
       const minSide = Math.min(window.innerWidth, window.innerHeight);
       tcx -= dx * (tzoom / minSide);
-      tcy += dy * (tzoom / minSide);
+      tcy -= dy * (tzoom / minSide);
       cx  -= dx * (tzoom / minSide);
-      cy  += dy * (tzoom / minSide);
+      cy  -= dy * (tzoom / minSide);
 
       lastPinchDist = dist;
       lastPinchMidX = midX; lastPinchMidY = midY;
@@ -436,7 +436,7 @@ void main(){
       const speed = Math.hypot(touchVelX, touchVelY);
       if (speed > 2) {
         vx = -(touchVelX / minSide) * zoom * 60;
-        vy =  (touchVelY / minSide) * zoom * 60;
+        vy = -(touchVelY / minSide) * zoom * 60;
       }
     }
     touchState = e.touches.length >= 2 ? 'pinch' : (e.touches.length === 1 ? 'drag' : 'idle');
