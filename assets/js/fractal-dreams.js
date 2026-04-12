@@ -252,7 +252,7 @@ void main(){
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
     ensureAudio();
-    const factor = e.deltaY > 0 ? 0.9 : 1.1;
+    const factor = e.deltaY > 0 ? 1.1 : 0.9;
     targetZoom *= factor;
     targetZoom = Math.max(0.0001, Math.min(1e8, targetZoom));
   }, { passive: false });
@@ -292,7 +292,7 @@ void main(){
       };
 
       if (lastPinchDist > 0) {
-        const scale = dist / lastPinchDist;
+        const scale = lastPinchDist / dist;
         targetZoom *= scale;
         targetZoom = Math.max(0.0001, Math.min(1e8, targetZoom));
       }
@@ -300,8 +300,8 @@ void main(){
       if (lastPinchCenter) {
         const moveX = (center.x - lastPinchCenter.x) / window.innerWidth;
         const moveY = (center.y - lastPinchCenter.y) / window.innerHeight;
-        targetPanX -= moveX * zoom * 0.8;
-        targetPanY += moveY * zoom * 0.8;
+        targetPanX += moveX * zoom * 0.8;
+        targetPanY -= moveY * zoom * 0.8;
       }
 
       lastPinchDist = dist;
