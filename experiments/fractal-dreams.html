@@ -66,6 +66,19 @@
       box-shadow: 0 0 12px rgba(45,212,191,0.35);
     }
 
+    /* Reset all global fixed-position overrides from style.css so buttons
+       sit inside .top-controls flex container */
+    #theme-btn, #sound-btn, #drift-btn, #contrast-btn {
+      position: static !important;
+      top: auto !important; right: auto !important;
+      bottom: auto !important; left: auto !important;
+      width: 36px !important;
+      height: 36px !important;
+      border-radius: 8px !important;
+      font-size: 0.8rem !important;
+      animation: none !important;
+    }
+
     /* Theme button gets the gradient treatment */
     #theme-btn {
       background: linear-gradient(135deg, var(--purple,#7c3aed), var(--pink,#ec4899), var(--teal,#2dd4bf));

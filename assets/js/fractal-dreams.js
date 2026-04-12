@@ -346,6 +346,7 @@ void main(){
   let lastTouchX = 0, lastTouchY = 0;
   let lastPinchDist = 0, lastPinchMidX = 0, lastPinchMidY = 0;
   let touchVelX = 0, touchVelY = 0;
+  let pinchJustEnded = false; // suppress inertia for the drag immediately after a pinch
 
   // Double-tap detection
   let lastTapTime = 0, lastTapX = 0, lastTapY = 0;
@@ -361,6 +362,8 @@ void main(){
       lastTouchX = t1.clientX; lastTouchY = t1.clientY;
       touchVelX = 0; touchVelY = 0;
       vx = 0; vy = 0; // cancel inertia on new touch
+      // If this touch follows a pinch, mark it so we don't fling on release
+      if (pinchJustEnded) { pinchJustEnded = false; touchVelX = 0; touchVelY = 0; }
 
       // Double-tap check
       const now = Date.now();
@@ -379,6 +382,7 @@ void main(){
 
     } else if (e.touches.length === 2) {
       touchState = 'pinch';
+      pinchJustEnded = false;
       vx = 0; vy = 0; touchVelX = 0; touchVelY = 0;
       const a = e.touches[0], b = e.touches[1];
       lastPinchDist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
@@ -434,10 +438,12 @@ void main(){
     const wasState = touchState;
     touchState = e.touches.length >= 2 ? 'pinch' : (e.touches.length === 1 ? 'drag' : 'idle');
 
-    // Only apply inertia when a clean single-finger drag lifts off completely.
-    // If we were pinching at any point, kill velocity — pinch finger velocities
-    // are noisy and cause the canvas to fly away.
-    if (wasState === 'drag' && touchState === 'idle') {
+    if (wasState === 'pinch') {
+      // A finger lifted off during/after pinch — kill everything, mark pinch-just-ended
+      vx = 0; vy = 0; touchVelX = 0; touchVelY = 0;
+      pinchJustEnded = true;
+    } else if (wasState === 'drag' && touchState === 'idle' && !pinchJustEnded) {
+      // Clean single-finger drag ended — apply inertia
       const minSide = Math.min(window.innerWidth, window.innerHeight);
       const speed = Math.hypot(touchVelX, touchVelY);
       if (speed > 2) {
@@ -445,9 +451,8 @@ void main(){
         vy = -(touchVelY / minSide) * zoom * 60;
       }
     } else {
-      // Pinch ended or finger count changed — always kill inertia
-      vx = 0; vy = 0;
-      touchVelX = 0; touchVelY = 0;
+      vx = 0; vy = 0; touchVelX = 0; touchVelY = 0;
+      pinchJustEnded = false;
     }
   }, { passive: true });
 
