@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ragdoll Void — trippy.ch</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <style>
+    html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#0a0a0f;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+    #c{position:fixed;inset:0;width:100%;height:100%;display:block}
+    .top-controls{position:fixed;top:1rem;right:1rem;z-index:200;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:0.5rem;align-items:center;max-width:calc(100vw - 2rem)}
+    .ctrl-btn{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.4);color:rgba(255,255,255,0.5);font-size:0.75rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color 0.3s,color 0.3s,box-shadow 0.3s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-family:inherit;user-select:none}
+    .ctrl-btn:hover{border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.8)}
+    .ctrl-btn.is-on{color:rgba(180,140,255,0.9);border-color:rgba(180,140,255,0.4);box-shadow:0 0 15px rgba(140,100,255,0.2)}
+    #theme-btn,#add-btn,#reset-btn,#info-btn{position:static!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;width:36px!important;height:36px!important;border-radius:50%!important;font-size:0.75rem!important;animation:none!important}
+    .back-link{position:fixed;top:1rem;left:1rem;z-index:200;font-size:0.85rem;color:rgba(255,255,255,0.3);text-decoration:none;letter-spacing:0.05em;transition:color 0.25s;backdrop-filter:blur(6px);background:rgba(0,0,0,0.3);padding:0.4rem 0.8rem;border-radius:20px;border:1px solid rgba(255,255,255,0.06)}
+    .back-link:hover{color:rgba(180,140,255,0.8)}
+    .bottom-left{position:fixed;bottom:1.5rem;left:1.5rem;z-index:200;pointer-events:none}
+    .exp-tag{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.18em;color:rgba(140,100,255,0.5);margin-bottom:0.15rem}
+    .exp-title{font-size:1.1rem;font-weight:200;letter-spacing:0.12em;color:rgba(255,255,255,0.6);text-shadow:0 0 20px rgba(140,100,255,0.2);margin:0}
+    .info-panel{position:fixed;top:0;right:0;width:min(360px,100vw);height:100%;background:rgba(8,8,14,0.95);backdrop-filter:blur(20px);border-left:1px solid rgba(140,100,255,0.15);z-index:500;transform:translateX(100%);transition:transform 0.4s cubic-bezier(0.25,0,0,1);overflow-y:auto;padding:2rem 1.75rem;box-sizing:border-box}
+    .info-panel.is-open{transform:translateX(0)}
+    .info-panel h2{font-size:0.7rem;text-transform:uppercase;letter-spacing:0.15em;color:rgba(140,100,255,0.6);margin:1.5rem 0 0.5rem;font-weight:400}
+    .info-panel h2:first-of-type{margin-top:0.5rem}
+    .info-panel p{font-size:0.85rem;line-height:1.7;color:rgba(255,255,255,0.4);margin:0 0 0.5rem}
+    .panel-title{font-size:1.3rem;font-weight:200;letter-spacing:0.1em;color:rgba(255,255,255,0.7);margin-bottom:0.2rem}
+    .panel-tag{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.15em;color:rgba(140,100,255,0.5);margin-bottom:1rem;display:block}
+    .close-panel{position:absolute;top:1rem;right:1rem;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(255,255,255,0.3);font-size:1.2rem;border:none;background:none;transition:color 0.2s}
+    .close-panel:hover{color:rgba(255,255,255,0.7)}
+    .hint-row{display:flex;align-items:baseline;gap:0.5rem;margin-bottom:0.4rem}
+    .hint-icon{font-size:1rem;flex-shrink:0;width:1.4rem;text-align:center}
+    .hint-text{font-size:0.82rem;color:rgba(255,255,255,0.4);line-height:1.5}
+    .panel-divider{border:none;border-top:1px solid rgba(140,100,255,0.1);margin:1.5rem 0}
+    .source-link{display:inline-block;font-size:0.75rem;color:rgba(255,255,255,0.2);text-decoration:none;margin-top:0.5rem;transition:color 0.25s}
+    .source-link:hover{color:rgba(140,100,255,0.6)}
+    .panel-overlay{position:fixed;inset:0;z-index:499;display:none}
+    .panel-overlay.is-active{display:block}
+  </style>
+</head>
+<body class="experiment-view">
+  <div id="page-transition" class="page-transition"></div>
+  <canvas id="c"></canvas>
+  <a href="../experiments.html" class="back-link">↞</a>
+  <div class="top-controls">
+    <button id="add-btn" class="ctrl-btn" title="Add ragdoll">+</button>
+    <button id="theme-btn" class="ctrl-btn" title="Theme">✦</button>
+    <button id="reset-btn" class="ctrl-btn" title="Reset">⟳</button>
+    <button id="info-btn" class="ctrl-btn" title="Info">i</button>
+  </div>
+  <div class="bottom-left">
+    <div class="exp-tag">canvas · physics · sacred geometry</div>
+    <h1 class="exp-title">Ragdoll Void</h1>
+  </div>
+  <div class="panel-overlay" id="panel-overlay"></div>
+  <div class="info-panel" id="info-panel">
+    <button class="close-panel" id="close-panel">×</button>
+    <p class="panel-title">Ragdoll Void</p>
+    <span class="panel-tag">Canvas 2D · Verlet Physics · Sacred Geometry</span>
+    <h2>How to play</h2>
+    <div class="hint-row"><span class="hint-icon">👆</span><span class="hint-text"><strong>Drag</strong> the ragdoll by any body part</span></div>
+    <div class="hint-row"><span class="hint-icon">📱</span><span class="hint-text"><strong>Tilt</strong> your phone to shift gravity</span></div>
+    <div class="hint-row"><span class="hint-icon">+</span><span class="hint-text"><strong>Add</strong> more ragdolls to the void</span></div>
+    <div class="hint-row"><span class="hint-icon">✦</span><span class="hint-text"><strong>Theme</strong> cycles sacred geometry styles</span></div>
+    <div class="hint-row"><span class="hint-icon">⟳</span><span class="hint-text"><strong>Reset</strong> clears everything</span></div>
+    <hr class="panel-divider">
+    <h2>What's happening</h2>
+    <p>Stick-figure ragdolls fall through an infinite void filled with frictionless spheres. Gravity responds to your phone's accelerometer — tilt to push them around. Sacred geometry patterns (flower of life, Metatron's cube, golden spirals) pulse softly in the background.</p>
+    <hr class="panel-divider">
+    <a href="https://github.com/menschenkreis/trippy.ch" class="source-link" target="_blank" rel="noopener">view source on GitHub ↗</a>
+  </div>
+  <script src="../assets/js/ragdoll-void.js"></script>
+  <script src="../assets/js/main.js"></script>
+  <script>
+    document.getElementById('page-transition').classList.add('is-active');
+    requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('page-transition').classList.remove('is-active')));
+    (function(){const p=document.getElementById('info-panel'),o=document.getElementById('panel-overlay'),open=()=>{p.classList.add('is-open');o.classList.add('is-active')},close=()=>{p.classList.remove('is-open');o.classList.remove('is-active')};document.getElementById('info-btn').onclick=open;document.getElementById('close-panel').onclick=close;o.onclick=close;document.addEventListener('keydown',e=>{if(e.key==='Escape')close()})})();
+  </script>
+</body>
+</html>
