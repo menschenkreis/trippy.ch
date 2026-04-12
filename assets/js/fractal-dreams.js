@@ -464,47 +464,56 @@ void main(){
     const dt = lastFrameTime ? Math.min((ts - lastFrameTime) * 0.001, 0.1) : 0.016;
     lastFrameTime = ts;
 
-    // ── Drift mode: slow orbital zoom keeping exploration feel ──────────────
-    if (driftEnabled && !isDragging && touchState === 'idle') {
+    const interacting = isDragging || touchState !== 'idle';
+
+    // ── Drift mode ───────────────────────────────────────────────────────────
+    if (driftEnabled && !interacting) {
       driftT += dt;
-      // Very slow zoom in, reset at deep limit
-      tzoom *= Math.pow(0.985, dt * 60);
+      tzoom *= Math.pow(0.986, dt * 60);
       if (tzoom < 3e-8) { tzoom = 3.0; tcx = -0.5; tcy = 0.0; }
-      // Gentle orbit around current centre
       tcx += Math.sin(driftT * 0.07) * zoom * 0.0003;
       tcy += Math.cos(driftT * 0.11) * zoom * 0.0003;
     }
 
-    // ── Inertia ─────────────────────────────────────────────────────────────
-    if (!isDragging && touchState === 'idle') {
-      const friction = Math.pow(0.88, dt * 60); // friction per second
+    // ── Inertia ──────────────────────────────────────────────────────────────
+    if (!interacting) {
+      const friction = Math.pow(0.85, dt * 60);
       vx *= friction; vy *= friction;
-      if (Math.abs(vx) > 1e-10 || Math.abs(vy) > 1e-10) {
+      if (Math.abs(vx) > 1e-12 || Math.abs(vy) > 1e-12) {
         tcx += vx * dt; tcy += vy * dt;
       }
     }
 
     // ── Smooth interpolation ─────────────────────────────────────────────────
-    // Pan is applied directly (no lag), only zoom is eased for smoothness
-    cx   = tcx;
-    cy   = tcy;
-    const zoomEase = 1.0 - Math.pow(0.08, dt * 60); // snappy zoom
+    // While a finger/mouse is down: pan tracks 1:1 (no lag at all).
+    // While coasting / resetting / drifting: smooth ease so motion feels fluid.
+    if (interacting) {
+      cx = tcx;
+      cy = tcy;
+    } else {
+      // expo ease — settles in ~300 ms, feels organic
+      const panEase = 1.0 - Math.pow(0.012, dt * 60);
+      cx += (tcx - cx) * panEase;
+      cy += (tcy - cy) * panEase;
+    }
+    // Zoom always eases — makes wheel/pinch feel springy
+    const zoomEase = 1.0 - Math.pow(0.04, dt * 60);
     zoom += (tzoom - zoom) * zoomEase;
 
-    // ── Mouse influence ──────────────────────────────────────────────────────
-    smoothMouse[0] += (mouseTarget[0] - smoothMouse[0]) * 0.04;
-    smoothMouse[1] += (mouseTarget[1] - smoothMouse[1]) * 0.04;
+    // ── Mouse / Julia influence ───────────────────────────────────────────────
+    smoothMouse[0] += (mouseTarget[0] - smoothMouse[0]) * 0.03;
+    smoothMouse[1] += (mouseTarget[1] - smoothMouse[1]) * 0.03;
 
     // ── Theme colours ────────────────────────────────────────────────────────
     for (let i = 0; i < 3; i++) {
-      themeColA[i] += (targetColA[i] - themeColA[i]) * 0.025;
-      themeColB[i] += (targetColB[i] - themeColB[i]) * 0.025;
-      themeColC[i] += (targetColC[i] - themeColC[i]) * 0.025;
+      themeColA[i] += (targetColA[i] - themeColA[i]) * 0.018;
+      themeColB[i] += (targetColB[i] - themeColB[i]) * 0.018;
+      themeColC[i] += (targetColC[i] - themeColC[i]) * 0.018;
     }
 
     // ── Morph energy decay ───────────────────────────────────────────────────
-    morphEnergy     += (targetMorphEnergy - morphEnergy) * 0.07;
-    targetMorphEnergy *= Math.pow(0.25, dt);
+    morphEnergy       += (targetMorphEnergy - morphEnergy) * 0.06;
+    targetMorphEnergy *= Math.pow(0.2, dt);
 
     // ── Audio ────────────────────────────────────────────────────────────────
     updateAudio(dt);
@@ -541,8 +550,10 @@ void main(){
   requestAnimationFrame(exposeState);
 
   window._fractalReset = function () {
+    // Smoothly glide home — targets set, easing does the rest
     tcx = -0.5; tcy = 0.0; tzoom = 3.0;
     vx = 0; vy = 0;
+    targetMorphEnergy += 0.5; // little visual pop on reset
   };
 
   requestAnimationFrame(frame);
