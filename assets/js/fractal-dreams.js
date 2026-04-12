@@ -1,4 +1,5 @@
 // Fractal Dreams — Evolving Julia set with DMT color palette
+// Supports infinite pinch-to-zoom (touch) and scroll-to-zoom (mouse)
 (function () {
   const cfg = window.fractalDreamsConfig || {};
   const canvasId = cfg.canvasId || 'fractal-canvas';
@@ -21,6 +22,8 @@
   }
 
   let W, H, mouse = [0.5, 0.5], time = 0, raf;
+  let zoom = 1.0, targetZoom = 1.0;
+  let panX = 0.0, panY = 0.0, targetPanX = 0.0, targetPanY = 0.0;
 
   function resize() {
     const dpr = Math.min(window.devicePixelRatio, 1.5);
@@ -45,6 +48,8 @@ precision highp float;
 uniform float t;
 uniform vec2 res;
 uniform vec2 mouse;
+uniform float zoom;
+uniform vec2 pan;
 
 vec3 hsv2rgb(vec3 c){
   vec4 K=vec4(1.0,2.0/3.0,1.0/3.0,3.0);
@@ -54,6 +59,7 @@ vec3 hsv2rgb(vec3 c){
 
 void main(){
   vec2 uv=(gl_FragCoord.xy-0.5*res)/min(res.x,res.y);
+  uv=uv*zoom+pan;
 
   // Julia set constant — evolves slowly through mesmerizing shapes
   float a=t*0.06;
@@ -62,14 +68,11 @@ void main(){
     0.27+0.26*sin(a*1.3)+mouse.y*0.15
   );
 
-  // Zoom — slow pulse in and out
-  float zoom=1.4+0.3*sin(t*0.04);
-
-  vec2 z=uv*zoom;
+  vec2 z=uv;
   float iter=0.0;
-  const float maxIter=180.0;
+  const float maxIter=256.0;
 
-  for(float i=0.0;i<180.0;i++){
+  for(float i=0.0;i<256.0;i++){
     z=vec2(z.x*z.x-z.y*z.y,2.0*z.x*z.y)+c;
     if(dot(z,z)>4.0) break;
     iter++;
@@ -82,31 +85,30 @@ void main(){
     float sl=iter-log2(log2(dot(z,z)))+4.0;
 
     // DMT-inspired color palette cycling
-    // Deep indigo → electric magenta → gold → neon teal → violet
     float hue=sl*0.012+t*0.008;
     hue=fract(hue);
 
     // Remap hue to cluster around DMT colors
-    float h2=hue*hue*(3.0-2.0*hue); // smoothstep shape
+    float h2=hue*hue*(3.0-2.0*hue);
     float finalHue=mix(0.72,0.85,h2)+sin(sl*0.05)*0.08;
 
     float sat=0.7+0.3*sin(sl*0.08+t*0.02);
     float val=0.15+0.85*pow(sl/maxIter,0.45);
 
-    // Add iridescent shimmer
+    // Iridescent shimmer
     val+=0.08*sin(sl*0.3+t*0.1)*cos(sl*0.17);
 
     col=hsv2rgb(vec3(fract(finalHue),clamp(sat,0.0,1.0),clamp(val,0.0,1.0)));
 
-    // Inner glow — brighter near the fractal boundary
+    // Inner glow near boundary
     float edge=1.0-smoothstep(0.0,0.3,sl/maxIter);
     col+=vec3(0.3,0.1,0.5)*edge*0.6;
     col+=vec3(0.1,0.3,0.3)*edge*0.3;
   } else {
-    // Inside the set — deep void with subtle color
+    // Inside the set — deep void
     col=vec3(0.02,0.01,0.05);
-    float inner=dot(uv,uv)*2.0;
-    col+=vec3(0.06,0.02,0.12)*exp(-inner*3.0);
+    float inner=length(uv)*0.5;
+    col+=vec3(0.06,0.02,0.12)*exp(-inner*0.5);
   }
 
   // Soft vignette
@@ -155,27 +157,106 @@ void main(){
   const uT = gl.getUniformLocation(prog, 't');
   const uRes = gl.getUniformLocation(prog, 'res');
   const uMouse = gl.getUniformLocation(prog, 'mouse');
+  const uZoom = gl.getUniformLocation(prog, 'zoom');
+  const uPan = gl.getUniformLocation(prog, 'pan');
+
+  // ── Zoom & Pan Input ──
+
+  // Mouse wheel zoom
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const factor = e.deltaY > 0 ? 0.9 : 1.1;
+    targetZoom *= factor;
+    // Clamp to avoid degenerate values
+    targetZoom = Math.max(0.0001, Math.min(1e8, targetZoom));
+  }, { passive: false });
+
+  // Pinch-to-zoom + two-finger pan
+  let lastPinchDist = 0;
+  let lastPinchCenter = null;
+  let isPinching = false;
+
+  canvas.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      isPinching = true;
+      const dx = e.touches[1].clientX - e.touches[0].clientX;
+      const dy = e.touches[1].clientY - e.touches[0].clientY;
+      lastPinchDist = Math.hypot(dx, dy);
+      lastPinchCenter = {
+        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+      };
+    }
+  }, { passive: true });
+
+  canvas.addEventListener('touchmove', e => {
+    if (e.touches.length === 1 && !isPinching) {
+      const t = e.touches[0];
+      mouse[0] = t.clientX / window.innerWidth;
+      mouse[1] = 1.0 - t.clientY / window.innerHeight;
+    }
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const dx = e.touches[1].clientX - e.touches[0].clientX;
+      const dy = e.touches[1].clientY - e.touches[0].clientY;
+      const dist = Math.hypot(dx, dy);
+      const center = {
+        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+      };
+
+      // Pinch zoom
+      if (lastPinchDist > 0) {
+        const scale = dist / lastPinchDist;
+        targetZoom *= scale;
+        targetZoom = Math.max(0.0001, Math.min(1e8, targetZoom));
+      }
+
+      // Two-finger pan
+      if (lastPinchCenter) {
+        const moveX = (center.x - lastPinchCenter.x) / window.innerWidth;
+        const moveY = (center.y - lastPinchCenter.y) / window.innerHeight;
+        targetPanX -= moveX * zoom * 0.8;
+        targetPanY += moveY * zoom * 0.8;
+      }
+
+      lastPinchDist = dist;
+      lastPinchCenter = center;
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', e => {
+    if (e.touches.length < 2) {
+      isPinching = false;
+      lastPinchDist = 0;
+      lastPinchCenter = null;
+    }
+  }, { passive: true });
+
+  // Mouse move for Julia constant influence
+  window.addEventListener('mousemove', e => {
+    mouse[0] = e.clientX / window.innerWidth;
+    mouse[1] = 1.0 - e.clientY / window.innerHeight;
+  });
 
   function frame(ts) {
     if (prefersReduced) { time = 0; } else { time = ts * 0.001; }
+
+    // Smooth zoom & pan interpolation
+    zoom += (targetZoom - zoom) * 0.08;
+    panX += (targetPanX - panX) * 0.08;
+    panY += (targetPanY - panY) * 0.08;
+
     gl.uniform1f(uT, time);
     gl.uniform2f(uRes, W, H);
     gl.uniform2f(uMouse, mouse[0], mouse[1]);
+    gl.uniform1f(uZoom, zoom);
+    gl.uniform2f(uPan, panX, panY);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     raf = requestAnimationFrame(frame);
   }
 
   window.addEventListener('resize', resize);
-  window.addEventListener('mousemove', e => {
-    mouse[0] = e.clientX / window.innerWidth;
-    mouse[1] = 1.0 - e.clientY / window.innerHeight;
-  });
-  window.addEventListener('touchmove', e => {
-    const t = e.touches[0];
-    mouse[0] = t.clientX / window.innerWidth;
-    mouse[1] = 1.0 - t.clientY / window.innerHeight;
-  }, { passive: true });
-
   resize();
   frame(0);
 })();
