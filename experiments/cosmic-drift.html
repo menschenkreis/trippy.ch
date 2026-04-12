@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Menger Descent — trippy.ch</title>
+  <title>Cosmic Drift — trippy.ch</title>
   <link rel="stylesheet" href="../assets/css/style.css">
   <style>
     html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#050208; }
@@ -54,24 +54,24 @@
     <button id="info-btn" class="ctrl-btn" title="Info">i</button>
   </div>
   <div class="bottom-left">
-    <div class="exp-tag">webgl · ray march · menger sponge · fractal</div>
-    <h1 class="exp-title">Menger Descent</h1>
+    <div class="exp-tag">webgl · ray march · fractal · psychedelic</div>
+    <h1 class="exp-title">Cosmic Drift</h1>
     <div class="depth-hud" id="hud">depth 1 · iteration 4</div>
   </div>
   <div class="panel-overlay" id="panel-overlay"></div>
   <div class="info-panel" id="info-panel">
     <button class="close-panel" id="close-panel">×</button>
-    <p class="panel-title">Menger Descent</p>
-    <span class="panel-tag">WebGL · Ray Marching · Fractal Distance Estimation</span>
+    <p class="panel-title">Cosmic Drift</p>
+    <span class="panel-tag">WebGL · Ray Marching · Fractal Geometry</span>
     <h2>How to explore</h2>
-    <div class="hint-row"><span class="hint-icon">🖱</span><span class="hint-text"><strong>Move cursor</strong> to steer through the sponge</span></div>
+    <div class="hint-row"><span class="hint-icon">🖱</span><span class="hint-text"><strong>Move cursor</strong> to steer through space</span></div>
     <div class="hint-row"><span class="hint-icon">👆</span><span class="hint-text"><strong>Touch & drag</strong> on mobile</span></div>
     <div class="hint-row"><span class="hint-icon">1×</span><span class="hint-text"><strong>Speed</strong> cycles: 0.5×, 1×, 2×, 3×</span></div>
     <div class="hint-row"><span class="hint-icon">✦</span><span class="hint-text"><strong>Theme</strong> generates a new colour palette</span></div>
     <div class="hint-row"><span class="hint-icon">🚀</span><span class="hint-text"><strong>Auto</strong> enables autonomous fly-through</span></div>
     <hr class="panel-divider">
     <h2>What you're seeing</h2>
-    <p>A Menger sponge — a fractal cube created by recursively removing the middle third of every face. You're flying through its infinite internal cavity structure. Every level of recursion reveals the same pattern at smaller scale, going on forever.</p>
+    <p>A flight through infinite procedural space filled with morphing fractal geometry — breathing shapes, rippling rings, and floating orbs. Everything feels alive.
     <h2>How it's rendered</h2>
     <p>Ray marching with a signed distance function (SDF). The SDF computes the exact distance to the nearest surface, allowing efficient traversal. Each step the camera descends deeper, and the fractal iteration count adapts. Psychedelic colour is derived from orbit traps and surface normals.</p>
     <hr class="panel-divider">
