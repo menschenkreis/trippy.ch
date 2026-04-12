@@ -29,9 +29,9 @@ uniform vec3  u_col2;
 uniform vec3  u_col3;
 uniform float u_seed;
 
-#define MAX_STEPS 100
-#define MAX_DIST  80.0
-#define SURF_DIST 0.001
+#define MAX_STEPS 80
+#define MAX_DIST  60.0
+#define SURF_DIST 0.002
 
 mat2 rot2(float a){ float s=sin(a),c=cos(a); return mat2(c,-s,s,c); }
 
@@ -58,7 +58,7 @@ float noise3(vec3 p){
 
 float fbm(vec3 p){
   float v=0.0, a=0.5;
-  for(int i=0;i<5;i++){ v+=a*noise3(p); p=p*2.01+vec3(100); a*=0.5; }
+  for(int i=0;i<4;i++){ v+=a*noise3(p); p=p*2.01+vec3(100); a*=0.5; }
   return v;
 }
 
@@ -101,15 +101,11 @@ float scene(vec3 p, float t){
   q1.xz *= rot2(t*0.2);
   q1.xy *= rot2(t*0.15);
   float oct = sdOctahedron(q1, 1.0 + 0.3*sin(t*0.4));
-  // Breathe with noise
-  oct += fbm(p*2.0 + t*0.1)*0.4;
 
-  // Torus knot-ish ring
+  // Torus ring
   vec3 q2 = p;
   q2.xz *= rot2(t*0.12);
-  q2.xy *= rot2(t*0.08);
   float torus = sdTorus(q2, vec2(1.8+0.3*sin(t*0.35), 0.15+0.1*sin(t*0.5)));
-  torus += fbm(q2*3.0 + t*0.15)*0.2;
 
   // Floating orbs
   vec3 q3 = p;
@@ -117,25 +113,22 @@ float scene(vec3 p, float t){
   q3.xy *= rot2(t*0.13);
   float orbs = sdSphere(q3, 0.5+0.2*sin(t*0.6));
 
-  // Blend them together smoothly
   d = smin(oct, torus, 0.6);
   d = smin(d, orbs, 0.4);
 
-  // Fractal walls — domain-repeated rippling planes
+  // Domain-repeated rippling walls
   vec3 rp = rep3(p, vec3(6.0));
   float wall = abs(rp.y) - 0.08 - 0.06*sin(rp.x*2.0+t*0.5)*cos(rp.z*2.0+t*0.3);
-  wall += fbm(rp*1.5 + t*0.08)*0.15;
   d = smin(d, wall, 0.8);
 
-  // Smaller repeating fractal detail
+  // Smaller repeating orbs
   vec3 rp2 = rep3(p, vec3(3.0));
   rp2.xz *= rot2(t*0.2);
   float smallBlob = sdSphere(rp2, 0.2+0.1*sin(t*0.7+length(rp2)*3.0));
   d = smin(d, smallBlob, 0.3);
 
-  // Organic displacement — everything breathes
-  d += fbm(p*3.0 + t*0.12 + u_seed)*0.15;
-  d += 0.05*sin(p.x*4.0+t*0.6)*sin(p.y*4.0+t*0.5)*sin(p.z*4.0+t*0.4);
+  // Light organic displacement — single FBM only
+  d += fbm(p*2.5 + t*0.1 + u_seed)*0.12;
 
   return d;
 }
@@ -151,10 +144,10 @@ vec3 getNormal(vec3 p){
 
 float calcAO(vec3 p, vec3 n){
   float occ=0.0, sca=1.0;
-  for(int i=0;i<5;i++){
-    float h=0.01+0.12*float(i);
+  for(int i=0;i<3;i++){
+    float h=0.02+0.15*float(i);
     float d=scene(p+h*n, u_time);
-    occ+=(h-d)*sca; sca*=0.95;
+    occ+=(h-d)*sca; sca*=0.9;
   }
   return clamp(1.0-3.0*occ, 0.0, 1.0);
 }
@@ -163,14 +156,12 @@ float calcAO(vec3 p, vec3 n){
 vec3 starfield(vec3 rd, float t){
   vec3 col = vec3(0.005, 0.002, 0.01);
 
-  // Nebula
+  // Nebula — single FBM
   float n1 = fbm(rd*2.0 + t*0.02);
-  float n2 = fbm(rd*3.0 + vec3(t*0.015, 0, t*0.01));
   col += vec3(0.06,0.01,0.08) * n1 * 0.5;
-  col += vec3(0.01,0.04,0.08) * n2 * 0.4;
 
-  // Stars
-  for(int layer=0; layer<3; layer++){
+  // Stars — 2 layers
+  for(int layer=0; layer<2; layer++){
     float scale = 60.0 + float(layer)*100.0;
     vec3 grid = rd * scale;
     vec3 id = floor(grid);
@@ -254,7 +245,7 @@ void main(){
     float h1 = fract(p.x*0.5 + p.y*0.3 + p.z*0.25 + t*0.08 + u_seed);
     float h2 = fract(dot(n,vec3(1.0))*2.0 + u_seed*0.7);
     float h3 = clamp(trap*0.4, 0.0, 1.0);
-    float h4 = fract(fbm(p*2.5 + t*0.12)*4.0);
+    float h4 = fract(noise3(p*2.5 + t*0.12)*4.0);
 
     // Heavy saturation boost
     vec3 c1 = mix(vec3(dot(u_col1,vec3(0.299,0.587,0.114))), u_col1, 3.0);
@@ -358,7 +349,7 @@ void main(){
   let paletteSeed = Math.random()*100;
 
   function resize() {
-    const dpr = Math.min(devicePixelRatio, 1.5);
+    const dpr = Math.min(devicePixelRatio, 1.0);
     canvas.width = window.innerWidth*dpr;
     canvas.height = window.innerHeight*dpr;
     gl.viewport(0,0,canvas.width,canvas.height);
