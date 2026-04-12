@@ -153,7 +153,12 @@ void main(){
   };
   const db = document.getElementById('drift-btn'); if (db) db.onclick = () => { driftEnabled = !driftEnabled; db.classList.toggle('is-on', driftEnabled); };
 
-  canvas.onwheel = e => { e.preventDefault(); targetZoom = Math.max(1e-12, Math.min(2.0, targetZoom * (e.deltaY > 0 ? 1.08 : 0.92))); };
+  canvas.onwheel = e => { 
+    e.preventDefault(); 
+    // Logarithmic scroll: move by percentage rather than absolute
+    const scrollFactor = e.deltaY > 0 ? 1.05 : 0.95;
+    targetZoom = Math.max(1e-15, Math.min(2.0, targetZoom * scrollFactor)); 
+  };
 
   let lastDist = 0, isPinching = false, lastCenter = null;
   canvas.ontouchstart = e => {
@@ -164,17 +169,29 @@ void main(){
     }
   };
   canvas.ontouchmove = e => {
-    if (e.touches.length === 1 && !isPinching) { mouseTarget[0] = e.touches[0].clientX/window.innerWidth; mouseTarget[1] = 1.0 - e.touches[0].clientY/window.innerHeight; }
+    if (e.touches.length === 1 && !isPinching) { 
+      mouseTarget[0] = e.touches[0].clientX/window.innerWidth; 
+      mouseTarget[1] = 1.0 - e.touches[0].clientY/window.innerHeight; 
+    }
     if (e.touches.length === 2) {
       e.preventDefault();
       const dist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
       const center = { x: (e.touches[0].clientX + e.touches[1].clientX)/2, y: (e.touches[0].clientY + e.touches[1].clientY)/2 };
-      if (lastDist > 0) targetZoom = Math.max(1e-12, Math.min(2.0, targetZoom * (lastDist / dist)));
+      
+      // LOGARITHMIC PINCH: Scale zoom by the ratio of finger distance change
+      if (lastDist > 0) {
+        const ratio = lastDist / dist;
+        targetZoom = Math.max(1e-15, Math.min(2.0, targetZoom * ratio));
+      }
+      
+      // RELATIVE PAN: Move 1:1 with visual pixels, adjusted for current zoom depth
       if (lastCenter) {
         const minSide = Math.min(window.innerWidth, window.innerHeight);
-        targetPanX += (lastCenter.x - center.x) * (zoom / minSide);
-        targetPanY -= (lastCenter.y - center.y) * (zoom / minSide);
+        // We divide by the DPR-adjusted resolution to keep it perfectly intuitive
+        targetPanX += (lastCenter.x - center.x) * (targetZoom / minSide);
+        targetPanY -= (lastCenter.y - center.y) * (targetZoom / minSide);
       }
+      
       lastDist = dist; lastCenter = center;
     }
   };
