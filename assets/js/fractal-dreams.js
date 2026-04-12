@@ -442,6 +442,12 @@ void main(){
       // A finger lifted off during/after pinch — kill everything, mark pinch-just-ended
       vx = 0; vy = 0; touchVelX = 0; touchVelY = 0;
       pinchJustEnded = true;
+      // *** THE REAL FIX: re-anchor lastTouch to the remaining finger ***
+      // Without this, the next touchmove computes a huge stale delta → flick.
+      if (e.touches.length === 1) {
+        lastTouchX = e.touches[0].clientX;
+        lastTouchY = e.touches[0].clientY;
+      }
     } else if (wasState === 'drag' && touchState === 'idle' && !pinchJustEnded) {
       // Clean single-finger drag ended — apply inertia
       const minSide = Math.min(window.innerWidth, window.innerHeight);
