@@ -75,100 +75,98 @@
       return vec2(cos(a), sin(a)) * r;
     }
 
-    // ── Poincaré-style hyperbolic warp ──────────────────────────────────
-    // Soft exponential stretch that mimics hyperbolic distance
-    // without blowing up at the boundary
-    vec2 hyperWarp(vec2 p, float t) {
-      float r = length(p);
-      if (r < 0.0001) return p;
-      // Hyperbolic-like stretch: log(1+r) pushes detail outward
-      float hR = log(1.0 + r * 3.0) * 1.2;
-      // Breathing pulse
-      hR *= 1.0 + 0.1 * sin(t * 0.4 + r * 2.0);
-      vec2 dir = p / r;
-      return dir * hR;
-    }
-
-    // Soft Möbius-like shift — keeps values bounded
-    vec2 softMobius(vec2 z, vec2 a) {
-      vec2 diff = z - a;
-      float den = 1.0 - dot(a, z);
-      return diff / max(abs(den), 0.15) * sign(den);
+    // ── Tunnel UV — polar coordinates with depth ──────────────────────
+    vec3 tunnelUv(vec2 uv, float t, vec2 m) {
+      float r = length(uv);
+      // Hyperbolic depth: 1/r gives infinite tunnel, log adds non-Euclidean compression
+      float depth = log(1.0 + 0.8 / max(r, 0.0001));
+      float angle = atan(uv.y, uv.x);
+      // Mouse steers the tunnel
+      angle += (m.x) * 0.5;
+      depth += (m.y) * 0.3;
+      // Forward flight — time drives depth
+      depth += t * 0.15;
+      // Geodesic spiral — twist increases with depth (hyperbolic!)
+      float twist = depth * 0.6 + 0.2 * sin(depth * 0.5);
+      angle += twist;
+      return vec3(angle, depth, r);
     }
 
     void main() {
       vec2 uv = (gl_FragCoord.xy - 0.5 * u_res) / min(u_res.x, u_res.y);
 
       float t = u_time;
+      vec2 m = (u_mouse - 0.5);
 
-      // Mouse influence
-      vec2 m = (u_mouse - 0.5) * 0.35;
+      // ── Tunnel projection ────────────────────────────────────────────
+      vec3 td = tunnelUv(uv, t, m);
+      float angle = td.x;
+      float depth = td.y;
+      float screenR = td.z;
 
-      // ── Hyperbolic warp ─────────────────────────────────────────────
-      vec2 p = hyperWarp(uv + m * 0.25, t);
+      // Unwrap angle + depth into 2D for kaleidoscope
+      vec2 p = vec2(cos(angle), sin(angle)) * depth;
 
-      // Möbius-like shift for non-Euclidean feel
-      vec2 mShift = vec2(0.12 * sin(t * 0.13), 0.12 * cos(t * 0.11));
-      p = softMobius(p, mShift);
-
-      // Poincaré geodesic spiral — rotation accelerates with hyperbolic distance
-      float r = length(p);
-      float spiral = t * 0.08 + r * 2.5 + 0.3 * sin(r * 4.0 - t * 0.5);
-      float cs = cos(spiral), sn = sin(spiral);
-      p = vec2(p.x * cs - p.y * sn, p.x * sn + p.y * cs);
-
-      // ── Kaleidoscope fold ─────────────────────────────────────────────
+      // ── Kaleidoscope fold on tunnel walls ────────────────────────────
       float n = u_folds;
       vec2 kp = kaleidoscope(p, n);
-      kp = kaleidoscope(kp * 1.4, max(n - 1.0, 2.0));
+      // Second fold pass
+      kp = kaleidoscope(kp * 1.3 + vec2(t * 0.02, 0.0), max(n - 1.0, 2.0));
 
-      // ── Domain warping (ominous, slow) ───────────────────────────────
+      // ── Domain warping — layered along the tunnel ───────────────────
+      float warpScale = 1.5 + 0.5 * sin(depth * 0.3); // walls breathe
       vec2 q = vec2(
-        fbm(kp * 2.5 + t * 0.08 + u_seed),
-        fbm(kp * 2.5 + vec2(5.2, 1.3) + t * 0.06 + u_seed)
+        fbm(kp * warpScale + t * 0.06 + u_seed),
+        fbm(kp * warpScale + vec2(5.2, 1.3) + t * 0.05 + u_seed)
       );
       vec2 rr = vec2(
-        fbm(kp * 2.5 + q * 3.5 + vec2(1.7, 9.2) + t * 0.04),
-        fbm(kp * 2.5 + q * 3.5 + vec2(8.3, 2.8) + t * 0.05)
+        fbm(kp * warpScale + q * 3.0 + vec2(1.7, 9.2) + t * 0.03),
+        fbm(kp * warpScale + q * 3.0 + vec2(8.3, 2.8) + t * 0.04)
       );
+      float f = fbm(kp * warpScale + rr * 2.0);
 
-      float f = fbm(kp * 2.5 + rr * 2.5);
+      // ── Colour: ominous ember tunnel ────────────────────────────────
+      vec3 col = vec3(0.01, 0.004, 0.001);
 
-      // ── Ominous ember colour mapping ─────────────────────────────────
-      vec3 col = vec3(0.015, 0.006, 0.002);
-
-      // Smouldering glow — boosted
-      float ember = pow(f, 1.8) * 1.2;
+      // Main ember glow
+      float ember = pow(f, 1.6) * 1.4;
       col += u_col1 * ember;
 
-      // Hot cracks
-      float cracks = pow(max(f - 0.45, 0.0) * 4.0, 1.3);
-      col += u_col2 * cracks * 0.8;
+      // Hot cracks in the walls
+      float cracks = pow(max(f - 0.4, 0.0) * 3.5, 1.2);
+      col += u_col2 * cracks * 0.9;
 
-      // Deep heat radiance
-      col += u_col3 * pow(length(q) * 0.35, 1.8) * 0.25;
+      // Depth-based heat — deeper = more intense
+      float depthHeat = 0.5 + 0.5 * sin(depth * 0.7);
+      col += u_col3 * depthHeat * 0.15;
 
-      // Fold-line ember glow
+      // Fold lines glow like magma veins
       float edgeDist = length(kp - kaleidoscope(kp + vec2(0.001, 0.0), n));
-      col += u_col2 * 0.04 / (edgeDist + 0.008);
+      float veinGlow = 0.06 / (edgeDist + 0.01);
+      col += u_col2 * veinGlow * 0.6;
 
-      // Heavy radial vignette — darkness closing in
-      col *= 1.0 - 0.6 * pow(length(uv), 1.8);
+      // Speed lines — streaks rushing past
+      float streaks = abs(sin(depth * 8.0 + angle * 2.0));
+      streaks = pow(streaks, 8.0) * 0.12;
+      col += u_col1 * streaks;
 
-      // Mouse proximity — faint warmth
-      float md = length(uv - m * 0.25);
-      col += u_col1 * 0.06 * exp(-md * 4.0);
+      // Central glow — the "light at the end"
+      float centerGlow = 0.04 / max(screenR, 0.001);
+      col += vec3(0.6, 0.08, 0.01) * min(centerGlow, 1.5) * 0.15;
 
-      // Hyperbolic boundary glow — faint red at the rim of the disk
-      float boundaryGlow = exp(-pow(1.0 - length(uv), 0.3) * 0.5);
-      col += vec3(0.15, 0.02, 0.0) * boundaryGlow * 0.4;
+      // Radial vignette — tunnel edges dark
+      col *= 1.0 - 0.4 * pow(screenR, 2.0);
 
-      // Film grain for atmosphere
-      col += (hash(uv * u_res + fract(t * 100.0)) - 0.5) * 0.015;
+      // Fog with depth — far walls dimmer
+      float fog = exp(-depth * 0.08);
+      col *= 0.4 + 0.6 * fog;
 
-      // Crush blacks, dim highlights
-      col = pow(col, vec3(1.1));
-      col = col / (col + 0.35);
+      // Film grain
+      col += (hash(uv * u_res + fract(t * 100.0)) - 0.5) * 0.012;
+
+      // Tone mapping
+      col = pow(col, vec3(1.05));
+      col = col / (col + 0.3);
 
       gl_FragColor = vec4(col, 1.0);
     }
