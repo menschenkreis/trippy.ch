@@ -247,28 +247,34 @@ void main(){
     float h3 = clamp(trap*0.4, 0.0, 1.0);
     float h4 = fract(noise3(p*2.5 + t*0.12)*4.0);
 
-    // Heavy saturation boost
-    vec3 c1 = mix(vec3(dot(u_col1,vec3(0.299,0.587,0.114))), u_col1, 4.0);
-    vec3 c2 = mix(vec3(dot(u_col2,vec3(0.299,0.587,0.114))), u_col2, 4.0);
-    vec3 c3 = mix(vec3(dot(u_col3,vec3(0.299,0.587,0.114))), u_col3, 3.5);
+    // Rainbow hue shift based on position — dark rainbow, not pastel
+    float rainbow = fract(p.x*0.15 + p.y*0.1 + p.z*0.08 + t*0.06);
+    vec3 rainbowCol = 0.5 + 0.5*cos(6.2832*(rainbow + vec3(0.0,0.33,0.67)));
+    rainbowCol = pow(rainbowCol, vec3(1.5)) * 0.7; // darken rainbow
 
-    // Base colour — maximum vibrancy
-    col = c1 * (0.5 + 0.5*h1);
-    col = mix(col, c2*1.5, h2*0.65);
-    col = mix(col, c3*1.4, h3*0.55);
-    col = mix(col, c1*1.8+c2*1.2, h4*0.4);
+    // Moderate saturation — rich, not washed
+    vec3 c1 = mix(vec3(dot(u_col1,vec3(0.299,0.587,0.114))), u_col1, 2.0);
+    vec3 c2 = mix(vec3(dot(u_col2,vec3(0.299,0.587,0.114))), u_col2, 2.0);
+    vec3 c3 = mix(vec3(dot(u_col3,vec3(0.299,0.587,0.114))), u_col3, 1.8);
 
-    // Lighting — high contrast
-    col *= (0.3 + 0.7*diff1) * (0.55 + 0.45*ao);
-    col += c2 * diff2 * 0.4;
-    col += c2 * spec * 1.5;
-    col += c3 * fres * 0.7;
+    // Base — blend palette with dark rainbow
+    col = c1 * (0.3 + 0.4*h1);
+    col = mix(col, rainbowCol, 0.4); // inject rainbow
+    col = mix(col, c2*1.2, h2*0.5);
+    col = mix(col, c3*1.1, h3*0.4);
+    col = mix(col, rainbowCol*c1, h4*0.35);
 
-    // Emissive — punchy
+    // Lighting — darker, moodier
+    col *= (0.18 + 0.82*diff1) * (0.5 + 0.5*ao);
+    col += c2 * diff2 * 0.25;
+    col += c2 * spec * 1.2;
+    col += rainbowCol * fres * 0.5;
+
+    // Emissive — deep colours in cavities
     float cavity = 1.0-ao;
-    col += c1 * cavity * cavity * 1.0;
-    col += c2 * cavity * 0.5;
-    col += c3 * cavity * 0.4;
+    col += c1 * cavity * cavity * 0.7;
+    col += rainbowCol * cavity * 0.4;
+    col += c3 * cavity * 0.25;
 
     // Lighter fog — preserve colour
     float fog = 1.0-exp(-totalDist*0.025);
@@ -281,14 +287,16 @@ void main(){
   }
 
   // ── Post ─────────────────────────────────────────────────────────────
-  col *= 1.0-0.15*dot(uv,uv);
-  float ca = length(uv)*0.006;
+  col *= 1.0-0.2*dot(uv,uv);
+  float ca = length(uv)*0.005;
   col.r *= 1.0+ca; col.b *= 1.0-ca;
   col += (hash2(uv*u_res+fract(t*100.0))-0.5)*0.008;
-  // High contrast tone mapping
-  col = pow(max(col,vec3(0.0)),vec3(0.8));
-  col = col/(col+0.12);
-  col = pow(col, vec3(0.85));
+  // Dark, contrasty tone mapping — no white blowout
+  col = pow(max(col,vec3(0.0)),vec3(0.9));
+  col = col/(col+0.18);
+  col = pow(col, vec3(0.95));
+  // Clamp highlights so nothing goes white
+  col = min(col, vec3(0.92));
 
   gl_FragColor = vec4(col,1.0);
 }
