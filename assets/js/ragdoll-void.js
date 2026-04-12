@@ -362,21 +362,86 @@ function drawPolygon(cx, cy, radius, sides, rotation, alpha){
   ctx.stroke();
 }
 
+function drawKaleidoscope(cx, cy, radius, folds, rotation, hueOffset, alpha, parallaxY){
+  // Draw kaleidoscopic petals with iridescent colour
+  const a = theme.accent, a2 = theme.accent2;
+  for(let i=0;i<folds;i++){
+    const angle1 = i * TAU / folds + rotation;
+    const angle2 = (i + 0.5) * TAU / folds + rotation;
+    const hue = (hueOffset + i * (360/folds) + time*20) % 360;
+    const hue2 = (hue + 40) % 360;
+    const r1 = radius * (0.6 + 0.4*Math.sin(time*0.4 + i*0.8));
+    const r2 = radius * (0.4 + 0.3*Math.cos(time*0.3 + i*1.1));
+
+    // Petal glow
+    const grad = ctx.createRadialGradient(
+      cx + Math.cos(angle1)*r1*0.3, cy + Math.sin(angle1)*r1*0.3, 0,
+      cx, cy, radius
+    );
+    grad.addColorStop(0, `hsla(${hue},70%,55%,${alpha*1.5})`);
+    grad.addColorStop(0.5, `hsla(${hue2},60%,40%,${alpha*0.6})`);
+    grad.addColorStop(1, `hsla(${hue},50%,20%,0)`);
+    ctx.fillStyle = grad;
+
+    // Draw petal shape
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    const petalW = TAU / folds * 0.45;
+    const steps = 12;
+    for(let s=0;s<=steps;s++){
+      const t = s/steps;
+      const a = angle1 - petalW/2 + petalW * t;
+      const r = radius * Math.sin(t * PI) * (0.8 + 0.2*Math.sin(time*0.5+i));
+      ctx.lineTo(cx + Math.cos(a)*r, cy + Math.sin(a)*r);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Petal outline
+    ctx.strokeStyle = `hsla(${hue},80%,65%,${alpha*0.8})`;
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+  // Centre glow
+  const cGrad = ctx.createRadialGradient(cx,cy,0,cx,cy,radius*0.2);
+  cGrad.addColorStop(0, `hsla(${(hueOffset+time*30)%360},60%,60%,${alpha*2})`);
+  cGrad.addColorStop(1, `hsla(${(hueOffset+time*30)%360},60%,40%,0)`);
+  ctx.fillStyle = cGrad;
+  ctx.beginPath(); ctx.arc(cx,cy,radius*0.2,0,TAU); ctx.fill();
+}
+
 function drawBackground(){
   // Gradient background — screen-space
   const grad = ctx.createRadialGradient(W/2,H/2,0, W/2,H/2,Math.max(W,H)*0.7);
   grad.addColorStop(0, '#0e0e18');
   grad.addColorStop(1, theme.bg);
-  // Fill screen-space first (behind world)
   ctx.save();
-  ctx.setTransform(dpr,0,0,dpr,0,0); // screen space
+  ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.fillStyle = grad;
   ctx.fillRect(0,0,W,H);
   ctx.restore();
 
-  // Subtle grid — world space, scrolls with camera
+  // ── Parallax kaleidoscope layers (screen-space, different scroll speeds) ──
+  // Layer 1: far background — slowest parallax
+  const px1 = cameraY * 0.1;
+  drawKaleidoscope(W/2, H*0.5 - px1, 350, 6, time*0.03, 0, 0.03, px1);
+  drawKaleidoscope(W*0.2, H*0.3 - px1*0.8, 200, 8, -time*0.02, 120, 0.025, px1*0.8);
+  drawKaleidoscope(W*0.8, H*0.7 - px1*1.2, 250, 5, time*0.025, 240, 0.025, px1*1.2);
+
+  // Layer 2: mid — medium parallax
+  const px2 = cameraY * 0.3;
+  drawKaleidoscope(W*0.3, H*0.4 - px2, 180, 7, -time*0.04, 60, 0.04, px2);
+  drawKaleidoscope(W*0.7, H*0.6 - px2*0.7, 220, 6, time*0.035, 180, 0.035, px2*0.7);
+  drawKaleidoscope(W*0.5, H*0.2 - px2*1.3, 160, 9, -time*0.03, 300, 0.03, px2*1.3);
+
+  // Layer 3: near — fastest parallax (but still behind gameplay)
+  const px3 = cameraY * 0.5;
+  drawKaleidoscope(W*0.15, H*0.6 - px3, 140, 5, time*0.05, 90, 0.045, px3);
+  drawKaleidoscope(W*0.85, H*0.35 - px3*0.6, 170, 8, -time*0.045, 210, 0.04, px3*0.6);
+
+  // Subtle grid — world space
   const a = theme.accent;
-  ctx.strokeStyle = `rgba(${a[0]},${a[1]},${a[2]},0.03)`;
+  ctx.strokeStyle = `rgba(${a[0]},${a[1]},${a[2]},0.025)`;
   ctx.lineWidth = 0.5;
   const gridSize = 60;
   const startY = Math.floor(cameraY / gridSize) * gridSize;
@@ -387,16 +452,14 @@ function drawBackground(){
     ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
   }
 
-  // Sacred geometry — world space, scrolls
+  // Sacred geometry — world space, scrolls with gameplay
   const cx = W/2, cy = cameraY + H*0.5;
   const pulse = 0.7 + 0.3*Math.sin(time*0.3);
-
-  drawFlowerOfLife(cx, cy, 120*pulse, 0.04);
-  drawMetatronsCube(cx, cy, 180*pulse, 0.025);
-  drawGoldenSpiral(cx, cy, 250, time*0.1, 0.035);
-
+  drawFlowerOfLife(cx, cy, 120*pulse, 0.035);
+  drawMetatronsCube(cx, cy, 180*pulse, 0.02);
+  drawGoldenSpiral(cx, cy, 250, time*0.1, 0.03);
   for(let i=0;i<4;i++){
-    drawPolygon(cx, cy, 100+i*60, 3+i, time*0.05*(i%2===0?1:-1), 0.02+i*0.005);
+    drawPolygon(cx, cy, 100+i*60, 3+i, time*0.05*(i%2===0?1:-1), 0.015+i*0.004);
   }
 }
 
