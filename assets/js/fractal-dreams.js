@@ -1,6 +1,5 @@
 // Fractal Dreams — Evolving Julia set with theme-reactive colors
 // Infinite zoom with double-precision emulation + Shepard tone
-// Wave 1: Synesthesia (Audio-Visual) & Drift Mode
 (function () {
   const cfg = window.fractalDreamsConfig || {};
   const canvasId = cfg.canvasId || 'fractal-canvas';
@@ -24,8 +23,7 @@
   let themeColA = [0.49, 0.23, 0.93], themeColB = [0.18, 0.83, 0.75], themeColC = [0.93, 0.28, 0.60];
   let targetColA = [...themeColA], targetColB = [...themeColB], targetColC = [...themeColC];
 
-  let driftEnabled = false;
-  let audioPhase = 0.0;
+  let driftEnabled = false, audioPhase = 0.0;
 
   function resize() {
     const dpr = Math.min(window.devicePixelRatio, 1.5);
@@ -54,8 +52,9 @@
     'uniform vec2 res, mouse, centerHi, centerLo;',
     'uniform vec3 colA, colB, colC;',
     'void main(){',
-    '  vec2 coord = (centerHi + centerLo) + ((gl_FragCoord.xy - 0.5 * res) / min(res.x, res.y)) * pixelScale;',
-    '  float depthFactor = 1.0 / (1.0 + log2(max(pixelScale, 1.0)) * 0.1);',
+    '  vec2 pxOff = (gl_FragCoord.xy - 0.5 * res) / min(res.x, res.y);',
+    '  vec2 coord = (centerHi + centerLo) + pxOff * pixelScale;',
+    '  float depthFactor = 1.0 / (1.0 + log2(max(1.0, 1.0/pixelScale)) * 0.1);',
     '  float a = t * 0.04;',
     '  vec2 c = vec2(-0.7 + 0.28 * cos(a) + mouse.x * 0.12 * depthFactor, 0.27 + 0.22 * sin(a * 1.3) + mouse.y * 0.12 * depthFactor);',
     '  vec2 z = coord; float iter = 0.0;',
@@ -157,7 +156,7 @@
       const dist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
       const center = { x: (e.touches[0].clientX + e.touches[1].clientX)/2, y: (e.touches[0].clientY + e.touches[1].clientY)/2 };
       if (lastDist > 0) targetZoom = Math.max(1e-15, Math.min(1e15, targetZoom * (lastDist / dist)));
-      if (lastCenter) { targetPanX += (lastCenter.x - center.x) / (Math.min(W, H) / zoom); targetPanY -= (lastCenter.y - center.y) / (Math.min(W, H) / zoom); }
+      if (lastCenter) { targetPanX += (lastCenter.x - center.x) * (zoom / Math.min(W, H)); targetPanY -= (lastCenter.y - center.y) * (zoom / Math.min(W, H)); }
       lastDist = dist; lastCenter = center;
     }
   };
@@ -176,12 +175,12 @@
     smoothMouse[0] += (mouseTarget[0] - smoothMouse[0]) * 0.03; smoothMouse[1] += (mouseTarget[1] - smoothMouse[1]) * 0.03;
     for (let i=0; i<3; i++) { themeColA[i] += (targetColA[i]-themeColA[i])*0.02; themeColB[i] += (targetColB[i]-themeColB[i])*0.02; themeColC[i] += (targetColC[i]-themeColC[i])*0.02; }
 
-    prevZoom = zoom; zoom += (targetZoom - zoom) * Math.min(0.04 + Math.abs(Math.log(targetZoom/zoom)) * 0.15, 0.2);
+    prevZoom = zoom; zoom += (targetZoom - zoom) * 0.1;
     panX += (targetPanX - panX) * 0.1; panY += (targetPanY - panY) * 0.1;
 
     updateAudio(dt, (Math.log(zoom) - Math.log(prevZoom)) / dt);
 
-    const minRes = Math.min(W, H), pxScale = zoom / minRes;
+    const minRes = Math.min(W, H), pxScale = zoom;
     const cxHi = Math.fround(panX), cxLo = panX - cxHi, cyHi = Math.fround(panY), cyLo = panY - cyHi;
 
     gl.uniform1f(uT, ts*0.001); gl.uniform2f(uRes, W, H); gl.uniform2f(uMouse, smoothMouse[0], smoothMouse[1]);
