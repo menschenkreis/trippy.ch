@@ -34,6 +34,11 @@
   // Mouse influence on Julia constant (separate from pan)
   let mouseTarget = [0.5, 0.5], smoothMouse = [0.5, 0.5];
 
+  // Julia constant — computed in JS so we can scale drift with zoom depth.
+  // At deep zoom even 0.001 change in c rewires the whole fractal.
+  let juliaT = 0;          // own time accumulator (decoupled from render time)
+  let juliaCX = -0.745, juliaCY = 0.110;  // live value sent to shader
+
   // Morph energy (tap burst)
   let morphEnergy = 0.0, targetMorphEnergy = 0.0;
 
@@ -116,6 +121,7 @@
   const fsSrc = `
 precision highp float;
 uniform float t, zoom, audioPhase, morphEnergy, maxIter;
+uniform vec2 juliaC;
 uniform vec2 res, mouse;
 uniform vec2 centre;          // fractal-space centre
 uniform vec3 colA, colB, colC;
@@ -128,12 +134,8 @@ void main(){
   // Flip Y so +Y is up
   coord.y = centre.y - (gl_FragCoord.y - res.y * 0.5) * (zoom / minSide);
 
-  // Julia constant: slow drift + subtle mouse influence
-  float a = t * 0.025 + morphEnergy * 0.5;
-  vec2 c = vec2(
-    -0.745 + 0.045 * cos(a)      + (mouse.x - 0.5) * 0.06,
-     0.110 + 0.045 * sin(a*1.3)  + (mouse.y - 0.5) * 0.06
-  );
+  // Julia constant passed from JS (pre-scaled for current zoom depth)
+  vec2 c = juliaC;
 
   vec2 z = coord;
   float iter = 0.0;
@@ -204,6 +206,7 @@ void main(){
   gl.vertexAttribPointer(pLoc, 2, gl.FLOAT, false, 0, 0);
 
   const uT         = gl.getUniformLocation(prog, 't');
+  const uJuliaC    = gl.getUniformLocation(prog, 'juliaC');
   const uRes       = gl.getUniformLocation(prog, 'res');
   const uMouse     = gl.getUniformLocation(prog, 'mouse');
   const uZoom      = gl.getUniformLocation(prog, 'zoom');
@@ -494,9 +497,8 @@ void main(){
     const now    = performance.now() * 0.001;
     const scoreI = Math.min(100, Math.max(35, Math.round(35 + Math.log2(3.0 / Math.max(zoom, 1e-14)) * 5)));
     // Mirror the shader's Julia constant at this moment
-    const a   = now * 0.025;
-    const c0x = -0.745 + 0.045 * Math.cos(a)       + (smoothMouse[0] - 0.5) * 0.06;
-    const c0y =  0.110 + 0.045 * Math.sin(a * 1.3)  + (smoothMouse[1] - 0.5) * 0.06;
+    const c0x = juliaCX;
+    const c0y = juliaCY;
 
     const N      = 12;
     const probeR = zoom * 0.5; // probe ring at 50% of visible half-width
@@ -597,6 +599,19 @@ void main(){
     morphEnergy       += (targetMorphEnergy - morphEnergy) * 0.06;
     targetMorphEnergy *= Math.pow(0.2, dt);
 
+    // ── Julia constant — zoom-scaled drift ───────────────────────────────────
+    // driftScale: 1.0 at overview (zoom>=1), shrinks to ~0 at deep zoom.
+    // This keeps c visually stable — perturbations never exceed ~1 screen unit.
+    const driftScale = Math.min(1.0, zoom * 1.5);
+    juliaT += dt * driftScale;
+    // Slow sinusoidal drift, amplitude scales with zoom so visual shift is constant
+    const jDrift = 0.045 * driftScale;
+    const jMouse = 0.05  * driftScale;
+    juliaCX = -0.745 + jDrift * Math.cos(juliaT * 0.25)
+                     + (smoothMouse[0] - 0.5) * jMouse;
+    juliaCY =  0.110 + jDrift * Math.sin(juliaT * 0.25 * 1.3)
+                     + (smoothMouse[1] - 0.5) * jMouse;
+
     // ── Audio ────────────────────────────────────────────────────────────────
     updateAudio(dt);
 
@@ -605,6 +620,7 @@ void main(){
 
     // ── Draw ─────────────────────────────────────────────────────────────────
     gl.uniform1f(uT,       ts * 0.001);
+    gl.uniform2f(uJuliaC,  juliaCX, juliaCY);
     gl.uniform2f(uRes,     W, H);
     gl.uniform2f(uMouse,   smoothMouse[0], smoothMouse[1]);
     gl.uniform1f(uZoom,    zoom);
