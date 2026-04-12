@@ -29,8 +29,8 @@ uniform vec3  u_col2;
 uniform vec3  u_col3;
 uniform float u_seed;
 
-#define MAX_STEPS 80
-#define MAX_DIST  60.0
+#define MAX_STEPS 64
+#define MAX_DIST  50.0
 #define SURF_DIST 0.002
 
 mat2 rot2(float a){ float s=sin(a),c=cos(a); return mat2(c,-s,s,c); }
@@ -134,7 +134,7 @@ float scene(vec3 p, float t){
 }
 
 vec3 getNormal(vec3 p){
-  vec2 e=vec2(0.001,0);
+  vec2 e=vec2(0.002,0);
   return normalize(vec3(
     scene(p+e.xyy,u_time)-scene(p-e.xyy,u_time),
     scene(p+e.yxy,u_time)-scene(p-e.yxy,u_time),
@@ -248,27 +248,27 @@ void main(){
     float h4 = fract(noise3(p*2.5 + t*0.12)*4.0);
 
     // Heavy saturation boost
-    vec3 c1 = mix(vec3(dot(u_col1,vec3(0.299,0.587,0.114))), u_col1, 3.0);
-    vec3 c2 = mix(vec3(dot(u_col2,vec3(0.299,0.587,0.114))), u_col2, 3.0);
-    vec3 c3 = mix(vec3(dot(u_col3,vec3(0.299,0.587,0.114))), u_col3, 2.5);
+    vec3 c1 = mix(vec3(dot(u_col1,vec3(0.299,0.587,0.114))), u_col1, 4.0);
+    vec3 c2 = mix(vec3(dot(u_col2,vec3(0.299,0.587,0.114))), u_col2, 4.0);
+    vec3 c3 = mix(vec3(dot(u_col3,vec3(0.299,0.587,0.114))), u_col3, 3.5);
 
-    // Base colour — full strength, high contrast mixing
-    col = c1 * (0.4 + 0.6*h1);
-    col = mix(col, c2*1.3, h2*0.6);
-    col = mix(col, c3*1.2, h3*0.5);
-    col = mix(col, c1*1.5+c2*1.0, h4*0.35);
+    // Base colour — maximum vibrancy
+    col = c1 * (0.5 + 0.5*h1);
+    col = mix(col, c2*1.5, h2*0.65);
+    col = mix(col, c3*1.4, h3*0.55);
+    col = mix(col, c1*1.8+c2*1.2, h4*0.4);
 
-    // Lighting — brighter ambient, stronger diffuse
-    col *= (0.25 + 0.75*diff1) * (0.6 + 0.4*ao);
-    col += c2 * diff2 * 0.35;
-    col += c2 * spec * 1.2;
-    col += c3 * fres * 0.6;
+    // Lighting — high contrast
+    col *= (0.3 + 0.7*diff1) * (0.55 + 0.45*ao);
+    col += c2 * diff2 * 0.4;
+    col += c2 * spec * 1.5;
+    col += c3 * fres * 0.7;
 
-    // Emissive — stronger
+    // Emissive — punchy
     float cavity = 1.0-ao;
-    col += c1 * cavity * cavity * 0.8;
-    col += c2 * cavity * 0.4;
-    col += c3 * cavity * 0.3;
+    col += c1 * cavity * cavity * 1.0;
+    col += c2 * cavity * 0.5;
+    col += c3 * cavity * 0.4;
 
     // Lighter fog — preserve colour
     float fog = 1.0-exp(-totalDist*0.025);
@@ -281,14 +281,14 @@ void main(){
   }
 
   // ── Post ─────────────────────────────────────────────────────────────
-  col *= 1.0-0.2*dot(uv,uv);
-  float ca = length(uv)*0.005;
+  col *= 1.0-0.15*dot(uv,uv);
+  float ca = length(uv)*0.006;
   col.r *= 1.0+ca; col.b *= 1.0-ca;
-  col += (hash2(uv*u_res+fract(t*100.0))-0.5)*0.01;
-  // Brighter tone mapping
-  col = pow(max(col,vec3(0.0)),vec3(0.85));
-  col = col/(col+0.15);
-  col = pow(col, vec3(0.88));
+  col += (hash2(uv*u_res+fract(t*100.0))-0.5)*0.008;
+  // High contrast tone mapping
+  col = pow(max(col,vec3(0.0)),vec3(0.8));
+  col = col/(col+0.12);
+  col = pow(col, vec3(0.85));
 
   gl_FragColor = vec4(col,1.0);
 }
