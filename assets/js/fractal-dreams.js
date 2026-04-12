@@ -467,6 +467,61 @@ void main(){
 
   // ── Drift mode ─────────────────────────────────────────────────────────────
   let driftT = 0;
+  let driftVx = 0, driftVy = 0;       // smooth drift velocity (fractal units/s)
+  let driftSteerX = 0, driftSteerY = 0; // target steering direction
+  let lastSampleTs = -9999;
+
+  // Score how "boundary-interesting" a fractal-space point is.
+  // Returns a 0-1 value peaking at the Julia set edge band.
+  function juliaInterest(px, py, c0x, c0y, maxI) {
+    let zx = px, zy = py, i = 0;
+    while (i < maxI) {
+      const zx2 = zx * zx, zy2 = zy * zy;
+      if (zx2 + zy2 > 256) break;
+      zy = 2 * zx * zy + c0y;
+      zx = zx2 - zy2 + c0x;
+      i++;
+    }
+    if (i >= maxI) return 0; // solid interior
+    const sl = i - Math.log2(Math.log2(zx * zx + zy * zy)) + 4;
+    const t  = sl / maxI;
+    return t < 0.01 ? 0 : 4 * t * (1 - t); // bell curve, peaks near boundary
+  }
+
+  // Sample candidate positions around the current centre, steer toward the
+  // most boundary-rich direction. Called at ~4 Hz during auto-drift.
+  function updateDriftSteering() {
+    const now    = performance.now() * 0.001;
+    const scoreI = Math.min(100, Math.max(35, Math.round(35 + Math.log2(3.0 / Math.max(zoom, 1e-14)) * 5)));
+    // Mirror the shader's Julia constant at this moment
+    const a   = now * 0.025;
+    const c0x = -0.745 + 0.045 * Math.cos(a)       + (smoothMouse[0] - 0.5) * 0.06;
+    const c0y =  0.110 + 0.045 * Math.sin(a * 1.3)  + (smoothMouse[1] - 0.5) * 0.06;
+
+    const N      = 12;
+    const probeR = zoom * 0.5; // probe ring at 50% of visible half-width
+    let   bestScore = -1, bestAngle = 0;
+
+    for (let k = 0; k < N; k++) {
+      const angle = (k / N) * Math.PI * 2;
+      const s = juliaInterest(tcx + Math.cos(angle) * probeR,
+                              tcy + Math.sin(angle) * probeR,
+                              c0x, c0y, scoreI);
+      if (s > bestScore) { bestScore = s; bestAngle = angle; }
+    }
+
+    if (bestScore < 0.04) {
+      // Completely void — zoom out and drift back toward the interesting region
+      tzoom = Math.min(tzoom * 2.5, 3.0);
+      driftSteerX = (-0.5 - tcx) * 0.5;
+      driftSteerY = ( 0.0 - tcy) * 0.5;
+    } else {
+      // Steer gently toward the best edge direction
+      driftSteerX = Math.cos(bestAngle) * probeR * 0.25;
+      driftSteerY = Math.sin(bestAngle) * probeR * 0.25;
+    }
+  }
+
 
   // ── Render loop ────────────────────────────────────────────────────────────
   function frame(ts) {
@@ -478,10 +533,25 @@ void main(){
     // ── Drift mode ───────────────────────────────────────────────────────────
     if (driftEnabled && !interacting) {
       driftT += dt;
-      tzoom *= Math.pow(0.986, dt * 60);
-      if (tzoom < 3e-8) { tzoom = 3.0; tcx = -0.5; tcy = 0.0; }
-      tcx += Math.sin(driftT * 0.07) * zoom * 0.0003;
-      tcy += Math.cos(driftT * 0.11) * zoom * 0.0003;
+
+      // Re-sample steering every ~250 ms
+      if (driftT - lastSampleTs > 0.25) {
+        lastSampleTs = driftT;
+        updateDriftSteering();
+      }
+
+      // Smooth velocity toward the steering target
+      const steerStrength = 1.2;
+      driftVx += (driftSteerX * steerStrength - driftVx) * Math.min(dt * 1.5, 1);
+      driftVy += (driftSteerY * steerStrength - driftVy) * Math.min(dt * 1.5, 1);
+
+      // Advance position
+      tcx += driftVx * dt;
+      tcy += driftVy * dt;
+
+      // Slow zoom — follows boundary depth naturally
+      tzoom *= Math.pow(0.987, dt * 60);
+      if (tzoom < 1e-8) { tzoom = 3.0; tcx = -0.5; tcy = 0.0; driftVx = 0; driftVy = 0; lastSampleTs = -9999; }
     }
 
     // ── Inertia ──────────────────────────────────────────────────────────────
