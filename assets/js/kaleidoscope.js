@@ -75,27 +75,25 @@
       return vec2(cos(a), sin(a)) * r;
     }
 
-    // ── Poincaré disk: hyperbolic conformal map ───────────────────────
-    // Maps Euclidean disk → hyperbolic plane, making edges stretch to
-    // infinity. The exponent controls curvature strength.
-    vec2 poincareWarp(vec2 p, float curvature, float t) {
+    // ── Poincaré-style hyperbolic warp ──────────────────────────────────
+    // Soft exponential stretch that mimics hyperbolic distance
+    // without blowing up at the boundary
+    vec2 hyperWarp(vec2 p, float t) {
       float r = length(p);
       if (r < 0.0001) return p;
-      // Hyperbolic distance: asinh-based stretch, stronger near boundary
-      float hDist = asinh(r / max(0.001, curvature)) / curvature;
-      // Breathing curvature
-      float breathe = curvature * (1.0 + 0.15 * sin(t * 0.4) * sin(r * 2.0 - t * 0.3));
-      hDist = asinh(r / max(0.001, breathe)) / max(0.001, breathe);
+      // Hyperbolic-like stretch: log(1+r) pushes detail outward
+      float hR = log(1.0 + r * 3.0) * 1.2;
+      // Breathing pulse
+      hR *= 1.0 + 0.1 * sin(t * 0.4 + r * 2.0);
       vec2 dir = p / r;
-      return dir * hDist;
+      return dir * hR;
     }
 
-    // Möbius transformation — the isometry of the Poincaré disk
-    vec2 mobius(vec2 z, vec2 a) {
-      float a2 = dot(a, a);
-      vec2 num = vec2(z.x - a.x, z.y - a.y);
-      float den = 1.0 - 2.0 * (a.x * z.x + a.y * z.y) + a2 * dot(z, z);
-      return num / max(den, 0.001);
+    // Soft Möbius-like shift — keeps values bounded
+    vec2 softMobius(vec2 z, vec2 a) {
+      vec2 diff = z - a;
+      float den = 1.0 - dot(a, z);
+      return diff / max(abs(den), 0.15) * sign(den);
     }
 
     void main() {
@@ -106,14 +104,12 @@
       // Mouse influence
       vec2 m = (u_mouse - 0.5) * 0.35;
 
-      // ── Hyperbolic (Poincaré disk) transform ─────────────────────────
-      // First, map into Poincaré disk with strong curvature
-      float curv = 0.25;
-      vec2 p = poincareWarp(uv + m * 0.25, curv, t);
+      // ── Hyperbolic warp ─────────────────────────────────────────────
+      vec2 p = hyperWarp(uv + m * 0.25, t);
 
-      // Möbius shift — moves the "centre" of hyperbolic space
-      vec2 mShift = vec2(0.15 * sin(t * 0.13), 0.15 * cos(t * 0.11));
-      p = mobius(p, mShift);
+      // Möbius-like shift for non-Euclidean feel
+      vec2 mShift = vec2(0.12 * sin(t * 0.13), 0.12 * cos(t * 0.11));
+      p = softMobius(p, mShift);
 
       // Poincaré geodesic spiral — rotation accelerates with hyperbolic distance
       float r = length(p);
@@ -139,19 +135,18 @@
       float f = fbm(kp * 2.5 + rr * 2.5);
 
       // ── Ominous ember colour mapping ─────────────────────────────────
-      // Base: deep black
-      vec3 col = vec3(0.01, 0.005, 0.0);
+      vec3 col = vec3(0.015, 0.006, 0.002);
 
-      // Faint smouldering glow
-      float ember = pow(f, 2.5) * 0.6;
+      // Smouldering glow — boosted
+      float ember = pow(f, 1.8) * 1.2;
       col += u_col1 * ember;
 
-      // Hot cracks — sharp highlights
-      float cracks = pow(max(f - 0.55, 0.0) * 5.0, 1.5);
-      col += u_col2 * cracks * 0.5;
+      // Hot cracks
+      float cracks = pow(max(f - 0.45, 0.0) * 4.0, 1.3);
+      col += u_col2 * cracks * 0.8;
 
       // Deep heat radiance
-      col += u_col3 * pow(length(q) * 0.3, 2.0) * 0.15;
+      col += u_col3 * pow(length(q) * 0.35, 1.8) * 0.25;
 
       // Fold-line ember glow
       float edgeDist = length(kp - kaleidoscope(kp + vec2(0.001, 0.0), n));
