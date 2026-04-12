@@ -379,7 +379,7 @@ void main(){
 
     } else if (e.touches.length === 2) {
       touchState = 'pinch';
-      vx = 0; vy = 0;
+      vx = 0; vy = 0; touchVelX = 0; touchVelY = 0;
       const a = e.touches[0], b = e.touches[1];
       lastPinchDist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
       lastPinchMidX = (a.clientX + b.clientX) * 0.5;
@@ -431,15 +431,24 @@ void main(){
   }, { passive: false });
 
   canvas.addEventListener('touchend', e => {
-    if (touchState === 'drag' && e.touches.length === 0) {
+    const wasState = touchState;
+    touchState = e.touches.length >= 2 ? 'pinch' : (e.touches.length === 1 ? 'drag' : 'idle');
+
+    // Only apply inertia when a clean single-finger drag lifts off completely.
+    // If we were pinching at any point, kill velocity — pinch finger velocities
+    // are noisy and cause the canvas to fly away.
+    if (wasState === 'drag' && touchState === 'idle') {
       const minSide = Math.min(window.innerWidth, window.innerHeight);
       const speed = Math.hypot(touchVelX, touchVelY);
       if (speed > 2) {
         vx = -(touchVelX / minSide) * zoom * 60;
         vy = -(touchVelY / minSide) * zoom * 60;
       }
+    } else {
+      // Pinch ended or finger count changed — always kill inertia
+      vx = 0; vy = 0;
+      touchVelX = 0; touchVelY = 0;
     }
-    touchState = e.touches.length >= 2 ? 'pinch' : (e.touches.length === 1 ? 'drag' : 'idle');
   }, { passive: true });
 
   // ── Drift mode ─────────────────────────────────────────────────────────────
