@@ -211,66 +211,91 @@ void main(){
   const uColB = gl.getUniformLocation(prog, 'colB');
   const uColC = gl.getUniformLocation(prog, 'colC');
 
-  // ── Shepard Tone Audio Engine ──
+  // ── Shepard Tone Audio Engine (constant descending, like fallingfalling.com) ──
   let audioCtx = null;
   let shepardGain = null;
   let shepardOscillators = [];
   let shepardFilters = [];
   let shepardPhase = 0;
-  const NUM_VOICES = 6;
-  const BASE_FREQ = 55;
+  let audioStartTime = 0;
+  const NUM_VOICES = 8;
+  const BASE_FREQ = 55; // A1
+  const DESCENT_RATE = 0.08; // octaves per second — slow, hypnotic fall
 
   function initAudio() {
     if (audioCtx) return;
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      audioStartTime = audioCtx.currentTime;
+
       shepardGain = audioCtx.createGain();
       shepardGain.gain.value = 0;
+      // Fade in gently over 3 seconds
+      shepardGain.gain.setTargetAtTime(0.06, audioCtx.currentTime, 1.5);
       shepardGain.connect(audioCtx.destination);
 
+      // Warm lowpass — keeps it muffled and dreamy
       const masterFilter = audioCtx.createBiquadFilter();
       masterFilter.type = 'lowpass';
-      masterFilter.frequency.value = 800;
-      masterFilter.Q.value = 0.7;
+      masterFilter.frequency.value = 600;
+      masterFilter.Q.value = 0.5;
       masterFilter.connect(shepardGain);
 
+      // Spread voices across 5 octaves
       for (let i = 0; i < NUM_VOICES; i++) {
         const osc = audioCtx.createOscillator();
         osc.type = 'sine';
-        const gain = audioCtx.createGain();
+
+        const voiceGain = audioCtx.createGain();
+        // Gaussian bell — voices in the middle are loudest, edges fade
         const norm = i / (NUM_VOICES - 1);
         const bell = Math.exp(-Math.pow((norm - 0.5) * 3.5, 2));
-        gain.gain.value = 0.04 * bell;
-        osc.connect(gain);
-        gain.connect(masterFilter);
+        voiceGain.gain.value = 0.035 * bell;
+
+        osc.connect(voiceGain);
+        voiceGain.connect(masterFilter);
         osc.start();
+
         shepardOscillators.push(osc);
-        shepardFilters.push(gain);
+        shepardFilters.push(voiceGain);
       }
     } catch (e) {}
   }
 
   function updateShepard(velocity, dt) {
     if (!audioCtx || !shepardGain) return;
+
+    // Always descend — zoom speed modulates rate and volume
     const absVel = Math.min(Math.abs(velocity), 5);
-    const direction = velocity > 0 ? 1 : -1;
-    shepardPhase += direction * absVel * dt * 0.3;
+    const speed = DESCENT_RATE + absVel * 0.15;
+
+    // Descend the phase
+    shepardPhase -= speed * dt;
     shepardPhase = shepardPhase % 1;
     if (shepardPhase < 0) shepardPhase += 1;
+
     const phaseOffset = shepardPhase * BASE_FREQ;
+
     for (let i = 0; i < NUM_VOICES; i++) {
-      let freq = BASE_FREQ * Math.pow(2, i / (NUM_VOICES - 1) * 4) + phaseOffset;
-      const minF = BASE_FREQ;
-      const maxF = BASE_FREQ * 32;
+      let freq = BASE_FREQ * Math.pow(2, i / (NUM_VOICES - 1) * 5) + phaseOffset;
+      const minF = BASE_FREQ * 0.5;
+      const maxF = BASE_FREQ * 64;
       while (freq > maxF) freq /= 2;
       while (freq < minF) freq *= 2;
-      shepardOscillators[i].frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.1);
-      const normPos = Math.log2(freq / minF) / 5;
+
+      shepardOscillators[i].frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.15);
+
+      // Bell envelope — voices at the edges of the range are quiet
+      const normPos = Math.log2(freq / minF) / 7;
       const bell = Math.exp(-Math.pow((normPos - 0.5) * 3.2, 2));
-      shepardFilters[i].gain.setTargetAtTime(0.04 * bell, audioCtx.currentTime, 0.15);
+      shepardFilters[i].gain.setTargetAtTime(0.035 * bell, audioCtx.currentTime, 0.2);
     }
-    const targetVol = Math.min(absVel * 0.08, 0.12);
-    shepardGain.gain.setTargetAtTime(targetVol, audioCtx.currentTime, 0.3);
+
+    // Volume: always audible, louder when zooming
+    const baseVol = 0.05;
+    const activeVol = Math.min(absVel * 0.06, 0.10);
+    const targetVol = baseVol + activeVol;
+    shepardGain.gain.setTargetAtTime(targetVol, audioCtx.currentTime, 0.5);
   }
 
   // ── Input ──
@@ -283,6 +308,7 @@ void main(){
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
     ensureAudio();
+    audioCtx && audioCtx.resume();
     const factor = e.deltaY > 0 ? 1.1 : 0.9;
     targetZoom *= factor;
     targetZoom = Math.max(0.0001, Math.min(1e8, targetZoom));
@@ -293,8 +319,9 @@ void main(){
   let isPinching = false;
 
   canvas.addEventListener('touchstart', e => {
+    ensureAudio();
+    audioCtx && audioCtx.resume();
     if (e.touches.length === 2) {
-      ensureAudio();
       isPinching = true;
       const dx = e.touches[1].clientX - e.touches[0].clientX;
       const dy = e.touches[1].clientY - e.touches[0].clientY;
