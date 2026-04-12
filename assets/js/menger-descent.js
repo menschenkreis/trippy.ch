@@ -33,7 +33,7 @@ uniform vec3  u_col3;
 uniform float u_seed;
 
 #define MAX_STEPS 120
-#define MAX_DIST  50.0
+#define MAX_DIST  100.0
 #define SURF_DIST 0.0005
 
 mat2 rot(float a){ float s=sin(a),c=cos(a); return mat2(c,-s,s,c); }
@@ -115,15 +115,68 @@ float softShadow(vec3 ro, vec3 rd, float mint, float maxt, float k) {
 float hash21(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
+float hash31(vec3 p) {
+  return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+}
+
+// ── Starfield skybox ───────────────────────────────────────────────────
+vec3 starfield(vec3 rd, float t) {
+  vec3 col = vec3(0.0);
+
+  // Deep space gradient
+  col = mix(vec3(0.01, 0.005, 0.02), vec3(0.0, 0.0, 0.01), max(rd.y, 0.0));
+
+  // Nebula glow — soft coloured clouds
+  float neb1 = smoothstep(0.0, 0.5, sin(rd.x * 3.0 + rd.z * 2.0) * cos(rd.y * 4.0 + 1.0));
+  float neb2 = smoothstep(0.0, 0.4, sin(rd.x * 5.0 - rd.y * 3.0) * sin(rd.z * 4.0 + 2.0));
+  col += vec3(0.04, 0.01, 0.06) * neb1 * 0.5;
+  col += vec3(0.01, 0.03, 0.06) * neb2 * 0.4;
+
+  // Stars — multiple layers for depth
+  for (int layer = 0; layer < 3; layer++) {
+    float scale = 80.0 + float(layer) * 120.0;
+    vec3 grid = rd * scale;
+    vec3 id = floor(grid);
+    vec3 f = fract(grid) - 0.5;
+
+    // Random per star
+    float h = hash31(id + float(layer) * 100.0);
+
+    // Star brightness — power distribution, few bright ones
+    float brightness = pow(h, 5.0) * 1.5;
+
+    // Twinkle
+    brightness *= 0.7 + 0.3 * sin(t * (1.0 + h * 3.0) + h * 100.0);
+
+    // Colour — slight variation per star
+    vec3 starCol = mix(vec3(0.8, 0.85, 1.0), mix(vec3(1.0, 0.8, 0.6), vec3(0.6, 0.7, 1.0), h), step(0.5, h));
+
+    // Point-like falloff
+    float dist = length(f);
+    float star = smoothstep(0.1, 0.0, dist) * brightness;
+
+    // Bright stars get a subtle cross/spike
+    if (h > 0.92) {
+      float spike = min(
+        smoothstep(0.3, 0.0, abs(f.x)) + smoothstep(0.3, 0.0, abs(f.y)),
+        1.0
+      ) * 0.3;
+      star += spike * brightness;
+    }
+
+    col += starCol * star;
+  }
+
+  return col;
+}
 
 void main() {
   vec2 uv = (gl_FragCoord.xy - 0.5 * u_res) / min(u_res.x, u_res.y);
   float t = u_time;
 
-  // ── Camera ────────────────────────────────────────────────────────────
-  // Fly along Z axis, descending through the sponge
-  float camZ = -t * 0.4 * u_speed;
-  vec3 ro = vec3(0.0, 0.0, camZ);
+  // ── Camera — zooming IN to the sponge centre ────────────────────────
+  float camDist = max(3.0 - t * 0.15 * u_speed, 0.08); // approaches zero, never reaches
+  vec3 ro = vec3(0.0, 0.0, camDist);
 
   // Mouse steers look direction
   vec2 m = (u_mouse - 0.5);
@@ -136,18 +189,22 @@ void main() {
     pitch = sin(t * 0.11) * 0.3 + cos(t * 0.09) * 0.15;
   }
 
-  // Look direction
-  vec3 rd = normalize(vec3(
-    sin(yaw) * cos(pitch),
-    sin(pitch),
-    cos(yaw) * cos(pitch)
+  // Look direction — toward centre (0,0,0)
+  vec3 target = vec3(0.0);
+  vec3 forward = normalize(target - ro);
+
+  // Apply yaw/pitch as camera orientation around the look direction
+  forward = normalize(vec3(
+    forward.x * cos(yaw) - forward.z * sin(yaw),
+    forward.y + sin(pitch) * 0.3,
+    forward.x * sin(yaw) + forward.z * cos(yaw)
   ));
 
   // Camera matrix
-  vec3 ww = normalize(rd);
+  vec3 ww = normalize(forward);
   vec3 uu = normalize(cross(ww, vec3(0.0, 1.0, 0.0)));
   vec3 vv = cross(uu, ww);
-  rd = normalize(uv.x * uu + uv.y * vv + 1.5 * ww);
+  vec3 rd = normalize(uv.x * uu + uv.y * vv + 1.5 * ww);
 
   // ── Ray March ─────────────────────────────────────────────────────────
   float totalDist = 0.0;
@@ -221,13 +278,12 @@ void main() {
     col = mix(col, fogCol, fog * fog);
 
   } else {
-    // Missed — background void
-    float bgGlow = exp(-totalDist * 0.05);
-    col = u_col3 * 0.03 * bgGlow;
+    // Missed — starfield skybox
+    col = starfield(rd, t);
 
-    // Subtle stars
-    float stars = pow(hash21(floor(uv * 200.0 + u_seed)), 20.0) * 0.3;
-    col += stars;
+    // Subtle sponge glow on the horizon
+    float horizonGlow = exp(-totalDist * 0.03);
+    col += u_col3 * 0.08 * horizonGlow;
   }
 
   // ── Post-processing ───────────────────────────────────────────────────
