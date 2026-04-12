@@ -377,6 +377,85 @@ footer a:hover { color: var(--pink); }
 .exp-card .tag { color: var(--teal); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; }
 .exp-card p { color: var(--fg-muted); margin-top: 0.8rem; font-size: 0.95rem; }
 
+/* Experiment Fullscreen View */
+.experiment-view {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.experiment-view #cosmic-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+.experiment-overlay {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100vh;
+  padding: 1.5rem;
+  pointer-events: none;
+}
+
+.experiment-overlay a,
+.experiment-overlay .exp-info {
+  pointer-events: auto;
+}
+
+.experiment-overlay .exp-back {
+  display: inline-block;
+  color: var(--fg-muted);
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  transition: opacity 0.3s, color 0.3s;
+}
+.experiment-overlay .exp-back:hover {
+  opacity: 1;
+  color: var(--teal);
+}
+
+.experiment-overlay .exp-info {
+  max-width: 480px;
+}
+.experiment-overlay .exp-info h1 {
+  font-size: clamp(1.8rem, 5vw, 3rem);
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 40px var(--purple-glow);
+ margin-bottom: 0.5rem;
+  transition: var(--transition-colors);
+}
+.experiment-overlay .exp-info p {
+  color: var(--fg-muted);
+  font-size: 1rem;
+  line-height: 1.6;
+  transition: var(--transition-colors);
+}
+.experiment-overlay .exp-info .tag {
+  color: var(--teal);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.experiment-overlay .exp-source {
+  display: inline-block;
+  color: var(--fg-muted);
+  font-size: 0.85rem;
+  opacity: 0.6;
+  transition: opacity 0.3s, color 0.3s;
+  align-self: flex-end;
+}
+.experiment-overlay .exp-source:hover {
+  opacity: 1;
+  color: var(--purple);
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .scroll-hint { animation: none; }

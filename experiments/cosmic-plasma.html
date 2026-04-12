@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cosmic Plasma — trippy.ch</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body class="experiment-view">
+  <div id="page-transition" class="page-transition"></div>
+  <button id="contrast-btn" title="Toggle high contrast">LC</button>
+  <button id="theme-btn" title="Randomize theme">✦</button>
+
+  <canvas id="cosmic-canvas"></canvas>
+
+  <div class="experiment-overlay">
+    <a href="../experiments.html" class="exp-back">↞ experiments</a>
+    <div class="exp-info">
+      <span class="tag">webgl · shader</span>
+      <h1>Cosmic Plasma</h1>
+      <p>A slowly morphing fractal plasma field that breathes with layered noise. Move your finger or cursor to warp the field.</p>
+    </div>
+    <a href="https://github.com/menschenkreis/trippy.ch" class="exp-source" target="_blank" rel="noopener">view source ↗</a>
+  </div>
+
+<script>window.cosmicPlasmaConfig = { fullscreen: true, showInfo: true };</script>
+<script src="../assets/js/cosmic-plasma.js"></script>
+<script src="../assets/js/main.js"></script>
+<script>document.getElementById('page-transition').classList.add('is-active');requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('page-transition').classList.remove('is-active')));</script>
+</body>
+</html>
