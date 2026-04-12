@@ -7,6 +7,9 @@
   <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
+  <div id="page-transition" class="page-transition"></div>
+  <button id="contrast-btn" title="Toggle high contrast">LC</button>
+  <button id="theme-btn" title="Randomize theme">✦</button>
   <article class="blog-post">
     <a href="../blog.html" class="back-link">↞ all insights</a>
     <h1>A Collaboration Between Human and Machine</h1>
@@ -34,5 +37,7 @@
   <footer>
     <p><a href="../index.html">trippy.ch</a></p>
   </footer>
+<script src="../assets/js/main.js"></script>
+  <script>document.getElementById('page-transition').classList.add('is-active');requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('page-transition').classList.remove('is-active')));</script>
 </body>
 </html>

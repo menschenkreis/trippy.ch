@@ -7,6 +7,9 @@
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
+  <div id="page-transition" class="page-transition"></div>
+  <button id="contrast-btn" title="Toggle high contrast">LC</button>
+  <button id="theme-btn" title="Randomize theme">✦</button>
   <section class="hero">
     <canvas id="cosmic-canvas"></canvas>
     <div class="hero-content">
@@ -37,5 +40,6 @@
   </footer>
 
   <script src="assets/js/main.js"></script>
+  <script>document.getElementById('page-transition').classList.add('is-active');requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('page-transition').classList.remove('is-active')));</script>
 </body>
 </html>
