@@ -313,8 +313,10 @@ void main(){
       dragLastX = e.clientX; dragLastY = e.clientY;
       // Mouse influence on Julia (when not dragging it's the raw pointer)
     } else {
-      mouseTarget[0] = e.clientX / window.innerWidth;
-      mouseTarget[1] = 1.0 - e.clientY / window.innerHeight;
+      // Don't update Julia constant while dragging — at deep zoom even
+      // a tiny c shift completely morphs the fractal, making pan feel wild.
+      // mouseTarget[0] = e.clientX / window.innerWidth;
+      // mouseTarget[1] = 1.0 - e.clientY / window.innerHeight;
     }
   });
 
@@ -406,8 +408,9 @@ void main(){
       touchVelX = touchVelX * 0.6 + dx * 0.4;
       touchVelY = touchVelY * 0.6 + dy * 0.4;
       lastTouchX = touch.clientX; lastTouchY = touch.clientY;
-      mouseTarget[0] = touch.clientX / window.innerWidth;
-      mouseTarget[1] = 1.0 - touch.clientY / window.innerHeight;
+      // Don't update Julia constant during touch drag (same reason as mouse drag)
+      // mouseTarget[0] = touch.clientX / window.innerWidth;
+      // mouseTarget[1] = 1.0 - touch.clientY / window.innerHeight;
 
     } else if (touchState === 'pinch' && e.touches.length >= 2) {
       const a = e.touches[0], b = e.touches[1];
@@ -507,8 +510,11 @@ void main(){
     zoom += (tzoom - zoom) * zoomEase;
 
     // ── Mouse / Julia influence ───────────────────────────────────────────────
-    smoothMouse[0] += (mouseTarget[0] - smoothMouse[0]) * 0.03;
-    smoothMouse[1] += (mouseTarget[1] - smoothMouse[1]) * 0.03;
+    // Only let Julia constant drift when not interacting; freeze it during drag/pinch
+    if (!interacting) {
+      smoothMouse[0] += (mouseTarget[0] - smoothMouse[0]) * 0.015;
+      smoothMouse[1] += (mouseTarget[1] - smoothMouse[1]) * 0.015;
+    }
 
     // ── Theme colours ────────────────────────────────────────────────────────
     for (let i = 0; i < 3; i++) {
