@@ -26,6 +26,9 @@
 
   // Smooth-render targets (what we're interpolating towards)
   let tcx = cx, tcy = cy, tzoom = zoom;
+  // Log-space zoom for perceptually-linear easing at any depth
+  let logZoom  = Math.log(zoom);   // rendered (eased) log zoom
+  let tlogZoom = Math.log(tzoom);  // target log zoom
 
   // Inertia: velocity in fractal-space units per second
   let vx = 0, vy = 0;
@@ -87,7 +90,8 @@
     const ratio = newZoom / tzoom;
     tcx = fx + (tcx - fx) * ratio;
     tcy = fy + (tcy - fy) * ratio;
-    tzoom = newZoom;
+    tzoom    = newZoom;
+    tlogZoom = Math.log(newZoom);
     vx = 0; vy = 0;
   }
 
@@ -515,6 +519,7 @@ void main(){
     if (bestScore < 0.04) {
       // Completely void — zoom out and drift back toward the interesting region
       tzoom = Math.min(tzoom * 2.5, 3.0);
+      tlogZoom = Math.log(tzoom);
       driftSteerX = (-0.5 - tcx) * 0.5;
       driftSteerY = ( 0.0 - tcy) * 0.5;
     } else {
@@ -553,7 +558,8 @@ void main(){
 
       // Slow zoom — follows boundary depth naturally
       tzoom *= Math.pow(0.987, dt * 60);
-      if (tzoom < 1e-8) { tzoom = 3.0; tcx = -0.5; tcy = 0.0; driftVx = 0; driftVy = 0; lastSampleTs = -9999; }
+      tlogZoom = Math.log(Math.max(tzoom, 1e-14));
+      if (tzoom < 1e-8) { tzoom = 3.0; tlogZoom = Math.log(3.0); tcx = -0.5; tcy = 0.0; driftVx = 0; driftVy = 0; lastSampleTs = -9999; }
     }
 
     // ── Inertia ──────────────────────────────────────────────────────────────
@@ -577,9 +583,11 @@ void main(){
       cx += (tcx - cx) * panEase;
       cy += (tcy - cy) * panEase;
     }
-    // Zoom always eases — makes wheel/pinch feel springy
-    const zoomEase = 1.0 - Math.pow(0.04, dt * 60);
-    zoom += (tzoom - zoom) * zoomEase;
+    // Zoom eased in log-space: perceptually constant speed at any depth
+    // Base 0.18 → settles in ~0.8s, feels like a gentle camera pull
+    const zoomEase = 1.0 - Math.pow(0.18, dt * 60);
+    logZoom += (tlogZoom - logZoom) * zoomEase;
+    zoom = Math.exp(logZoom);
 
     // ── Mouse / Julia influence ───────────────────────────────────────────────
     // Only let Julia constant drift when not interacting; freeze it during drag/pinch
@@ -648,10 +656,12 @@ void main(){
   requestAnimationFrame(exposeState);
 
   window._fractalReset = function () {
-    // Smoothly glide home — targets set, easing does the rest
-    tcx = -0.5; tcy = 0.0; tzoom = 3.0;
+    // Set targets only — all easing handles the animation
+    tcx = -0.5; tcy = 0.0;
+    tzoom    = 3.0;
+    tlogZoom = Math.log(3.0);
     vx = 0; vy = 0;
-    targetMorphEnergy += 0.5; // little visual pop on reset
+    targetMorphEnergy += 0.5;
   };
 
   requestAnimationFrame(frame);
