@@ -216,16 +216,22 @@ body.high-contrast .hero-title {
   display: inline-block;
 }
 
-.portal-active #cosmic-canvas {
-  transform: scale(8);
-  filter: brightness(2) saturate(1.5);
-  transition: transform 2s cubic-bezier(0.7, 0, 0.3, 1), filter 1.5s ease;
+.portal-active .hero {
+  pointer-events: none;
 }
-
-.portal-active .hero-content {
+.portal-active #cosmic-canvas {
+  transform: scale(20);
+  filter: brightness(2.5) saturate(1.5);
+  transition: transform 2.5s cubic-bezier(0.7, 0, 0.3, 1), filter 2s ease;
+}
+.portal-active .hero-content,
+.portal-active .scroll-hint,
+.portal-active .nav-section,
+.portal-active footer,
+.portal-active #theme-btn,
+.portal-active #contrast-btn {
   opacity: 0;
-  transform: scale(0.8);
-  transition: opacity 0.5s ease, transform 0.5s ease;
+  transition: opacity 0.8s ease;
 }
 
 .hero-sub {

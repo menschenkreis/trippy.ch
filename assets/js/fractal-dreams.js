@@ -91,38 +91,49 @@
   const uColA = gl.getUniformLocation(prog, 'colA'), uColB = gl.getUniformLocation(prog, 'colB'), uColC = gl.getUniformLocation(prog, 'colC');
   const uAudioPhase = gl.getUniformLocation(prog, 'audioPhase');
 
-  // ── Audio ──
+  // ── Audio (Warmer & Harmonic) ──
   let audioCtx = null, shepardGain = null, shepardOscs = [], shepardGains = [], shepardPhase = 0;
-  const NUM_VOICES = 8, BASE_FREQ = 55, DESCENT_RATE = 0.08;
+  const NUM_VOICES = 12, BASE_FREQ = 432, DESCENT_RATE = 0.05; // 432Hz tuning
 
   function initAudio() {
     if (audioCtx) return;
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       shepardGain = audioCtx.createGain(); shepardGain.gain.value = 0; shepardGain.connect(audioCtx.destination);
-      const lp = audioCtx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 600; lp.connect(shepardGain);
+      
+      // Much warmer filter
+      const lp = audioCtx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400; lp.Q.value = 0.5; lp.connect(shepardGain);
+      const lp2 = audioCtx.createBiquadFilter(); lp2.type = 'lowpass'; lp2.frequency.value = 800; lp2.connect(lp);
+
       for (let i = 0; i < NUM_VOICES; i++) {
-        const osc = audioCtx.createOscillator(); const g = audioCtx.createGain();
-        g.gain.value = 0.035 * Math.exp(-Math.pow((i/(NUM_VOICES-1)-0.5)*3.5, 2));
-        osc.connect(g); g.connect(lp); osc.start(); shepardOscs.push(osc); shepardGains.push(g);
+        const osc = audioCtx.createOscillator(); 
+        const g = audioCtx.createGain();
+        
+        // Harmonics: blend sine and triangle for warmth
+        osc.type = (i % 2 === 0) ? 'sine' : 'triangle';
+        
+        const b = Math.exp(-Math.pow((i/(NUM_VOICES-1)-0.5)*3.0, 2));
+        g.gain.value = 0.02 * b; 
+        osc.connect(g); g.connect(lp2); osc.start(); shepardOscs.push(osc); shepardGains.push(g);
       }
     } catch (e) {}
   }
 
   function updateAudio(dt, vel) {
     if (!audioCtx || !shepardGain) return;
-    const absV = Math.min(Math.abs(vel), 5);
-    shepardPhase = (shepardPhase - (DESCENT_RATE + absV * 0.15) * dt) % 1.0;
+    const absV = Math.min(Math.abs(vel), 3);
+    shepardPhase = (shepardPhase - (DESCENT_RATE + absV * 0.1) * dt) % 1.0;
     if (shepardPhase < 0) shepardPhase += 1.0;
     audioPhase = shepardPhase;
     for (let i = 0; i < NUM_VOICES; i++) {
-      let f = BASE_FREQ * Math.pow(2, i/(NUM_VOICES-1)*5) + shepardPhase * BASE_FREQ;
-      while (f > BASE_FREQ*64) f /= 2; while (f < BASE_FREQ*0.5) f *= 2;
-      shepardOscs[i].frequency.setTargetAtTime(f, audioCtx.currentTime, 0.15);
-      const n = Math.log2(f/BASE_FREQ*0.5)/7, b = Math.exp(-Math.pow((n-0.5)*3.2, 2));
-      shepardGains[i].gain.setTargetAtTime(0.035 * b, audioCtx.currentTime, 0.2);
+      // Harmonic series spacing
+      let f = (BASE_FREQ * 0.25) * Math.pow(2, i/(NUM_VOICES-1)*6) * (1.0 + shepardPhase);
+      while (f > BASE_FREQ*8) f /= 2; while (f < BASE_FREQ*0.125) f *= 2;
+      shepardOscs[i].frequency.setTargetAtTime(f, audioCtx.currentTime, 0.2);
+      const n = Math.log2(f/(BASE_FREQ*0.125))/6, b = Math.exp(-Math.pow((n-0.5)*3.5, 2));
+      shepardGains[i].gain.setTargetAtTime(0.025 * b, audioCtx.currentTime, 0.3);
     }
-    shepardGain.gain.setTargetAtTime(soundEnabled ? 0.05 + Math.min(absV * 0.06, 0.1) : 0, audioCtx.currentTime, 0.5);
+    shepardGain.gain.setTargetAtTime(soundEnabled ? 0.04 + Math.min(absV * 0.04, 0.06) : 0, audioCtx.currentTime, 0.8);
   }
 
   // ── Interactions ──
