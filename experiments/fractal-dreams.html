@@ -257,6 +257,7 @@
 
   <!-- Top-right controls -->
   <div class="top-controls">
+    <button id="reset-btn" class="ctrl-btn" title="Reset view">⌂</button>
     <button id="drift-btn" class="ctrl-btn" title="Auto-Drift">Auto</button>
     <button id="sound-btn" class="ctrl-btn" title="Toggle sound">♪</button>
     <button id="theme-btn" class="ctrl-btn" title="Randomize theme">✦</button>
@@ -325,6 +326,11 @@
         hud.textContent = label;
       }, 200);
     })();
+
+    // ── Reset button
+    document.getElementById('reset-btn').onclick = () => {
+      if (window._fractalReset) window._fractalReset();
+    };
 
     // ── Info panel toggle ────────────────────────────────────────────────────
     (function () {

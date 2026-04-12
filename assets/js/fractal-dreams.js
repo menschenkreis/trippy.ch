@@ -519,12 +519,17 @@ void main(){
   canvas.style.cursor = 'grab';
   window.addEventListener('resize', resize);
   resize();
-  // Expose zoom level for the depth HUD
+  // Expose zoom level for the depth HUD + reset hook
   function exposeState() {
     window._fractalZoom = zoom;
     requestAnimationFrame(exposeState);
   }
   requestAnimationFrame(exposeState);
+
+  window._fractalReset = function () {
+    tcx = -0.5; tcy = 0.0; tzoom = 3.0;
+    vx = 0; vy = 0;
+  };
 
   requestAnimationFrame(frame);
 })();
