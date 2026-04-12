@@ -35,6 +35,9 @@ const SUBSTEPS = 2;
 
 let gravityX = 0, gravityY = GRAVITY;
 let isDragging = false;
+let isSlowed = false;
+let timeScale = 1.0;
+let targetTimeScale = 1.0;
 let dragRagdoll = null;
 let dragParticle = null;
 let dragOffsetX = 0, dragOffsetY = 0;
@@ -217,6 +220,9 @@ function spawnSphereNear(x,y){
 canvas.addEventListener('pointerdown', e => {
   const x = e.clientX, y = e.clientY;
   touchX = x; touchY = y;
+  // Slow everything on touch
+  targetTimeScale = 0.05;
+  isSlowed = true;
   for(const r of ragdolls){
     const p = r.closestParticle(x,y);
     if(p){
@@ -253,6 +259,8 @@ function releaseDrag(){
     for(const p of dragRagdoll.particles){ p.pinned = p._wasPinned || false; }
   }
   isDragging = false;
+  isSlowed = false;
+  targetTimeScale = 1.0;
   dragRagdoll = null;
   dragParticle = null;
 }
@@ -559,9 +567,12 @@ function frame(now){
   requestAnimationFrame(frame);
   const rawDt = Math.min((now - lastTime)/1000, 0.033);
   lastTime = now;
-  time += rawDt;
 
-  const dt = rawDt / SUBSTEPS;
+  // Smoothly interpolate time scale
+  timeScale += (targetTimeScale - timeScale) * 0.12;
+
+  time += rawDt;
+  const dt = (rawDt * timeScale) / SUBSTEPS;
 
   // Physics substeps
   for(let s=0;s<SUBSTEPS;s++){
