@@ -595,7 +595,7 @@ function frame(now){
 
   // Draw UI elements in screen space (no camera transform)
   if(isDragging && dragParticle){
- ctx.strokeStyle = `rgba(${theme.accent2[0]},${theme.accent2[1]},${theme.accent2[2]},0.15)`;
+    ctx.strokeStyle = `rgba(${theme.accent2[0]},${theme.accent2[1]},${theme.accent2[2]},0.15)`;
     ctx.lineWidth = 1;
     ctx.setLineDash([4,4]);
     ctx.beginPath();
@@ -603,6 +603,15 @@ function frame(now){
     ctx.lineTo(dragParticle.x, dragParticle.y - cameraY);
     ctx.stroke();
     ctx.setLineDash([]);
+  }
+
+  // Slow-mo indicator
+  if(isSlowed){
+    const alpha = 0.15 + 0.1 * Math.sin(time * 3);
+    ctx.fillStyle = `rgba(${theme.accent[0]},${theme.accent[1]},${theme.accent[2]},${alpha})`;
+    ctx.font = '200 0.7rem sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('hold to slow', W/2, H - 30);
   }
 }
 requestAnimationFrame(frame);
