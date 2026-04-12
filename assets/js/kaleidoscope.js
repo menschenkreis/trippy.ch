@@ -146,72 +146,76 @@
       );
       float f = fbm(kp * warpScale + rr * 2.5 + ss * 1.5);
 
-      // ── Evolving colour: ember that breathes ────────────────────────
-      vec3 col = vec3(0.012, 0.005, 0.002);
+      // ── Vibrant colour: glowing tunnel ─────────────────────────────
+      vec3 col = vec3(0.012, 0.006, 0.003);
 
-      // Slow colour cycling — hues shift over time
+      // Slow colour cycling
       float colourShift = sin(t * 0.08) * 0.5 + 0.5;
       vec3 c1 = mix(u_col1, u_col3, colourShift * 0.3);
       vec3 c2 = mix(u_col2, u_col1, colourShift * 0.25);
 
-      // Main glow
-      float ember = pow(f, 1.4) * 1.6;
+      // Boost saturation for vibrancy
+      c1 = mix(vec3(dot(c1, vec3(0.299, 0.587, 0.114))), c1, 1.8);
+      c2 = mix(vec3(dot(c2, vec3(0.299, 0.587, 0.114))), c2, 2.0);
+
+      // Main glow — brighter
+      float ember = pow(f, 1.3) * 2.0;
       col += c1 * ember;
 
-      // Hot cracks
-      float cracks = pow(max(f - 0.35, 0.0) * 3.0, 1.1);
-      col += c2 * cracks;
+      // Hot cracks — vivid
+      float cracks = pow(max(f - 0.3, 0.0) * 2.8, 1.0);
+      col += c2 * cracks * 1.2;
 
       // Pulsing depth heat
       float depthHeat = 0.5 + 0.5 * sin(depth * 0.7 + t * 0.25);
-      col += u_col3 * depthHeat * 0.2;
+      col += u_col3 * depthHeat * 0.3;
 
-      // Morphing fold-line glow
+      // Morphing fold-line glow — vivid veins
       float edgeDist = length(kp - mix(
         kaleidoscope(kp + vec2(0.001, 0.0), n),
         kaleidoscope(kp + vec2(0.001, 0.0), nNext),
         smoothstep(0.3, 0.7, morphPhase)
       ));
-      float veinGlow = 0.07 / (edgeDist + 0.008);
-      col += c2 * veinGlow * 0.7;
+      float veinGlow = 0.09 / (edgeDist + 0.008);
+      col += c2 * veinGlow * 0.9;
 
-      // Speed streaks with depth variation
+      // Speed streaks
       float streakFreq = 6.0 + 4.0 * sin(depth * 0.3 + t * 0.1);
       float streaks = abs(sin(depth * streakFreq + angle * 3.0));
-      streaks = pow(streaks, 6.0) * 0.15;
+      streaks = pow(streaks, 6.0) * 0.2;
       col += c1 * streaks;
 
-      // Morphing ring pulses — concentric rings that breathe
+      // Morphing ring pulses
       float rings = sin(depth * 4.0 - t * 0.6) * 0.5 + 0.5;
-      rings = pow(rings, 4.0) * 0.12;
+      rings = pow(rings, 4.0) * 0.18;
       col += c2 * rings;
 
-      // Central glow
-      float centerGlow = 0.05 / max(screenR, 0.001);
-      vec3 centerCol = mix(vec3(0.6, 0.08, 0.01), vec3(0.9, 0.3, 0.05), sin(t * 0.15) * 0.5 + 0.5);
-      col += centerCol * min(centerGlow, 1.8) * 0.18;
+      // Central glow — vivid
+      float centerGlow = 0.06 / max(screenR, 0.001);
+      vec3 centerCol = mix(u_col1 * 1.5, u_col2 * 1.5, sin(t * 0.15) * 0.5 + 0.5);
+      col += centerCol * min(centerGlow, 2.0) * 0.2;
 
-      // Vignette
-      col *= 1.0 - 0.35 * pow(screenR, 2.0);
+      // Vignette — lighter
+      col *= 1.0 - 0.25 * pow(screenR, 2.0);
 
-      // Depth fog with pulsing
-      float fog = exp(-depth * 0.06 + 0.15 * sin(t * 0.2));
-      col *= 0.45 + 0.55 * clamp(fog, 0.0, 1.0);
+      // Depth fog
+      float fog = exp(-depth * 0.05 + 0.15 * sin(t * 0.2));
+      col *= 0.5 + 0.5 * clamp(fog, 0.0, 1.0);
 
-      // Chromatic aberration — subtle colour fringing
-      float aberration = 0.003 * screenR;
+      // Chromatic aberration
+      float aberration = 0.004 * screenR;
       float fR = fbm((kp + vec2(aberration, 0.0)) * warpScale + rr * 2.5);
       float fB = fbm((kp - vec2(aberration, 0.0)) * warpScale + rr * 2.5);
-      col.r += c1.r * pow(fR, 1.4) * 0.15;
-      col.b += c1.b * pow(fB, 1.4) * 0.15;
+      col.r += c1.r * pow(fR, 1.3) * 0.25;
+      col.b += c1.b * pow(fB, 1.3) * 0.25;
 
       // Film grain
       col += (hash(uv * u_res + fract(t * 100.0)) - 0.5) * 0.012;
 
-      // Tone mapping — slightly more contrast
-      col = pow(max(col, vec3(0.0)), vec3(1.0));
-      col = col / (col + 0.28);
-      col = pow(col, vec3(0.95)); // slight gamma lift
+      // Tone mapping — preserve vibrancy
+      col = pow(max(col, vec3(0.0)), vec3(0.95));
+      col = col / (col + 0.22);
+      col = pow(col, vec3(0.92));
 
       gl_FragColor = vec4(col, 1.0);
     }
@@ -246,16 +250,69 @@
   ['u_time','u_res','u_mouse','u_folds','u_auto','u_col1','u_col2','u_col3','u_seed'].forEach(n => u[n] = gl.getUniformLocation(prog, n));
 
   // ── Palettes ──────────────────────────────────────────────────────────────
-  // ── Palettes (ominous ember) ──────────────────────────────────────────────
-  const palettes = [
-    [[0.8,0.12,0.02],[1.0,0.45,0.05],[0.15,0.03,0.0]],   // deep crimson / amber / charcoal
-    [[0.6,0.04,0.1],[1.0,0.25,0.02],[0.08,0.01,0.05]],   // dark wine / hot orange / void
-    [[0.9,0.3,0.0],[0.5,0.08,0.0],[0.05,0.05,0.08]],     // burnt orange / dark rust / cold ash
-    [[0.3,0.0,0.0],[0.95,0.5,0.08],[0.1,0.02,0.02]],      // near-black / molten gold / dried blood
-    [[0.7,0.1,0.15],[1.0,0.6,0.1],[0.02,0.01,0.03]],      // smouldering red / bright ember / abyss
-    [[0.4,0.06,0.0],[0.85,0.35,0.05],[0.12,0.08,0.06]],   // dark umber / glowing coal / ash grey
-  ];
-  let pal = palettes[0];
+  // ── Color theory palette generator ─────────────────────────────────────
+  function hsl2rgb(h, s, l) {
+    // h: 0-360, s: 0-1, l: 0-1
+    h = ((h % 360) + 360) % 360;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = l - c / 2;
+    let r, g, b;
+    if      (h < 60)  { r = c; g = x; b = 0; }
+    else if (h < 120) { r = x; g = c; b = 0; }
+    else if (h < 180) { r = 0; g = c; b = x; }
+    else if (h < 240) { r = 0; g = x; b = c; }
+    else if (h < 300) { r = x; g = 0; b = c; }
+    else               { r = c; g = 0; b = x; }
+    return [r + m, g + m, b + m];
+  }
+
+  function generatePalette() {
+    // Pick a random harmony scheme
+    const schemes = ['analogous', 'triadic', 'splitComp', 'tetradic', 'warmMono', 'coolMono'];
+    const scheme = schemes[Math.floor(Math.random() * schemes.length)];
+    const baseHue = Math.random() * 360;
+    const sat = 0.7 + Math.random() * 0.3; // 70-100% saturation
+
+    let hues;
+    switch (scheme) {
+      case 'analogous':
+        hues = [baseHue, baseHue + 30 + Math.random() * 30, baseHue - 30 - Math.random() * 30];
+        break;
+      case 'triadic':
+        hues = [baseHue, baseHue + 120 + Math.random() * 20 - 10, baseHue + 240 + Math.random() * 20 - 10];
+        break;
+      case 'splitComp':
+        hues = [baseHue, baseHue + 150 + Math.random() * 30, baseHue + 210 + Math.random() * 30];
+        break;
+      case 'tetradic':
+        hues = [baseHue, baseHue + 90 + Math.random() * 30, baseHue + 180 + Math.random() * 20, baseHue + 270 + Math.random() * 20];
+        break;
+      case 'warmMono':
+        // Reds, oranges, yellows — ember territory
+        hues = [Math.random() * 60, 20 + Math.random() * 40, 340 + Math.random() * 40];
+        break;
+      case 'coolMono':
+        // Blues, purples, cyans
+        hues = [180 + Math.random() * 60, 240 + Math.random() * 60, 300 + Math.random() * 60];
+        break;
+    }
+
+    // Vary lightness: one dark, one mid, one bright
+    const lightnesses = [
+      0.35 + Math.random() * 0.15,  // dark base
+      0.5 + Math.random() * 0.2,    // mid accent
+      0.2 + Math.random() * 0.15,   // deep shadow
+    ];
+
+    return [
+      hsl2rgb(hues[0], sat, lightnesses[0]),
+      hsl2rgb(hues[1], sat * (0.9 + Math.random() * 0.1), lightnesses[1] + 0.1),
+      hsl2rgb(hues[2], sat * 0.7, lightnesses[2]),
+    ];
+  }
+
+  let pal = generatePalette();
 
   // ── Resize ────────────────────────────────────────────────────────────────
   function resize() {
@@ -309,7 +366,7 @@
 
   themeBtn.addEventListener('click', () => {
     paletteSeed = Math.random() * 100;
-    pal = palettes[Math.floor(Math.random() * palettes.length)];
+    pal = generatePalette();
   });
 
   resetBtn.addEventListener('click', () => {
@@ -319,7 +376,7 @@
     autoMode = false;
     autoBtn.classList.remove('is-on');
     paletteSeed = 0;
-    pal = palettes[0];
+    pal = generatePalette();
     autoTime = 0;
     updateHud();
   });
