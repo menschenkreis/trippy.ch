@@ -28,24 +28,17 @@ let theme = themes[0];
 function setTheme(i){ themeIdx = i % themes.length; theme = themes[themeIdx]; }
 
 // ── Physics constants ────────────────────────────────────────────────────
-const GRAVITY = 600;
+const GRAVITY = 500;
 const DAMPING = 0.998;
 const ITERATIONS = 8;
 const SUBSTEPS = 2;
 
 let gravityX = 0, gravityY = GRAVITY;
-
-// ── Accelerometer ────────────────────────────────────────────────────────
-let hasAccel = false;
-function onAccel(e){
-  hasAccel = true;
-  const a = e.accelerationIncludingGravity || e.acceleration;
-  if(!a) return;
-  gravityX = (a.x || 0) * GRAVITY * 0.5;
-  gravityY = (a.y || 0) * GRAVITY * 0.5;
-  if(gravityY > -50) gravityY = GRAVITY; // fallback: always some down
-}
-window.addEventListener('devicemotion', onAccel, {passive:true});
+let isDragging = false;
+let dragRagdoll = null;
+let dragParticle = null;
+let dragOffsetX = 0, dragOffsetY = 0;
+let touchX = 0, touchY = 0;
 
 // ── Verlet Particle ─────────────────────────────────────────────────────
 class Particle {
@@ -205,12 +198,9 @@ function collideRagdollSphere(ragdoll, sphere){
 let ragdolls = [];
 let spheres = [];
 let time = 0;
-let dragParticle = null;
-let dragOffsetX = 0, dragOffsetY = 0;
-let touchX = W/2, touchY = H/2;
 
-// Spawn initial
-ragdolls.push(new Ragdoll(W/2, H*0.3));
+// Spawn initial — centered at top
+ragdolls.push(new Ragdoll(W/2, -80));
 for(let i=0;i<8;i++) spawnSphere();
 
 function spawnSphere(){
@@ -236,28 +226,57 @@ canvas.addEventListener('pointerdown', e => {
   // Find closest ragdoll particle
   for(const r of ragdolls){
     const p = r.closestParticle(x,y);
-    if(p){ dragParticle = p; dragOffsetX = p.x-x; dragOffsetY = p.y-y; break; }
+    if(p){
+      isDragging = true;
+      dragRagdoll = r;
+      dragParticle = p;
+      dragOffsetX = p.x-x; dragOffsetY = p.y-y;
+      // Pin all particles to freeze the ragdoll
+      for(const pp of r.particles){ pp._wasPinned = pp.pinned; pp.pinned = true; }
+      break;
+    }
   }
 });
 canvas.addEventListener('pointermove', e => {
   touchX = e.clientX; touchY = e.clientY;
-  if(dragParticle){
-    dragParticle.x = e.clientX + dragOffsetX;
-    dragParticle.y = e.clientY + dragOffsetY;
-    dragParticle.ox = dragParticle.x;
-    dragParticle.oy = dragParticle.y;
+  if(isDragging && dragRagdoll){
+    const dx = e.clientX - touchX, dy = e.clientY - touchY;
+    // Move entire ragdoll by the drag delta
+    for(const p of dragRagdoll.particles){
+      p.x += dx; p.y += dy;
+      p.ox = p.x; p.oy = p.y; // kill velocity
+    }
+    touchX = e.clientX; touchY = e.clientY;
   }
 });
-canvas.addEventListener('pointerup', () => { dragParticle = null; });
-canvas.addEventListener('pointercancel', () => { dragParticle = null; });
+function releaseDrag(){
+  if(isDragging && dragRagdoll){
+    // Unpin all particles
+    for(const p of dragRagdoll.particles){ p.pinned = p._wasPinned || false; }
+    // Re-center: gently shift ragdoll toward screen centre
+    const head = dragRagdoll.particles[0];
+    const centerX = W/2;
+    const offsetX = centerX - head.x;
+    for(const p of dragRagdoll.particles){
+      p.x += offsetX;
+      p.ox += offsetX;
+    }
+  }
+  isDragging = false;
+  dragRagdoll = null;
+  dragParticle = null;
+}
+canvas.addEventListener('pointerup', releaseDrag);
+canvas.addEventListener('pointercancel', releaseDrag);
 
 // ── Buttons ───────────────────────────────────────────────────────────────
 document.getElementById('add-btn').onclick = () => {
-  ragdolls.push(new Ragdoll(W*0.3 + Math.random()*W*0.4, H*0.1));
+  ragdolls.push(new Ragdoll(W/2, -80));
 };
 document.getElementById('theme-btn').onclick = () => setTheme(themeIdx+1);
 document.getElementById('reset-btn').onclick = () => {
-  ragdolls = [new Ragdoll(W/2, H*0.3)];
+  isDragging = false; dragRagdoll = null; dragParticle = null;
+  ragdolls = [new Ragdoll(W/2, -80)];
   spheres = [];
   for(let i=0;i<8;i++) spawnSphere();
 };
@@ -531,12 +550,13 @@ function recycleObjects(){
     if(s.x > W + margin + s.r){ s.x = -margin; s.vy = 0; }
     if(s.x < -margin - s.r){ s.x = W + margin; s.vy = 0; }
   }
-  // Ragdolls that fall too far get reset
+  // Ragdolls that fall too far: respawn centered at top
   for(const r of ragdolls){
     if(r.particles[0].y > H + 300){
-      const x = W*0.3 + Math.random()*W*0.4;
-      const fresh = new Ragdoll(x, -100);
-      Object.assign(r, fresh);
+      const fresh = new Ragdoll(W/2, -80);
+      // Copy over arrays
+      r.particles = fresh.particles;
+      r.constraints = fresh.constraints;
     }
   }
   // Spawn new spheres if too few
@@ -577,7 +597,7 @@ function frame(now){
   for(const r of ragdolls) drawRagdoll(r);
 
   // Drag indicator
-  if(dragParticle){
+  if(isDragging && dragParticle){
     ctx.strokeStyle = `rgba(${theme.accent2[0]},${theme.accent2[1]},${theme.accent2[2]},0.2)`;
     ctx.lineWidth = 1;
     ctx.setLineDash([4,4]);
