@@ -86,7 +86,7 @@
   function zoomToPoint(px, py, factor) {
     // factor < 1 → zoom in, factor > 1 → zoom out
     const [fx, fy] = screenToFractal(px, py);
-    const newZoom = Math.max(1e-13, Math.min(4.0, tzoom * factor));
+    const newZoom = Math.max(ZOOM_SOFT_LIMIT * 0.1, Math.min(4.0, tzoom * factor));
     // Keep (fx, fy) stationary: new_centre = fp + (old_centre - fp) * (newZoom / oldZoom)
     const ratio = newZoom / tzoom;
     tcx = fx + (tcx - fx) * ratio;
@@ -496,19 +496,24 @@ void main(){
     return t < 0.01 ? 0 : 4 * t * (1 - t); // bell curve, peaks near boundary
   }
 
+  // Soft depth limit — float32 shader precision starts breaking below ~1e-5.
+  // We push back gently before that wall.
+  const ZOOM_SOFT_LIMIT = 4e-5;
+
   // Sample candidate positions around the current centre, steer toward the
-  // most boundary-rich direction. Called at ~4 Hz during auto-drift.
+  // most boundary-rich direction. Called at ~7 Hz during auto-drift.
   function updateDriftSteering() {
-    const now    = performance.now() * 0.001;
-    const scoreI = Math.min(100, Math.max(35, Math.round(35 + Math.log2(3.0 / Math.max(zoom, 1e-14)) * 5)));
-    // Mirror the shader's Julia constant at this moment
     const c0x = juliaCX;
     const c0y = juliaCY;
 
+    // At very deep zoom the fractal landscape barely changes across tiny probes.
+    // Use a minimum probe radius of 0.05 (fractal units) so we always sample
+    // a meaningfully different region regardless of zoom level.
     const N      = 12;
-    const probeR = zoom * 0.5; // probe ring at 50% of visible half-width
-    let   bestScore = -1, bestAngle = 0;
+    const probeR = Math.max(zoom * 0.6, 0.05);
+    const scoreI = Math.min(120, Math.max(40, Math.round(40 + Math.log2(3.0 / Math.max(zoom, 1e-14)) * 5)));
 
+    let bestScore = -1, bestAngle = 0;
     for (let k = 0; k < N; k++) {
       const angle = (k / N) * Math.PI * 2;
       const s = juliaInterest(tcx + Math.cos(angle) * probeR,
@@ -517,20 +522,20 @@ void main(){
       if (s > bestScore) { bestScore = s; bestAngle = angle; }
     }
 
-    // Blend new target into driftSteer gradually — prevents 180° direction flips
-    const blendRate = 0.25; // only 25% of new target per sample
+    // Only 20% of new target blended per sample — smooth course changes
+    const blendRate = 0.20;
     if (bestScore < 0.04) {
-      // Void: gentle zoom-out (no jump), nudge back toward known interest
-      const escapeX = (-0.5 - tcx) * 0.15;
-      const escapeY = ( 0.0 - tcy) * 0.15;
+      // Void: nudge back toward known interesting region, zoom out gently
+      const escapeX = (-0.5 - tcx) * 0.12;
+      const escapeY = ( 0.0 - tcy) * 0.12;
       driftSteerX += (escapeX - driftSteerX) * blendRate;
       driftSteerY += (escapeY - driftSteerY) * blendRate;
-      // Very gentle zoom-out: just slow the zoom-in rate, don't jump
-      tzoom = Math.min(tzoom * Math.pow(1.002, 60 * 0.25), 3.0);
+      tzoom    = Math.min(tzoom * Math.pow(1.001, 60 * 0.15), 3.0);
       tlogZoom = Math.log(tzoom);
     } else {
-      const newSteerX = Math.cos(bestAngle) * probeR * 0.25;
-      const newSteerY = Math.sin(bestAngle) * probeR * 0.25;
+      // Steer toward most interesting direction, scaled to current view size
+      const newSteerX = Math.cos(bestAngle) * zoom * 0.2;
+      const newSteerY = Math.sin(bestAngle) * zoom * 0.2;
       driftSteerX += (newSteerX - driftSteerX) * blendRate;
       driftSteerY += (newSteerY - driftSteerY) * blendRate;
     }
@@ -559,14 +564,39 @@ void main(){
       driftVx += (driftSteerX * steerStrength - driftVx) * Math.min(dt * 0.18, 1);
       driftVy += (driftSteerY * steerStrength - driftVy) * Math.min(dt * 0.18, 1);
 
+      // Cap velocity to prevent oscillation: max 0.15 fractal-units/s
+      const driftSpeed = Math.hypot(driftVx, driftVy);
+      const maxDriftSpeed = zoom * 1.5; // scales with zoom so never feels too fast
+      if (driftSpeed > maxDriftSpeed) {
+        const s = maxDriftSpeed / driftSpeed;
+        driftVx *= s; driftVy *= s;
+      }
+
       // Advance position
       tcx += driftVx * dt;
       tcy += driftVy * dt;
 
+      // Soft depth wall — resist zoom beyond float32 precision limit
+      if (tzoom < ZOOM_SOFT_LIMIT) {
+        // Exponentially push back: the closer to the wall, the stronger the push
+        const pushStrength = Math.pow(ZOOM_SOFT_LIMIT / tzoom, 1.5);
+        tzoom    = Math.min(tzoom * (1.0 + 0.003 * pushStrength * dt * 60), 3.0);
+        tlogZoom = Math.log(tzoom);
+      }
+
       // Slow zoom — follows boundary depth naturally
-      tzoom *= Math.pow(0.9967, dt * 60);
-      tlogZoom = Math.log(Math.max(tzoom, 1e-14));
-      if (tzoom < 1e-8) { tzoom = 3.0; tlogZoom = Math.log(3.0); tcx = -0.5; tcy = 0.0; driftVx = 0; driftVy = 0; lastSampleTs = -9999; }
+      if (tzoom >= ZOOM_SOFT_LIMIT) {
+        tzoom *= Math.pow(0.9967, dt * 60);
+        tlogZoom = Math.log(Math.max(tzoom, 1e-14));
+      }
+
+      // Safety reset only if somehow we breach far below the wall
+      if (tzoom < 1e-10) {
+        tzoom = ZOOM_SOFT_LIMIT * 2;
+        tlogZoom = Math.log(tzoom);
+        driftVx = 0; driftVy = 0;
+        lastSampleTs = -9999;
+      }
     }
 
     // ── Inertia ──────────────────────────────────────────────────────────────
