@@ -29,8 +29,11 @@
       right: 1rem;
       z-index: 200;
       display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
       gap: 0.5rem;
       align-items: center;
+      max-width: calc(100vw - 2rem);
     }
 
     .ctrl-btn {
@@ -257,7 +260,11 @@
 
   <!-- Top-right controls -->
   <div class="top-controls">
-    <button id="reset-btn" class="ctrl-btn" title="Reset view">⌂</button>
+    <button id="reset-btn" class="ctrl-btn" title="Reset view">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block">
+        <path d="M8 2.5L1.5 8H3.5V13.5H6.5V9.5H9.5V13.5H12.5V8H14.5L8 2.5Z" fill="currentColor"/>
+      </svg>
+    </button>
     <button id="drift-btn" class="ctrl-btn" title="Auto-Drift">Auto</button>
     <button id="sound-btn" class="ctrl-btn" title="Toggle sound">♪</button>
     <button id="theme-btn" class="ctrl-btn" title="Randomize theme">✦</button>
