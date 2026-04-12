@@ -168,7 +168,7 @@ class Ragdoll {
 }
 
 // ── Collision helpers ────────────────────────────────────────────────────
-function collideParticleSphere(p, s){
+function collideParticleSphere(p, s, dt){
   const dx = p.x-s.x, dy = p.y-s.y;
   const d = Math.sqrt(dx*dx+dy*dy) || 0.001;
   const minD = (p.radius||3) + s.r;
@@ -176,10 +176,15 @@ function collideParticleSphere(p, s){
     const nx = dx/d, ny = dy/d;
     const overlap = minD - d;
     if(!p.pinned){
-      p.x += nx * overlap;
-      p.y += ny * overlap;
+      // Push particle out
+      p.x += nx * overlap * 0.4;
+      p.y += ny * overlap * 0.4;
     }
-    // Transfer velocity (frictionless = no tangential force)
+    // Push the sphere away too (the key change)
+    const pushForce = overlap * 0.6;
+    s.x -= nx * pushForce;
+    s.y -= ny * pushForce;
+    // Transfer velocity (frictionless)
     const vx = p.x - p.ox, vy = p.y - p.oy;
     const dot = vx*nx + vy*ny;
     if(dot < 0){
@@ -189,8 +194,8 @@ function collideParticleSphere(p, s){
   }
 }
 
-function collideRagdollSphere(ragdoll, sphere){
-  for(const p of ragdoll.particles) collideParticleSphere(p, sphere);
+function collideRagdollSphere(ragdoll, sphere, dt){
+  for(const p of ragdoll.particles) collideParticleSphere(p, sphere, dt);
 }
 
 // ── State ────────────────────────────────────────────────────────────────
