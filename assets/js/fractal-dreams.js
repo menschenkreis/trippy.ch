@@ -1,5 +1,6 @@
-// Fractal Dreams — Evolving Julia set with DMT color palette
+// Fractal Dreams — Evolving Julia set with theme-reactive colors
 // Infinite pinch-to-zoom with eased interpolation + Shepard tone audio
+// Smooth mouse input — nothing snaps, everything flows
 (function () {
   const cfg = window.fractalDreamsConfig || {};
   const canvasId = cfg.canvasId || 'fractal-canvas';
@@ -21,12 +22,24 @@
     return;
   }
 
-  let W, H, mouse = [0.5, 0.5], time = 0, raf;
+  let W, H, time = 0, raf;
   let zoom = 1.0, targetZoom = 1.0;
   let panX = 0.0, panY = 0.0, targetPanX = 0.0, targetPanY = 0.0;
-  let prevZoom = 1.0; // for velocity tracking
+  let prevZoom = 1.0;
   let zoomVelocity = 0.0;
   let lastFrameTime = 0;
+
+  // Smooth mouse — lerps toward target, never snaps
+  let mouseTarget = [0.5, 0.5];
+  let smoothMouse = [0.5, 0.5];
+
+  // Theme colors (smoothed for transitions)
+  let themeColA = [0.49, 0.23, 0.93]; // purple
+  let themeColB = [0.18, 0.83, 0.75]; // teal
+  let themeColC = [0.93, 0.28, 0.60]; // pink
+  let targetColA = [...themeColA];
+  let targetColB = [...themeColB];
+  let targetColC = [...themeColC];
 
   function resize() {
     const dpr = Math.min(window.devicePixelRatio, 1.5);
@@ -44,6 +57,34 @@
     gl.viewport(0, 0, W, H);
   }
 
+  // Parse hex color to [r, g, b] in 0..1
+  function hexToRGB(hex) {
+    hex = hex.replace('#', '');
+    return [
+      parseInt(hex.substring(0, 2), 16) / 255,
+      parseInt(hex.substring(2, 4), 16) / 255,
+      parseInt(hex.substring(4, 6), 16) / 255
+    ];
+  }
+
+  // Read current theme colors from CSS custom properties
+  function readThemeColors() {
+    const style = getComputedStyle(document.documentElement);
+    const purple = style.getPropertyValue('--purple').trim();
+    const teal = style.getPropertyValue('--teal').trim();
+    const pink = style.getPropertyValue('--pink').trim();
+    if (purple) targetColA = hexToRGB(purple);
+    if (teal) targetColB = hexToRGB(teal);
+    if (pink) targetColC = hexToRGB(pink);
+  }
+
+  // Watch for theme changes
+  const observer = new MutationObserver(() => readThemeColors());
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
+  // Also poll for class changes (high contrast toggle)
+  setInterval(readThemeColors, 500);
+  readThemeColors();
+
   const vsSrc = `attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}`;
 
   const fsSrc = `
@@ -53,6 +94,9 @@ uniform vec2 res;
 uniform vec2 mouse;
 uniform float zoom;
 uniform vec2 pan;
+uniform vec3 colA;
+uniform vec3 colB;
+uniform vec3 colC;
 
 vec3 hsv2rgb(vec3 c){
   vec4 K=vec4(1.0,2.0/3.0,1.0/3.0,3.0);
@@ -64,10 +108,11 @@ void main(){
   vec2 uv=(gl_FragCoord.xy-0.5*res)/min(res.x,res.y);
   uv=uv*zoom+pan;
 
-  float a=t*0.06;
+  // Julia set constant — slow, zen drift
+  float a=t*0.04;
   vec2 c=vec2(
-    -0.7+0.32*cos(a)+mouse.x*0.15,
-    0.27+0.26*sin(a*1.3)+mouse.y*0.15
+    -0.7+0.28*cos(a)+mouse.x*0.12,
+    0.27+0.22*sin(a*1.3)+mouse.y*0.12
   );
 
   vec2 z=uv;
@@ -84,27 +129,41 @@ void main(){
 
   if(iter<maxIter){
     float sl=iter-log2(log2(dot(z,z)))+4.0;
-    float hue=sl*0.012+t*0.008;
-    hue=fract(hue);
-    float h2=hue*hue*(3.0-2.0*hue);
-    float finalHue=mix(0.72,0.85,h2)+sin(sl*0.05)*0.08;
-    float sat=0.7+0.3*sin(sl*0.08+t*0.02);
+
+    // Build palette from theme colors
+    float phase=fract(sl*0.012+t*0.008);
+    vec3 pal;
+    if(phase<0.33){
+      pal=mix(colA,colB,phase/0.33);
+    } else if(phase<0.66){
+      pal=mix(colB,colC,(phase-0.33)/0.33);
+    } else {
+      pal=mix(colC,colA,(phase-0.66)/0.34);
+    }
+
+    // Brightness from iteration depth
     float val=0.15+0.85*pow(sl/maxIter,0.45);
-    val+=0.08*sin(sl*0.3+t*0.1)*cos(sl*0.17);
-    col=hsv2rgb(vec3(fract(finalHue),clamp(sat,0.0,1.0),clamp(val,0.0,1.0)));
+    val+=0.06*sin(sl*0.3+t*0.1)*cos(sl*0.17);
+    col=pal*clamp(val,0.0,1.0);
+
+    // Inner glow near boundary
     float edge=1.0-smoothstep(0.0,0.3,sl/maxIter);
-    col+=vec3(0.3,0.1,0.5)*edge*0.6;
-    col+=vec3(0.1,0.3,0.3)*edge*0.3;
+    col+=colA*edge*0.25;
+    col+=colB*edge*0.15;
   } else {
-    col=vec3(0.02,0.01,0.05);
+    // Inside the set — deep void
+    col=vec3(0.02,0.01,0.04);
     float inner=length(uv)*0.5;
-    col+=vec3(0.06,0.02,0.12)*exp(-inner*0.5);
+    col+=colA*0.15*exp(-inner*0.5);
   }
 
+  // Soft vignette
   vec2 uv2=gl_FragCoord.xy/res;
   float vig=1.0-length((uv2-0.5)*1.2);
   col*=smoothstep(0.0,0.6,vig);
-  col*=0.95+0.05*sin(t*0.2);
+
+  // Very subtle pulse
+  col*=0.97+0.03*sin(t*0.15);
 
   gl_FragColor=vec4(col,1);
 }`;
@@ -146,107 +205,77 @@ void main(){
   const uMouse = gl.getUniformLocation(prog, 'mouse');
   const uZoom = gl.getUniformLocation(prog, 'zoom');
   const uPan = gl.getUniformLocation(prog, 'pan');
+  const uColA = gl.getUniformLocation(prog, 'colA');
+  const uColB = gl.getUniformLocation(prog, 'colB');
+  const uColC = gl.getUniformLocation(prog, 'colC');
 
   // ── Shepard Tone Audio Engine ──
   let audioCtx = null;
   let shepardGain = null;
   let shepardOscillators = [];
   let shepardFilters = [];
-  let shepardFreqs = [];
   let shepardPhase = 0;
   const NUM_VOICES = 6;
-  const BASE_FREQ = 55; // A1
+  const BASE_FREQ = 55;
 
   function initAudio() {
     if (audioCtx) return;
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-      // Master gain — starts silent, fades in
       shepardGain = audioCtx.createGain();
       shepardGain.gain.value = 0;
       shepardGain.connect(audioCtx.destination);
 
-      // Warm filter
       const masterFilter = audioCtx.createBiquadFilter();
       masterFilter.type = 'lowpass';
       masterFilter.frequency.value = 800;
       masterFilter.Q.value = 0.7;
       masterFilter.connect(shepardGain);
 
-      // Create layered sine oscillators spanning ~5 octaves
       for (let i = 0; i < NUM_VOICES; i++) {
         const osc = audioCtx.createOscillator();
         osc.type = 'sine';
-
         const gain = audioCtx.createGain();
-        // Bell-shaped amplitude envelope: loudest in the middle octave
-        const norm = i / (NUM_VOICES - 1); // 0..1
+        const norm = i / (NUM_VOICES - 1);
         const bell = Math.exp(-Math.pow((norm - 0.5) * 3.5, 2));
         gain.gain.value = 0.04 * bell;
-
         osc.connect(gain);
         gain.connect(masterFilter);
         osc.start();
-
         shepardOscillators.push(osc);
         shepardFilters.push(gain);
-        shepardFreqs.push(BASE_FREQ * Math.pow(2, i / (NUM_VOICES - 1) * 4));
       }
-    } catch (e) {
-      // Audio not available — silent fallback
-    }
+    } catch (e) {}
   }
 
   function updateShepard(velocity, dt) {
     if (!audioCtx || !shepardGain) return;
-
-    // velocity > 0 = zooming in (ascending), < 0 = zooming out (descending)
     const absVel = Math.min(Math.abs(velocity), 5);
     const direction = velocity > 0 ? 1 : -1;
-
-    // Advance phase based on zoom speed
     shepardPhase += direction * absVel * dt * 0.3;
-
-    // Wrap phase within one octave range
     shepardPhase = shepardPhase % 1;
     if (shepardPhase < 0) shepardPhase += 1;
-
-    // Update oscillator frequencies and amplitudes
-    const phaseOffset = shepardPhase * BASE_FREQ; // shift in Hz across one octave
-
+    const phaseOffset = shepardPhase * BASE_FREQ;
     for (let i = 0; i < NUM_VOICES; i++) {
-      // Base frequency for this voice, shifted by phase
       let freq = BASE_FREQ * Math.pow(2, i / (NUM_VOICES - 1) * 4) + phaseOffset;
-
-      // Wrap into the audible range (wrap at 5 octaves = factor of 32)
       const minF = BASE_FREQ;
       const maxF = BASE_FREQ * 32;
       while (freq > maxF) freq /= 2;
       while (freq < minF) freq *= 2;
-
       shepardOscillators[i].frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.1);
-
-      // Bell envelope based on position in range — voices at edges fade out
-      const normPos = Math.log2(freq / minF) / 5; // 0..1 across 5 octaves
+      const normPos = Math.log2(freq / minF) / 5;
       const bell = Math.exp(-Math.pow((normPos - 0.5) * 3.2, 2));
       shepardFilters[i].gain.setTargetAtTime(0.04 * bell, audioCtx.currentTime, 0.15);
     }
-
-    // Master volume: fade in when zooming, fade out when idle
     const targetVol = Math.min(absVel * 0.08, 0.12);
     shepardGain.gain.setTargetAtTime(targetVol, audioCtx.currentTime, 0.3);
   }
 
-  // ── Zoom & Pan Input ──
+  // ── Input ──
 
   let audioStarted = false;
-
   function ensureAudio() {
-    if (!audioStarted) {
-      audioStarted = true;
-      initAudio();
-    }
+    if (!audioStarted) { audioStarted = true; initAudio(); }
   }
 
   canvas.addEventListener('wheel', e => {
@@ -278,8 +307,8 @@ void main(){
   canvas.addEventListener('touchmove', e => {
     if (e.touches.length === 1 && !isPinching) {
       const t = e.touches[0];
-      mouse[0] = t.clientX / window.innerWidth;
-      mouse[1] = 1.0 - t.clientY / window.innerHeight;
+      mouseTarget[0] = t.clientX / window.innerWidth;
+      mouseTarget[1] = 1.0 - t.clientY / window.innerHeight;
     }
     if (e.touches.length === 2) {
       e.preventDefault();
@@ -290,20 +319,17 @@ void main(){
         x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
         y: (e.touches[0].clientY + e.touches[1].clientY) / 2
       };
-
       if (lastPinchDist > 0) {
         const scale = lastPinchDist / dist;
         targetZoom *= scale;
         targetZoom = Math.max(0.0001, Math.min(1e8, targetZoom));
       }
-
       if (lastPinchCenter) {
         const moveX = (center.x - lastPinchCenter.x) / window.innerWidth;
         const moveY = (center.y - lastPinchCenter.y) / window.innerHeight;
         targetPanX += moveX * zoom * 0.8;
         targetPanY -= moveY * zoom * 0.8;
       }
-
       lastPinchDist = dist;
       lastPinchCenter = center;
     }
@@ -315,11 +341,12 @@ void main(){
       lastPinchDist = 0;
       lastPinchCenter = null;
     }
+    // When all fingers lift, keep smoothMouse where it is — no snap back
   }, { passive: true });
 
   window.addEventListener('mousemove', e => {
-    mouse[0] = e.clientX / window.innerWidth;
-    mouse[1] = 1.0 - e.clientY / window.innerHeight;
+    mouseTarget[0] = e.clientX / window.innerWidth;
+    mouseTarget[1] = 1.0 - e.clientY / window.innerHeight;
   });
 
   // ── Render Loop ──
@@ -330,8 +357,18 @@ void main(){
 
     if (prefersReduced) { time = 0; } else { time = ts * 0.001; }
 
-    // Ease factor — larger distance = faster easing, but with a soft cap
-    // Creates a luxurious, fluid feel like moving through honey
+    // Smooth mouse — gentle ease, nothing snaps
+    smoothMouse[0] += (mouseTarget[0] - smoothMouse[0]) * 0.03;
+    smoothMouse[1] += (mouseTarget[1] - smoothMouse[1]) * 0.03;
+
+    // Smooth theme color transitions
+    for (let i = 0; i < 3; i++) {
+      themeColA[i] += (targetColA[i] - themeColA[i]) * 0.02;
+      themeColB[i] += (targetColB[i] - themeColB[i]) * 0.02;
+      themeColC[i] += (targetColC[i] - themeColC[i]) * 0.02;
+    }
+
+    // Eased zoom & pan
     const zoomDist = Math.abs(Math.log(targetZoom / zoom));
     const easeZoom = Math.min(0.04 + zoomDist * 0.15, 0.2);
     const easePan = Math.min(0.04 + (Math.abs(targetPanX - panX) + Math.abs(targetPanY - panY)) * 2, 0.15);
@@ -341,21 +378,23 @@ void main(){
     panX += (targetPanX - panX) * easePan;
     panY += (targetPanY - panY) * easePan;
 
-    // Track zoom velocity (log-scale) for Shepard tone
+    // Track zoom velocity for Shepard tone
     if (dt > 0) {
       const logPrev = Math.log(Math.max(prevZoom, 1e-10));
       const logCurr = Math.log(Math.max(zoom, 1e-10));
       const rawVel = (logCurr - logPrev) / dt;
-      // Smooth the velocity
       zoomVelocity += (rawVel - zoomVelocity) * 0.1;
       updateShepard(zoomVelocity, dt);
     }
 
     gl.uniform1f(uT, time);
     gl.uniform2f(uRes, W, H);
-    gl.uniform2f(uMouse, mouse[0], mouse[1]);
+    gl.uniform2f(uMouse, smoothMouse[0], smoothMouse[1]);
     gl.uniform1f(uZoom, zoom);
     gl.uniform2f(uPan, panX, panY);
+    gl.uniform3f(uColA, themeColA[0], themeColA[1], themeColA[2]);
+    gl.uniform3f(uColB, themeColB[0], themeColB[1], themeColB[2]);
+    gl.uniform3f(uColC, themeColC[0], themeColC[1], themeColC[2]);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     raf = requestAnimationFrame(frame);
   }
