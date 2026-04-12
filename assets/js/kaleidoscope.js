@@ -75,11 +75,27 @@
       return vec2(cos(a), sin(a)) * r;
     }
 
-    // ── Hyperbolic warp ───────────────────────────────────────────────────
-    vec2 hyperWarp(vec2 p, float t) {
+    // ── Poincaré disk: hyperbolic conformal map ───────────────────────
+    // Maps Euclidean disk → hyperbolic plane, making edges stretch to
+    // infinity. The exponent controls curvature strength.
+    vec2 poincareWarp(vec2 p, float curvature, float t) {
       float r = length(p);
-      float warp = 1.0 + 0.3 * sin(r * 3.0 - t * 0.7) * exp(-r * 0.5);
-      return p * warp;
+      if (r < 0.0001) return p;
+      // Hyperbolic distance: asinh-based stretch, stronger near boundary
+      float hDist = asinh(r / max(0.001, curvature)) / curvature;
+      // Breathing curvature
+      float breathe = curvature * (1.0 + 0.15 * sin(t * 0.4) * sin(r * 2.0 - t * 0.3));
+      hDist = asinh(r / max(0.001, breathe)) / max(0.001, breathe);
+      vec2 dir = p / r;
+      return dir * hDist;
+    }
+
+    // Möbius transformation — the isometry of the Poincaré disk
+    vec2 mobius(vec2 z, vec2 a) {
+      float a2 = dot(a, a);
+      vec2 num = vec2(z.x - a.x, z.y - a.y);
+      float den = 1.0 - 2.0 * (a.x * z.x + a.y * z.y) + a2 * dot(z, z);
+      return num / max(den, 0.001);
     }
 
     void main() {
@@ -87,60 +103,77 @@
 
       float t = u_time;
 
-      // Mouse influence — warps the centre
-      vec2 m = (u_mouse - 0.5) * 0.4;
-      float mouseInfluence = smoothstep(0.0, 0.5, length(uv - m * 0.5));
+      // Mouse influence
+      vec2 m = (u_mouse - 0.5) * 0.35;
 
-      // ── Hyperbolic distortion ─────────────────────────────────────────
-      vec2 p = hyperWarp(uv + m * 0.3, t);
+      // ── Hyperbolic (Poincaré disk) transform ─────────────────────────
+      // First, map into Poincaré disk with strong curvature
+      float curv = 0.25;
+      vec2 p = poincareWarp(uv + m * 0.25, curv, t);
 
-      // Spiral twist
+      // Möbius shift — moves the "centre" of hyperbolic space
+      vec2 mShift = vec2(0.15 * sin(t * 0.13), 0.15 * cos(t * 0.11));
+      p = mobius(p, mShift);
+
+      // Poincaré geodesic spiral — rotation accelerates with hyperbolic distance
       float r = length(p);
-      float spiral = t * 0.1 + r * 1.5;
+      float spiral = t * 0.08 + r * 2.5 + 0.3 * sin(r * 4.0 - t * 0.5);
       float cs = cos(spiral), sn = sin(spiral);
       p = vec2(p.x * cs - p.y * sn, p.x * sn + p.y * cs);
 
       // ── Kaleidoscope fold ─────────────────────────────────────────────
       float n = u_folds;
       vec2 kp = kaleidoscope(p, n);
+      kp = kaleidoscope(kp * 1.4, max(n - 1.0, 2.0));
 
-      // Second pass fold for complexity
-      kp = kaleidoscope(kp * 1.3, max(n - 1.0, 2.0));
-
-      // ── Domain warping ────────────────────────────────────────────────
+      // ── Domain warping (ominous, slow) ───────────────────────────────
       vec2 q = vec2(
-        fbm(kp * 3.0 + t * 0.15 + u_seed),
-        fbm(kp * 3.0 + vec2(5.2, 1.3) + t * 0.12 + u_seed)
+        fbm(kp * 2.5 + t * 0.08 + u_seed),
+        fbm(kp * 2.5 + vec2(5.2, 1.3) + t * 0.06 + u_seed)
       );
       vec2 rr = vec2(
-        fbm(kp * 3.0 + q * 4.0 + vec2(1.7, 9.2) + t * 0.08),
-        fbm(kp * 3.0 + q * 4.0 + vec2(8.3, 2.8) + t * 0.1)
+        fbm(kp * 2.5 + q * 3.5 + vec2(1.7, 9.2) + t * 0.04),
+        fbm(kp * 2.5 + q * 3.5 + vec2(8.3, 2.8) + t * 0.05)
       );
 
-      float f = fbm(kp * 3.0 + rr * 3.0);
+      float f = fbm(kp * 2.5 + rr * 2.5);
 
-      // ── Colour mapping ────────────────────────────────────────────────
-      vec3 col = mix(u_col1, u_col2, clamp(f * f * 2.0, 0.0, 1.0));
-      col = mix(col, u_col3, clamp(length(q) * 0.5, 0.0, 1.0));
-      col = mix(col, u_col1 * 1.5, clamp(length(rr.x) * 0.4, 0.0, 1.0));
+      // ── Ominous ember colour mapping ─────────────────────────────────
+      // Base: deep black
+      vec3 col = vec3(0.01, 0.005, 0.0);
 
-      // Bright edge glow on fold lines
+      // Faint smouldering glow
+      float ember = pow(f, 2.5) * 0.6;
+      col += u_col1 * ember;
+
+      // Hot cracks — sharp highlights
+      float cracks = pow(max(f - 0.55, 0.0) * 5.0, 1.5);
+      col += u_col2 * cracks * 0.5;
+
+      // Deep heat radiance
+      col += u_col3 * pow(length(q) * 0.3, 2.0) * 0.15;
+
+      // Fold-line ember glow
       float edgeDist = length(kp - kaleidoscope(kp + vec2(0.001, 0.0), n));
-      col += u_col2 * 0.15 / (edgeDist + 0.01);
+      col += u_col2 * 0.04 / (edgeDist + 0.008);
 
-      // Radial vignette
-      col *= 1.0 - 0.3 * pow(length(uv), 2.5);
+      // Heavy radial vignette — darkness closing in
+      col *= 1.0 - 0.6 * pow(length(uv), 1.8);
 
-      // Mouse proximity glow
-      float md = length(uv - m * 0.5);
-      col += u_col3 * 0.08 * exp(-md * 3.0);
+      // Mouse proximity — faint warmth
+      float md = length(uv - m * 0.25);
+      col += u_col1 * 0.06 * exp(-md * 4.0);
 
-      // Subtle scanlines
-      col *= 0.95 + 0.05 * sin(gl_FragCoord.y * 1.5);
+      // Hyperbolic boundary glow — faint red at the rim of the disk
+      float boundaryGlow = exp(-pow(1.0 - length(uv), 0.3) * 0.5);
+      col += vec3(0.15, 0.02, 0.0) * boundaryGlow * 0.4;
 
-      // Tone mapping
-      col = col / (col + 0.5);
-      col = pow(col, vec3(0.9));
+      // Film grain for atmosphere
+      col += (hash(uv * u_res + fract(t * 100.0)) - 0.5) * 0.015;
+
+      // Crush blacks, dim highlights
+      col = pow(col, vec3(1.1));
+      col = col / (col + 0.35);
 
       gl_FragColor = vec4(col, 1.0);
     }
@@ -175,13 +208,14 @@
   ['u_time','u_res','u_mouse','u_folds','u_auto','u_col1','u_col2','u_col3','u_seed'].forEach(n => u[n] = gl.getUniformLocation(prog, n));
 
   // ── Palettes ──────────────────────────────────────────────────────────────
+  // ── Palettes (ominous ember) ──────────────────────────────────────────────
   const palettes = [
-    [[0.95,0.15,0.4],[0.1,0.85,0.95],[0.98,0.75,0.1]],   // hot pink / cyan / gold
-    [[0.2,1.0,0.5],[0.6,0.1,0.95],[1.0,0.35,0.05]],       // green / violet / orange
-    [[1.0,0.0,0.5],[0.0,1.0,0.8],[0.95,0.95,0.1]],        // magenta / teal / yellow
-    [[0.1,0.4,1.0],[1.0,0.1,0.6],[0.2,1.0,0.2]],          // blue / hot pink / green
-    [[1.0,0.5,0.0],[0.5,0.0,1.0],[0.0,1.0,0.7]],          // orange / purple / aqua
-    [[0.9,0.9,1.0],[1.0,0.2,0.2],[0.2,0.2,1.0]],          // ice / red / blue
+    [[0.8,0.12,0.02],[1.0,0.45,0.05],[0.15,0.03,0.0]],   // deep crimson / amber / charcoal
+    [[0.6,0.04,0.1],[1.0,0.25,0.02],[0.08,0.01,0.05]],   // dark wine / hot orange / void
+    [[0.9,0.3,0.0],[0.5,0.08,0.0],[0.05,0.05,0.08]],     // burnt orange / dark rust / cold ash
+    [[0.3,0.0,0.0],[0.95,0.5,0.08],[0.1,0.02,0.02]],      // near-black / molten gold / dried blood
+    [[0.7,0.1,0.15],[1.0,0.6,0.1],[0.02,0.01,0.03]],      // smouldering red / bright ember / abyss
+    [[0.4,0.06,0.0],[0.85,0.35,0.05],[0.12,0.08,0.06]],   // dark umber / glowing coal / ash grey
   ];
   let pal = palettes[0];
 
