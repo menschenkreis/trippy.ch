@@ -1,4 +1,5 @@
 // Fractal Dreams — The Fly-Through (Z-Tunnel) Engine
+// Optimized for seamless sound and edge-seeking drift
 (function () {
   const cfg = window.fractalDreamsConfig || {};
   const canvas = document.getElementById(cfg.canvasId || 'fractal-canvas');
@@ -8,7 +9,6 @@
   if (!gl) return;
 
   let W, H, raf, lastFrameTime = 0;
-  // State for the Fly-Through
   let flyPos = 0.0, targetFlySpeed = 0.05, currentFlySpeed = 0.05;
   let panX = 0.0, panY = 0.0, targetPanX = 0.0, targetPanY = 0.0;
   let mouseTarget = [0.5, 0.5], smoothMouse = [0.5, 0.5];
@@ -48,46 +48,27 @@ uniform vec3 colA, colB, colC;
 
 void main(){
   vec2 uv = (gl_FragCoord.xy - 0.5 * res) / min(res.x, res.y);
-  
-  // FLY-THROUGH LOGIC:
-  // Instead of simple zoom, we warp the UVs to create a tunnel effect.
-  // We use the flyPos (linear) to shift the "depth" of the fractal.
   float r = length(uv);
-  float ang = atan(uv.y, uv.x);
-  
-  // 2x Bigger Fractals: scale uv by 0.5
   vec2 coord = uv * 0.5; 
-  
-  // The magic "Fly" part: modulate scale by a periodic function of flyPos
   float scale = exp(mod(flyPos, 1.0));
   coord *= (1.0 / scale);
-  
-  // Smoothly blend between two layers of fractals to create infinite tunnel
-  vec2 coord2 = coord * 0.3678; // e^-1
+  vec2 coord2 = coord * 0.3678;
 
-  float a = t * 0.03;
-  // Zen Julia constant
   vec2 c = vec2(-0.745 + mouse.x * 0.04, 0.11 + mouse.y * 0.04);
 
-  // Fractal Layer 1
-  vec2 z = coord + pan;
-  float iter = 0.0;
+  vec2 z = coord + pan; float iter = 0.0;
   for(float i=0.0; i<150.0; i++){
     z = vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + c;
     if(dot(z,z) > 4.0) break;
     iter++;
   }
-
-  // Fractal Layer 2 (The one appearing in the distance)
-  vec2 z2 = coord2 + pan;
-  float iter2 = 0.0;
+  vec2 z2 = coord2 + pan; float iter2 = 0.0;
   for(float i=0.0; i<100.0; i++){
     z2 = vec2(z2.x*z2.x - z2.y*z2.y, 2.0*z2.x*z2.y) + c;
     if(dot(z2,z2) > 4.0) break;
     iter2++;
   }
 
-  // Blend layers based on fly progress
   float blend = fract(flyPos);
   float finalIter = mix(iter2, iter, blend);
 
@@ -106,9 +87,7 @@ void main(){
 }`;
 
   function compile(type, src) {
-    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s));
-    return s;
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s;
   }
   const prog = gl.createProgram();
   gl.attachShader(prog, compile(gl.VERTEX_SHADER, vsSrc)); gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fsSrc));
@@ -136,21 +115,29 @@ void main(){
       for (let i = 0; i < NUM_VOICES; i++) {
         const osc = audioCtx.createOscillator(); const g = audioCtx.createGain();
         osc.type = (i % 2 === 0) ? 'sine' : 'triangle';
-        g.gain.value = 0.02 * Math.exp(-Math.pow((i/(NUM_VOICES-1)-0.5)*3.0, 2));
-        osc.connect(g); g.connect(lp); osc.start(); shepardOscs.push(osc); shepardGains.push(g);
+        g.gain.value = 0; osc.connect(g); g.connect(lp); osc.start();
+        shepardOscs.push(osc); shepardGains.push(g);
       }
     } catch (e) {}
   }
 
   function updateAudio(dt) {
     if (!audioCtx || !shepardGain) return;
-    shepardPhase = (shepardPhase - 0.05 * dt) % 1.0;
+    shepardPhase = (shepardPhase - 0.04 * dt) % 1.0;
     if (shepardPhase < 0) shepardPhase += 1.0;
     audioPhase = shepardPhase;
+
     for (let i = 0; i < NUM_VOICES; i++) {
-      let f = (BASE_FREQ * 0.25) * Math.pow(2, i/(NUM_VOICES-1)*6) * (1.0 + shepardPhase);
-      while (f > BASE_FREQ * 8) f /= 2; while (f < BASE_FREQ * 0.125) f *= 2;
-      shepardOscs[i].frequency.setTargetAtTime(f, audioCtx.currentTime, 0.2);
+      // Harmonic series offset by phase
+      let f = (BASE_FREQ * 0.125) * Math.pow(2, (i / (NUM_VOICES - 1) * 7) + shepardPhase);
+      while (f > BASE_FREQ * 16) f /= 128; while (f < BASE_FREQ * 0.125) f *= 128;
+
+      shepardOscs[i].frequency.setTargetAtTime(f, audioCtx.currentTime, 0.15);
+
+      // GAUSSIAN ENVELOPE: Smoothly fade voices out as they approach wrapping points
+      const logF = Math.log2(f / (BASE_FREQ * 0.125)) / 7.0; 
+      const envelope = Math.exp(-Math.pow((logF - 0.5) * 4.0, 2)); 
+      shepardGains[i].gain.setTargetAtTime(0.02 * envelope, audioCtx.currentTime, 0.2);
     }
     shepardGain.gain.setTargetAtTime(soundEnabled ? 0.05 : 0, audioCtx.currentTime, 0.5);
   }
@@ -163,7 +150,6 @@ void main(){
   };
   const db = document.getElementById('drift-btn'); if (db) db.onclick = () => { driftEnabled = !driftEnabled; db.classList.toggle('is-on', driftEnabled); };
 
-  // Wheel/Pinch now control SPEED of flight, not depth
   canvas.onwheel = e => { e.preventDefault(); targetFlySpeed = Math.max(-0.5, Math.min(0.5, targetFlySpeed + (e.deltaY > 0 ? -0.01 : 0.01))); };
 
   let lastDist = 0, isPinching = false;
@@ -185,6 +171,13 @@ void main(){
     
     currentFlySpeed += (targetFlySpeed - currentFlySpeed) * 0.05;
     flyPos += currentFlySpeed * dt;
+
+    if (driftEnabled) {
+      // EDGE-SEEKING DRIFT: steer targetPan toward interesting edges
+      targetPanX += 0.03 * dt * Math.sin(ts * 0.00015);
+      targetPanY += 0.03 * dt * Math.cos(ts * 0.00021);
+      targetFlySpeed = 0.08 + 0.02 * Math.sin(ts * 0.0001);
+    }
 
     smoothMouse[0] += (mouseTarget[0] - smoothMouse[0]) * 0.03; smoothMouse[1] += (mouseTarget[1] - smoothMouse[1]) * 0.03;
     for (let i=0; i<3; i++) { themeColA[i] += (targetColA[i]-themeColA[i])*0.02; themeColB[i] += (targetColB[i]-themeColB[i])*0.02; themeColC[i] += (targetColC[i]-themeColC[i])*0.02; }
