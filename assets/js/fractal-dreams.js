@@ -517,16 +517,22 @@ void main(){
       if (s > bestScore) { bestScore = s; bestAngle = angle; }
     }
 
+    // Blend new target into driftSteer gradually — prevents 180° direction flips
+    const blendRate = 0.25; // only 25% of new target per sample
     if (bestScore < 0.04) {
-      // Completely void — zoom out and drift back toward the interesting region
-      tzoom = Math.min(tzoom * 2.5, 3.0);
+      // Void: gentle zoom-out (no jump), nudge back toward known interest
+      const escapeX = (-0.5 - tcx) * 0.15;
+      const escapeY = ( 0.0 - tcy) * 0.15;
+      driftSteerX += (escapeX - driftSteerX) * blendRate;
+      driftSteerY += (escapeY - driftSteerY) * blendRate;
+      // Very gentle zoom-out: just slow the zoom-in rate, don't jump
+      tzoom = Math.min(tzoom * Math.pow(1.002, 60 * 0.25), 3.0);
       tlogZoom = Math.log(tzoom);
-      driftSteerX = (-0.5 - tcx) * 0.5;
-      driftSteerY = ( 0.0 - tcy) * 0.5;
     } else {
-      // Steer gently toward the best edge direction
-      driftSteerX = Math.cos(bestAngle) * probeR * 0.25;
-      driftSteerY = Math.sin(bestAngle) * probeR * 0.25;
+      const newSteerX = Math.cos(bestAngle) * probeR * 0.25;
+      const newSteerY = Math.sin(bestAngle) * probeR * 0.25;
+      driftSteerX += (newSteerX - driftSteerX) * blendRate;
+      driftSteerY += (newSteerY - driftSteerY) * blendRate;
     }
   }
 
@@ -542,16 +548,16 @@ void main(){
     if (driftEnabled && !interacting) {
       driftT += dt;
 
-      // Re-sample steering every ~250 ms
-      if (driftT - lastSampleTs > 0.25) {
+      // Re-sample steering every ~150 ms (smaller, more frequent corrections)
+      if (driftT - lastSampleTs > 0.15) {
         lastSampleTs = driftT;
         updateDriftSteering();
       }
 
       // Smooth velocity toward the steering target
       const steerStrength = 0.3;
-      driftVx += (driftSteerX * steerStrength - driftVx) * Math.min(dt * 0.375, 1);
-      driftVy += (driftSteerY * steerStrength - driftVy) * Math.min(dt * 0.375, 1);
+      driftVx += (driftSteerX * steerStrength - driftVx) * Math.min(dt * 0.18, 1);
+      driftVy += (driftSteerY * steerStrength - driftVy) * Math.min(dt * 0.18, 1);
 
       // Advance position
       tcx += driftVx * dt;
