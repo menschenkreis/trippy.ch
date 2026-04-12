@@ -548,16 +548,16 @@ void main(){
       }
 
       // Smooth velocity toward the steering target
-      const steerStrength = 0.15;
-      driftVx += (driftSteerX * steerStrength - driftVx) * Math.min(dt * 0.18, 1);
-      driftVy += (driftSteerY * steerStrength - driftVy) * Math.min(dt * 0.18, 1);
+      const steerStrength = 0.3;
+      driftVx += (driftSteerX * steerStrength - driftVx) * Math.min(dt * 0.375, 1);
+      driftVy += (driftSteerY * steerStrength - driftVy) * Math.min(dt * 0.375, 1);
 
       // Advance position
       tcx += driftVx * dt;
       tcy += driftVy * dt;
 
       // Slow zoom — follows boundary depth naturally
-      tzoom *= Math.pow(0.9983, dt * 60);
+      tzoom *= Math.pow(0.9967, dt * 60);
       tlogZoom = Math.log(Math.max(tzoom, 1e-14));
       if (tzoom < 1e-8) { tzoom = 3.0; tlogZoom = Math.log(3.0); tcx = -0.5; tcy = 0.0; driftVx = 0; driftVy = 0; lastSampleTs = -9999; }
     }
@@ -611,13 +611,13 @@ void main(){
     // driftScale: 1.0 at overview (zoom>=1), shrinks to ~0 at deep zoom.
     // This keeps c visually stable — perturbations never exceed ~1 screen unit.
     const driftScale = Math.min(1.0, zoom * 1.5);
-    juliaT += dt * driftScale;
+    juliaT += dt * driftScale * 0.4;
     // Slow sinusoidal drift, amplitude scales with zoom so visual shift is constant
     const jDrift = 0.045 * driftScale;
     const jMouse = 0.05  * driftScale;
-    juliaCX = -0.745 + jDrift * Math.cos(juliaT * 0.25)
+    juliaCX = -0.745 + jDrift * Math.cos(juliaT * 0.08)
                      + (smoothMouse[0] - 0.5) * jMouse;
-    juliaCY =  0.110 + jDrift * Math.sin(juliaT * 0.25 * 1.3)
+    juliaCY =  0.110 + jDrift * Math.sin(juliaT * 0.08 * 1.3)
                      + (smoothMouse[1] - 0.5) * jMouse;
 
     // ── Audio ────────────────────────────────────────────────────────────────
