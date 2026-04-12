@@ -81,20 +81,16 @@ class Sphere {
   constructor(x, y, r){
     this.x = x; this.y = y;
     this.r = r || (15 + Math.random()*35);
-    this.vx = (Math.random()-0.5)*20;
-    this.vy = (Math.random()-0.5)*20;
+    this.vx = 0;
+    this.vy = 0;
     this.rotation = Math.random()*TAU;
     this.rotSpeed = (Math.random()-0.5)*0.02;
     this.hue = Math.random()*360;
     this.segments = 3 + Math.floor(Math.random()*5); // sacred geometry sides
   }
   update(dt){
-    this.vy += gravityY * dt * 0.3;
-    this.vx += gravityX * dt * 0.3;
-    this.vx *= 0.999; this.vy *= 0.999;
-    this.x += this.vx * dt;
-    this.y += this.vy * dt;
     this.rotation += this.rotSpeed;
+    // Spheres are STATIC in world space — no gravity, no movement
   }
 }
 
@@ -569,13 +565,18 @@ function frame(now){
 
   // Physics substeps
   for(let s=0;s<SUBSTEPS;s++){
-    // Update ragdolls
     for(const r of ragdolls) r.update(dt);
-    // Update spheres
-    for(const sp of spheres) sp.update(dt);
-    // Collisions
+    // No sphere physics — they're static obstacles
     for(const r of ragdolls){
       for(const sp of spheres) collideRagdollSphere(r, sp);
+    }
+  }
+
+  // Clamp ragdoll to screen width
+  for(const r of ragdolls){
+    for(const p of r.particles){
+      if(p.x < 20){ p.x = 20; p.ox = 20; }
+      if(p.x > W-20){ p.x = W-20; p.ox = W-20; }
     }
   }
 
