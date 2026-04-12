@@ -1,5 +1,4 @@
-// Fractal Dreams — Evolving Julia set with theme-reactive colors
-// High-precision infinite zoom engine
+// Fractal Dreams — The Fly-Through (Z-Tunnel) Engine
 (function () {
   const cfg = window.fractalDreamsConfig || {};
   const canvas = document.getElementById(cfg.canvasId || 'fractal-canvas');
@@ -8,12 +7,10 @@
   const gl = canvas.getContext('webgl', { antialias: true, depth: false }) || canvas.getContext('experimental-webgl');
   if (!gl) return;
 
-  let W, H, raf;
-  // Initialize with a comfortable zoom and centered pan
-  let zoom = 2.0, targetZoom = 2.0;
+  let W, H, raf, lastFrameTime = 0;
+  // State for the Fly-Through
+  let flyPos = 0.0, targetFlySpeed = 0.05, currentFlySpeed = 0.05;
   let panX = 0.0, panY = 0.0, targetPanX = 0.0, targetPanY = 0.0;
-  let prevZoom = 2.0, zoomVelocity = 0.0, lastFrameTime = 0;
-
   let mouseTarget = [0.5, 0.5], smoothMouse = [0.5, 0.5];
 
   let themeColA = [0.49, 0.23, 0.93], themeColB = [0.18, 0.83, 0.75], themeColC = [0.93, 0.28, 0.60];
@@ -24,8 +21,7 @@
   function resize() {
     const dpr = Math.min(window.devicePixelRatio, 2.0);
     const w = window.innerWidth, h = window.innerHeight;
-    canvas.width = Math.floor(w * dpr);
-    canvas.height = Math.floor(h * dpr);
+    canvas.width = Math.floor(w * dpr); canvas.height = Math.floor(h * dpr);
     W = canvas.width; H = canvas.height;
     gl.viewport(0, 0, W, H);
   }
@@ -46,41 +42,66 @@
   const vsSrc = 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0, 1); }';
   const fsSrc = `
 precision highp float;
-uniform float t, zoom, audioPhase;
+uniform float t, flyPos, audioPhase;
 uniform vec2 res, mouse, pan;
 uniform vec3 colA, colB, colC;
 
 void main(){
   vec2 uv = (gl_FragCoord.xy - 0.5 * res) / min(res.x, res.y);
-  // Simpler coordinate math to guarantee visibility
-  vec2 coord = uv * zoom + pan;
+  
+  // FLY-THROUGH LOGIC:
+  // Instead of simple zoom, we warp the UVs to create a tunnel effect.
+  // We use the flyPos (linear) to shift the "depth" of the fractal.
+  float r = length(uv);
+  float ang = atan(uv.y, uv.x);
+  
+  // 2x Bigger Fractals: scale uv by 0.5
+  vec2 coord = uv * 0.5; 
+  
+  // The magic "Fly" part: modulate scale by a periodic function of flyPos
+  float scale = exp(mod(flyPos, 1.0));
+  coord *= (1.0 / scale);
+  
+  // Smoothly blend between two layers of fractals to create infinite tunnel
+  vec2 coord2 = coord * 0.3678; // e^-1
 
-  float logZ = log2(max(1.0, 1.0/zoom));
-  float depthFactor = 1.0 / (1.0 + logZ * 0.1);
+  float a = t * 0.03;
+  // Zen Julia constant
+  vec2 c = vec2(-0.745 + mouse.x * 0.04, 0.11 + mouse.y * 0.04);
 
-  float a = t * 0.04;
-  vec2 c = vec2(-0.745 + 0.1 * cos(a) + mouse.x * 0.05 * depthFactor, 0.11 + 0.1 * sin(a * 1.3) + mouse.y * 0.05 * depthFactor);
-
-  vec2 z = coord; float iter = 0.0;
-  for(float i=0.0; i<200.0; i++){
+  // Fractal Layer 1
+  vec2 z = coord + pan;
+  float iter = 0.0;
+  for(float i=0.0; i<150.0; i++){
     z = vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + c;
     if(dot(z,z) > 4.0) break;
     iter++;
   }
 
+  // Fractal Layer 2 (The one appearing in the distance)
+  vec2 z2 = coord2 + pan;
+  float iter2 = 0.0;
+  for(float i=0.0; i<100.0; i++){
+    z2 = vec2(z2.x*z2.x - z2.y*z2.y, 2.0*z2.x*z2.y) + c;
+    if(dot(z2,z2) > 4.0) break;
+    iter2++;
+  }
+
+  // Blend layers based on fly progress
+  float blend = fract(flyPos);
+  float finalIter = mix(iter2, iter, blend);
+
   vec3 col = vec3(0.01, 0.005, 0.02);
-  if(iter < 200.0){
-    float sl = iter - log2(log2(dot(z,z))) + 4.0;
+  if(finalIter > 0.0){
+    float sl = finalIter - log2(log2(max(1.1, dot(z,z)))) + 4.0;
     float phase = fract(sl * 0.02 + t * 0.01 + audioPhase * 0.2);
     vec3 pal = (phase < 0.33) ? mix(colA, colB, phase/0.33) : (phase < 0.66 ? mix(colB, colC, (phase-0.33)/0.33) : mix(colC, colA, (phase-0.66)/0.34));
-    float val = 0.2 + 0.8 * pow(sl/200.0, 0.5) + 0.05 * sin(audioPhase * 6.28);
+    float val = 0.2 + 0.8 * pow(finalIter/150.0, 0.5) + 0.05 * sin(audioPhase * 6.28);
     col = pal * clamp(val, 0.0, 1.2);
-  } else {
-    col += colA * 0.1 * exp(-length(coord)*0.5);
   }
 
   vec2 sc = gl_FragCoord.xy / res;
-  col *= smoothstep(0.0, 0.8, 1.0 - length(sc - 0.5) * 1.2);
+  col *= smoothstep(0.0, 0.8, 1.0 - length(sc - 0.5) * 1.3);
   gl_FragColor = vec4(col, 1.0);
 }`;
 
@@ -99,7 +120,7 @@ void main(){
   gl.vertexAttribPointer(pLoc, 2, gl.FLOAT, false, 0, 0);
 
   const uT = gl.getUniformLocation(prog, 't'), uRes = gl.getUniformLocation(prog, 'res'), uMouse = gl.getUniformLocation(prog, 'mouse');
-  const uZoom = gl.getUniformLocation(prog, 'zoom'), uPan = gl.getUniformLocation(prog, 'pan');
+  const uFlyPos = gl.getUniformLocation(prog, 'flyPos'), uPan = gl.getUniformLocation(prog, 'pan');
   const uColA = gl.getUniformLocation(prog, 'colA'), uColB = gl.getUniformLocation(prog, 'colB'), uColC = gl.getUniformLocation(prog, 'colC'), uAudioPhase = gl.getUniformLocation(prog, 'audioPhase');
 
   // ── Audio ──
@@ -121,9 +142,9 @@ void main(){
     } catch (e) {}
   }
 
-  function updateAudio(dt, vel) {
+  function updateAudio(dt) {
     if (!audioCtx || !shepardGain) return;
-    shepardPhase = (shepardPhase - (0.05 + Math.min(Math.abs(vel), 3) * 0.1) * dt) % 1.0;
+    shepardPhase = (shepardPhase - 0.05 * dt) % 1.0;
     if (shepardPhase < 0) shepardPhase += 1.0;
     audioPhase = shepardPhase;
     for (let i = 0; i < NUM_VOICES; i++) {
@@ -142,49 +163,37 @@ void main(){
   };
   const db = document.getElementById('drift-btn'); if (db) db.onclick = () => { driftEnabled = !driftEnabled; db.classList.toggle('is-on', driftEnabled); };
 
-  canvas.onwheel = e => { e.preventDefault(); targetZoom = Math.max(0.0001, Math.min(100, targetZoom * (e.deltaY > 0 ? 1.1 : 0.9))); };
+  // Wheel/Pinch now control SPEED of flight, not depth
+  canvas.onwheel = e => { e.preventDefault(); targetFlySpeed = Math.max(-0.5, Math.min(0.5, targetFlySpeed + (e.deltaY > 0 ? -0.01 : 0.01))); };
 
-  let lastDist = 0, lastCenter = null, isPinching = false;
-  canvas.ontouchstart = e => {
-    if (e.touches.length === 2) {
-      isPinching = true;
-      lastDist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
-      lastCenter = { x: (e.touches[0].clientX + e.touches[1].clientX)/2, y: (e.touches[0].clientY + e.touches[1].clientY)/2 };
-    }
-  };
+  let lastDist = 0, isPinching = false;
+  canvas.ontouchstart = e => { if (e.touches.length === 2) { isPinching = true; lastDist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY); } };
   canvas.ontouchmove = e => {
-    if (e.touches.length === 1 && !isPinching) {
-      mouseTarget[0] = e.touches[0].clientX/window.innerWidth; mouseTarget[1] = 1.0 - e.touches[0].clientY/window.innerHeight;
-    }
+    if (e.touches.length === 1 && !isPinching) { mouseTarget[0] = e.touches[0].clientX/window.innerWidth; mouseTarget[1] = 1.0 - e.touches[0].clientY/window.innerHeight; }
     if (e.touches.length === 2) {
       e.preventDefault();
       const dist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
-      const center = { x: (e.touches[0].clientX + e.touches[1].clientX)/2, y: (e.touches[0].clientY + e.touches[1].clientY)/2 };
-      if (lastDist > 0) targetZoom = Math.max(0.0001, Math.min(100, targetZoom * (lastDist / dist)));
-      if (lastCenter) {
-        targetPanX += (lastCenter.x - center.x) * (zoom / Math.min(window.innerWidth, window.innerHeight));
-        targetPanY -= (lastCenter.y - center.y) * (zoom / Math.min(window.innerWidth, window.innerHeight));
-      }
-      lastDist = dist; lastCenter = center;
+      if (lastDist > 0) targetFlySpeed += (dist - lastDist) * 0.001;
+      lastDist = dist;
     }
   };
-  canvas.ontouchend = () => { isPinching = false; lastDist = 0; lastCenter = null; };
+  canvas.ontouchend = () => { isPinching = false; lastDist = 0; };
   window.onmousemove = e => { mouseTarget[0] = e.clientX/window.innerWidth; mouseTarget[1] = 1.0 - e.clientY/window.innerHeight; };
 
   function frame(ts) {
     const dt = lastFrameTime ? Math.min((ts - lastFrameTime) * 0.001, 0.1) : 0.016; lastFrameTime = ts;
-    if (driftEnabled) { targetZoom *= (1.0 - 0.05 * dt); targetPanX += 0.005 * dt * Math.sin(ts * 0.0002); }
+    
+    currentFlySpeed += (targetFlySpeed - currentFlySpeed) * 0.05;
+    flyPos += currentFlySpeed * dt;
 
     smoothMouse[0] += (mouseTarget[0] - smoothMouse[0]) * 0.03; smoothMouse[1] += (mouseTarget[1] - smoothMouse[1]) * 0.03;
     for (let i=0; i<3; i++) { themeColA[i] += (targetColA[i]-themeColA[i])*0.02; themeColB[i] += (targetColB[i]-themeColB[i])*0.02; themeColC[i] += (targetColC[i]-themeColC[i])*0.02; }
 
-    prevZoom = zoom; zoom += (targetZoom - zoom) * 0.1;
     panX += (targetPanX - panX) * 0.1; panY += (targetPanY - panY) * 0.1;
-
-    updateAudio(dt, (Math.log(zoom) - Math.log(prevZoom)) / dt);
+    updateAudio(dt);
 
     gl.uniform1f(uT, ts*0.001); gl.uniform2f(uRes, W, H); gl.uniform2f(uMouse, smoothMouse[0], smoothMouse[1]);
-    gl.uniform1f(uZoom, zoom); gl.uniform2f(uPan, panX, panY);
+    gl.uniform1f(uFlyPos, flyPos); gl.uniform2f(uPan, panX, panY);
     gl.uniform3f(uColA, themeColA[0], themeColA[1], themeColA[2]); gl.uniform3f(uColB, themeColB[0], themeColB[1], themeColB[2]); gl.uniform3f(uColC, themeColC[0], themeColC[1], themeColC[2]);
     gl.uniform1f(uAudioPhase, audioPhase);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
