@@ -327,8 +327,8 @@ void main(){
       if (lastPinchCenter) {
         const moveX = (center.x - lastPinchCenter.x) / window.innerWidth;
         const moveY = (center.y - lastPinchCenter.y) / window.innerHeight;
-        targetPanX += moveX * zoom * 0.8;
-        targetPanY -= moveY * zoom * 0.8;
+        targetPanX -= moveX * zoom * 1.5;
+        targetPanY += moveY * zoom * 1.5;
       }
       lastPinchDist = dist;
       lastPinchCenter = center;
