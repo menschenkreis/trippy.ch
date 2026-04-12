@@ -29,6 +29,7 @@
   // Log-space zoom for perceptually-linear easing at any depth
   let logZoom  = Math.log(zoom);   // rendered (eased) log zoom
   let tlogZoom = Math.log(tzoom);  // target log zoom
+  let smoothMaxIter = 80;           // eased iteration count — prevents pop-in
 
   // Inertia: velocity in fractal-space units per second
   let vx = 0, vy = 0;
@@ -624,7 +625,10 @@ void main(){
     updateAudio(dt);
 
     // ── Adaptive iterations ──────────────────────────────────────────────────
-    const maxIter = calcMaxIter(zoom);
+    // Ease maxIter to avoid sudden detail pop-in during auto-zoom
+    const targetMaxIter = calcMaxIter(zoom);
+    smoothMaxIter += (targetMaxIter - smoothMaxIter) * Math.min(dt * 0.8, 1);
+    const maxIter = smoothMaxIter;
 
     // ── Draw ─────────────────────────────────────────────────────────────────
     gl.uniform1f(uT,       ts * 0.001);
