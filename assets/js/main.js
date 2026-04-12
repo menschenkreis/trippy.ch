@@ -128,17 +128,28 @@
   }
 })();
 
-// ── Smooth Page Transitions ──
+// ── Smooth Page Transitions & Portal ──
 (function () {
   const overlay = document.getElementById('page-transition');
   if (!overlay) return;
 
+  // Portal effect on home page
+  const portalTrigger = document.querySelector('.portal-trigger');
+  if (portalTrigger) {
+    portalTrigger.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.body.classList.add('portal-active');
+      setTimeout(() => {
+        window.location.href = portalTrigger.getAttribute('href');
+      }, 1200);
+    });
+  }
+
   // Intercept internal links
   document.addEventListener('click', (e) => {
     const a = e.target.closest('a[href]');
-    if (!a) return;
+    if (!a || a.classList.contains('portal-trigger')) return;
     const href = a.getAttribute('href');
-    // Skip external, hash, and non-http links
     if (!href || href.startsWith('#') || href.startsWith('http') || href.startsWith('//') || a.target === '_blank') return;
 
     e.preventDefault();

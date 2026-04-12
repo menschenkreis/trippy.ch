@@ -108,6 +108,54 @@ a:hover { color: var(--pink); }
 }
 #contrast-btn:hover { border-color: var(--violet); color: var(--fg); }
 
+/* Sound Toggle */
+#sound-btn {
+  position: fixed;
+  top: 1rem;
+  right: 3.5rem;
+  z-index: 1000;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--fg-muted);
+  background: rgba(0,0,0,0.4);
+  color: var(--fg-muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-colors);
+  backdrop-filter: blur(8px);
+}
+#sound-btn:hover { border-color: var(--violet); color: var(--fg); }
+#sound-btn.is-on { color: var(--teal); border-color: var(--teal); }
+
+/* Drift Toggle */
+#drift-btn {
+  position: fixed;
+  top: 1rem;
+  right: 6rem;
+  z-index: 1000;
+  width: 50px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--fg-muted);
+  background: rgba(0,0,0,0.4);
+  color: var(--fg-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-colors);
+  backdrop-filter: blur(8px);
+}
+#drift-btn:hover { border-color: var(--violet); color: var(--fg); }
+#drift-btn.is-on { color: var(--pink); border-color: var(--pink); box-shadow: 0 0 15px var(--pink-glow); }
+
 /* High Contrast Mode */
 body.high-contrast {
   --bg: #0d0520;
@@ -159,7 +207,33 @@ body.high-contrast .hero-title {
   color: var(--fg);
   text-shadow: 0 0 60px var(--purple-glow), 0 0 120px var(--teal-glow);
   margin-bottom: 0.5rem;
-  transition: var(--transition-colors);
+  transition: transform 1.5s cubic-bezier(0.7, 0, 0.3, 1), opacity 0.8s ease, var(--transition-colors);
+}
+
+.portal-trigger {
+  text-decoration: none;
+  pointer-events: auto;
+  display: inline-block;
+}
+
+.portal-active .hero-title {
+  transform: scale(100);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.portal-active .hero-sub,
+.portal-active .scroll-hint,
+.portal-active #theme-btn,
+.portal-active #contrast-btn,
+.portal-active #sound-btn {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.portal-active #cosmic-canvas {
+  filter: blur(10px) brightness(2);
+  transition: filter 1.5s ease;
 }
 
 .hero-sub {
@@ -277,9 +351,33 @@ footer a:hover { color: var(--pink); }
 }
 
 .blog-entry {
-  padding: 2rem 0;
+  position: relative;
+  padding: 3rem 2rem;
+  margin-bottom: 2rem;
+  border-radius: 20px;
+  overflow: hidden;
   border-bottom: 1px solid rgba(107, 33, 168, 0.15);
-  transition: border-color 0.6s ease;
+  transition: transform 0.4s ease;
+}
+
+.blog-bg-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  opacity: 0.4;
+}
+
+.blog-entry-content {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+.blog-entry-content a { pointer-events: auto; }
+
+.blog-entry:hover {
+  transform: scale(1.02);
 }
 
 .blog-entry:last-child { border-bottom: none; }
