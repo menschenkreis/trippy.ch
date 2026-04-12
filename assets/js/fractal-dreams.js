@@ -1,211 +1,529 @@
-// Fractal Dreams — The Eternal Bloom Engine (UX Overhaul)
-// Map-style panning, tap-to-morph, and harmonic seamless audio.
+// Fractal Dreams — Phase 1: Google Maps-quality interaction overhaul
+// Features:
+//   • Mouse click-drag panning (desktop)
+//   • Zoom-to-cursor (wheel zooms where you point)
+//   • Zoom-to-pinch-midpoint (mobile)
+//   • Inertia / momentum after drag release
+//   • Double-tap to zoom in (mobile)
+//   • Adaptive iteration count (scales with zoom depth)
+//   • Smooth easing on all state transitions
 (function () {
   const cfg = window.fractalDreamsConfig || {};
   const canvas = document.getElementById(cfg.canvasId || 'fractal-canvas');
   if (!canvas) return;
 
-  const gl = canvas.getContext('webgl', { antialias: true, depth: false }) || canvas.getContext('experimental-webgl');
+  const gl = canvas.getContext('webgl', { antialias: true, depth: false })
+           || canvas.getContext('experimental-webgl');
   if (!gl) return;
 
-  let W, H, raf, lastFrameTime = 0;
-  
-  // zoom: smaller = deeper. 
-  let zoom = 1.2, targetZoom = 1.2;
-  let panX = 0.0, panY = 0.0, targetPanX = 0.0, targetPanY = 0.0;
+  // ── State ──────────────────────────────────────────────────────────────────
+  let W, H;
+
+  // Fractal coordinate space: centre + zoom (zoom = fractal units visible on
+  // the shorter screen side). Smaller zoom = deeper in.
+  let cx = -0.5, cy = 0.0;   // fractal-space centre
+  let zoom = 3.0;              // fractal units visible on min(W,H)
+
+  // Smooth-render targets (what we're interpolating towards)
+  let tcx = cx, tcy = cy, tzoom = zoom;
+
+  // Inertia: velocity in fractal-space units per second
+  let vx = 0, vy = 0;
+  let lastFrameTime = 0;
+
+  // Mouse influence on Julia constant (separate from pan)
   let mouseTarget = [0.5, 0.5], smoothMouse = [0.5, 0.5];
 
-  // Extra parameter for tapping "life"
+  // Morph energy (tap burst)
   let morphEnergy = 0.0, targetMorphEnergy = 0.0;
 
-  let themeColA = [0.49, 0.23, 0.93], themeColB = [0.18, 0.83, 0.75], themeColC = [0.93, 0.28, 0.60];
-  let targetColA = [...themeColA], targetColB = [...themeColB], targetColC = [...themeColC];
+  // Theme colours
+  let themeColA = [0.49, 0.23, 0.93];
+  let themeColB = [0.18, 0.83, 0.75];
+  let themeColC = [0.93, 0.28, 0.60];
+  let targetColA = [...themeColA];
+  let targetColB = [...themeColB];
+  let targetColC = [...themeColC];
 
-  let driftEnabled = false, audioPhase = 0.0;
+  // Audio
+  let audioPhase = 0.0, shepardPhase = 0.0;
+  let soundEnabled = false, audioStarted = false;
+  let audioCtx = null, shepardGain = null;
+  const shepardOscs = [], shepardGains = [];
+  const NUM_VOICES = 12, BASE_FREQ = 432;
 
+  // UI state
+  let driftEnabled = false;
+
+  // ── Resize ─────────────────────────────────────────────────────────────────
   function resize() {
     const dpr = Math.min(window.devicePixelRatio, 2.0);
-    const w = window.innerWidth, h = window.innerHeight;
-    canvas.width = Math.floor(w * dpr); canvas.height = Math.floor(h * dpr);
+    canvas.width  = Math.floor(window.innerWidth  * dpr);
+    canvas.height = Math.floor(window.innerHeight * dpr);
     W = canvas.width; H = canvas.height;
     gl.viewport(0, 0, W, H);
   }
 
+  // ── Coordinate helpers ─────────────────────────────────────────────────────
+  // Convert screen pixel (css px, not dpr-scaled) → fractal space
+  function screenToFractal(px, py) {
+    const minSide = Math.min(window.innerWidth, window.innerHeight);
+    const fx = cx + (px - window.innerWidth  * 0.5) * (zoom / minSide);
+    const fy = cy - (py - window.innerHeight * 0.5) * (zoom / minSide);
+    return [fx, fy];
+  }
+
+  // Clean zoom-to-point
+  function zoomToPoint(px, py, factor) {
+    // factor < 1 → zoom in, factor > 1 → zoom out
+    const [fx, fy] = screenToFractal(px, py);
+    const newZoom = Math.max(1e-13, Math.min(4.0, tzoom * factor));
+    // Keep (fx, fy) stationary: new_centre = fp + (old_centre - fp) * (newZoom / oldZoom)
+    const ratio = newZoom / tzoom;
+    tcx = fx + (tcx - fx) * ratio;
+    tcy = fy + (tcy - fy) * ratio;
+    tzoom = newZoom;
+    vx = 0; vy = 0;
+  }
+
+  // ── Shader ─────────────────────────────────────────────────────────────────
   function hexToRGB(hex) {
     hex = hex.replace('#', '');
-    if (hex.length === 3) hex = hex.split('').map(c => c+c).join('');
-    return [parseInt(hex.substring(0, 2), 16) / 255, parseInt(hex.substring(2, 4), 16) / 255, parseInt(hex.substring(4, 6), 16) / 255];
+    if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    return [
+      parseInt(hex.substring(0, 2), 16) / 255,
+      parseInt(hex.substring(2, 4), 16) / 255,
+      parseInt(hex.substring(4, 6), 16) / 255
+    ];
   }
 
   function readThemeColors() {
     const s = getComputedStyle(document.documentElement);
-    const p = s.getPropertyValue('--purple').trim(), t = s.getPropertyValue('--teal').trim(), k = s.getPropertyValue('--pink').trim();
-    if (p) targetColA = hexToRGB(p); if (t) targetColB = hexToRGB(t); if (k) targetColC = hexToRGB(k);
+    const p = s.getPropertyValue('--purple').trim();
+    const t = s.getPropertyValue('--teal').trim();
+    const k = s.getPropertyValue('--pink').trim();
+    if (p) targetColA = hexToRGB(p);
+    if (t) targetColB = hexToRGB(t);
+    if (k) targetColC = hexToRGB(k);
   }
-  setInterval(readThemeColors, 1000); readThemeColors();
+  setInterval(readThemeColors, 1000);
+  readThemeColors();
 
   const vsSrc = 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0, 1); }';
+
+  // Adaptive max iterations — injected as a #define at compile time per zoom level.
+  // We'll use a uniform instead so we can change it without recompiling.
   const fsSrc = `
 precision highp float;
-uniform float t, zoom, audioPhase, morphEnergy;
-uniform vec2 res, mouse, pan;
+uniform float t, zoom, audioPhase, morphEnergy, maxIter;
+uniform vec2 res, mouse;
+uniform vec2 centre;          // fractal-space centre
 uniform vec3 colA, colB, colC;
 
 void main(){
-  vec2 uv = (gl_FragCoord.xy - 0.5 * res) / min(res.x, res.y);
-  vec2 coord = uv * zoom + pan;
+  vec2 uv = gl_FragCoord.xy / res;
+  // Map pixel to fractal coordinate
+  float minSide = min(res.x, res.y);
+  vec2 coord = centre + (gl_FragCoord.xy - res * 0.5) * (zoom / minSide);
+  // Flip Y so +Y is up
+  coord.y = centre.y - (gl_FragCoord.y - res.y * 0.5) * (zoom / minSide);
 
-  float logZ = log2(max(0.0001, 1.0/zoom));
-  float depthFactor = 1.0 / (1.0 + logZ * 0.1);
+  // Julia constant: slow drift + subtle mouse influence
+  float a = t * 0.025 + morphEnergy * 0.5;
+  vec2 c = vec2(
+    -0.745 + 0.045 * cos(a)      + (mouse.x - 0.5) * 0.06,
+     0.110 + 0.045 * sin(a*1.3)  + (mouse.y - 0.5) * 0.06
+  );
 
-  // Julia Constant: Base drift + Touch influence + Morph Energy pulse
-  float a = t * 0.03 + morphEnergy * 0.5;
-  vec2 c = vec2(-0.745 + 0.05 * cos(a) + mouse.x * 0.04 * depthFactor, 0.11 + 0.05 * sin(a * 1.3) + mouse.y * 0.04 * depthFactor);
-
-  vec2 z = coord; float iter = 0.0;
-  for(float i=0.0; i<200.0; i++){
+  vec2 z = coord;
+  float iter = 0.0;
+  float mi = maxIter;
+  for(float i = 0.0; i < 1024.0; i++){
+    if(i >= mi) break;
     z = vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + c;
-    if(dot(z,z) > 4.0) break;
+    if(dot(z,z) > 256.0) break;
     iter++;
   }
 
   vec3 col = vec3(0.01, 0.005, 0.02);
-  if(iter < 200.0){
+  if(iter < mi){
+    // Smooth iteration count (continuous colouring)
     float sl = iter - log2(log2(dot(z,z))) + 4.0;
-    float phase = fract(sl * 0.015 + t * 0.008 + audioPhase * 0.15 + morphEnergy * 0.2);
-    vec3 pal = (phase < 0.33) ? mix(colA, colB, phase/0.33) : (phase < 0.66 ? mix(colB, colC, (phase-0.33)/0.33) : mix(colC, colA, (phase-0.66)/0.34));
-    
-    // Add glowing "life" based on morph energy
-    float val = 0.2 + 0.8 * pow(sl/200.0, 0.45) + 0.05 * sin(audioPhase * 6.28) + morphEnergy * 0.1;
-    col = pal * clamp(val, 0.0, 1.5);
-    
-    float edge = 1.0 - smoothstep(0.0, 0.25, sl/200.0);
-    col += colA * edge * (0.3 + morphEnergy * 0.4);
+    float phase = fract(sl * 0.012 + t * 0.006 + audioPhase * 0.12 + morphEnergy * 0.15);
+
+    // Three-colour palette
+    vec3 pal;
+    if(phase < 0.333){
+      pal = mix(colA, colB, phase / 0.333);
+    } else if(phase < 0.666){
+      pal = mix(colB, colC, (phase - 0.333) / 0.333);
+    } else {
+      pal = mix(colC, colA, (phase - 0.666) / 0.334);
+    }
+
+    float val = 0.15 + 0.85 * pow(clamp(sl / mi, 0.0, 1.0), 0.42)
+              + 0.04 * sin(audioPhase * 6.283)
+              + morphEnergy * 0.08;
+    col = pal * clamp(val, 0.0, 1.6);
+
+    // Edge glow
+    float edge = 1.0 - smoothstep(0.0, 0.2, sl / mi);
+    col += colA * edge * (0.25 + morphEnergy * 0.35);
   } else {
-    col += colA * 0.12 * exp(-length(coord)*0.3);
+    // Interior glow
+    col += colA * 0.10 * exp(-length(coord - centre) * 0.25);
   }
 
-  vec2 sc = gl_FragCoord.xy / res;
-  col *= smoothstep(0.0, 0.8, 1.0 - length(sc - 0.5) * 1.3);
+  // Vignette
+  col *= smoothstep(0.0, 0.75, 1.0 - length(uv - 0.5) * 1.25);
+
   gl_FragColor = vec4(col, 1.0);
 }`;
 
-  function compile(type, src) {
-    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s;
+  function compileShader(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      console.error('Shader error:', gl.getShaderInfoLog(s));
+    }
+    return s;
   }
-  const prog = gl.createProgram();
-  gl.attachShader(prog, compile(gl.VERTEX_SHADER, vsSrc)); gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fsSrc));
-  gl.linkProgram(prog); gl.useProgram(prog);
 
-  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compileShader(gl.VERTEX_SHADER,   vsSrc));
+  gl.attachShader(prog, compileShader(gl.FRAGMENT_SHADER, fsSrc));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
-  const pLoc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(pLoc);
+  const pLoc = gl.getAttribLocation(prog, 'p');
+  gl.enableVertexAttribArray(pLoc);
   gl.vertexAttribPointer(pLoc, 2, gl.FLOAT, false, 0, 0);
 
-  const uT = gl.getUniformLocation(prog, 't'), uRes = gl.getUniformLocation(prog, 'res'), uMouse = gl.getUniformLocation(prog, 'mouse'), uZoom = gl.getUniformLocation(prog, 'zoom'), uPan = gl.getUniformLocation(prog, 'pan'), uColA = gl.getUniformLocation(prog, 'colA'), uColB = gl.getUniformLocation(prog, 'colB'), uColC = gl.getUniformLocation(prog, 'colC'), uAudioPhase = gl.getUniformLocation(prog, 'audioPhase'), uMorphEnergy = gl.getUniformLocation(prog, 'morphEnergy');
+  const uT         = gl.getUniformLocation(prog, 't');
+  const uRes       = gl.getUniformLocation(prog, 'res');
+  const uMouse     = gl.getUniformLocation(prog, 'mouse');
+  const uZoom      = gl.getUniformLocation(prog, 'zoom');
+  const uCentre    = gl.getUniformLocation(prog, 'centre');
+  const uColA      = gl.getUniformLocation(prog, 'colA');
+  const uColB      = gl.getUniformLocation(prog, 'colB');
+  const uColC      = gl.getUniformLocation(prog, 'colC');
+  const uAudio     = gl.getUniformLocation(prog, 'audioPhase');
+  const uMorph     = gl.getUniformLocation(prog, 'morphEnergy');
+  const uMaxIter   = gl.getUniformLocation(prog, 'maxIter');
 
-  // ── Audio Engine ──
-  let audioCtx = null, shepardGain = null, shepardOscs = [], shepardGains = [], shepardPhase = 0;
-  const NUM_VOICES = 12, BASE_FREQ = 432;
+  // ── Adaptive iterations ────────────────────────────────────────────────────
+  // At zoom=3 (overview) → ~80 iters is fine.
+  // At zoom=1e-10 (very deep) → 600+ needed.
+  function calcMaxIter(z) {
+    // log scale: 80 at z=3, ~800 at z=1e-12
+    const depth = Math.log2(3.0 / Math.max(z, 1e-14));
+    return Math.min(900, Math.max(80, Math.round(80 + depth * 38)));
+  }
+
+  // ── Audio engine ───────────────────────────────────────────────────────────
   function initAudio() {
     if (audioCtx) return;
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      shepardGain = audioCtx.createGain(); shepardGain.gain.value = 0; shepardGain.connect(audioCtx.destination);
-      const lp = audioCtx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400; lp.connect(shepardGain);
+      shepardGain = audioCtx.createGain();
+      shepardGain.gain.value = 0;
+      shepardGain.connect(audioCtx.destination);
+      const lp = audioCtx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 440;
+      lp.connect(shepardGain);
       for (let i = 0; i < NUM_VOICES; i++) {
-        const osc = audioCtx.createOscillator(); const g = audioCtx.createGain();
+        const osc = audioCtx.createOscillator();
+        const g   = audioCtx.createGain();
         osc.type = (i % 2 === 0) ? 'sine' : 'triangle';
-        g.gain.value = 0; osc.connect(g); g.connect(lp); osc.start();
+        g.gain.value = 0;
+        osc.connect(g); g.connect(lp); osc.start();
         shepardOscs.push(osc); shepardGains.push(g);
       }
-    } catch (e) {}
+    } catch (e) { console.warn('Audio init failed', e); }
   }
+
   function updateAudio(dt) {
     if (!audioCtx || !shepardGain) return;
-    shepardPhase = (shepardPhase - 0.04 * dt) % 1.0;
-    if (shepardPhase < 0) shepardPhase += 1.0;
+    shepardPhase = ((shepardPhase - 0.035 * dt) % 1.0 + 1.0) % 1.0;
     audioPhase = shepardPhase;
     for (let i = 0; i < NUM_VOICES; i++) {
-      let f = (BASE_FREQ * 0.125) * Math.pow(2, (i / (NUM_VOICES - 1) * 7) + shepardPhase);
-      while (f > BASE_FREQ * 16) f /= 128; while (f < BASE_FREQ * 0.125) f *= 128;
+      let f = BASE_FREQ * 0.125 * Math.pow(2, (i / (NUM_VOICES - 1) * 7) + shepardPhase);
+      while (f > BASE_FREQ * 16)   f /= 128;
+      while (f < BASE_FREQ * 0.125) f *= 128;
       shepardOscs[i].frequency.setTargetAtTime(f, audioCtx.currentTime, 0.15);
       const logF = Math.log2(f / (BASE_FREQ * 0.125)) / 7.0;
-      const env = Math.exp(-Math.pow((logF - 0.5) * 4.5, 2));
-      shepardGains[i].gain.setTargetAtTime(0.02 * env, audioCtx.currentTime, 0.2);
+      const env  = Math.exp(-Math.pow((logF - 0.5) * 4.5, 2));
+      shepardGains[i].gain.setTargetAtTime(0.022 * env, audioCtx.currentTime, 0.2);
     }
-    shepardGain.gain.setTargetAtTime(soundEnabled ? 0.05 : 0, audioCtx.currentTime, 0.8);
+    shepardGain.gain.setTargetAtTime(soundEnabled ? 0.055 : 0, audioCtx.currentTime, 0.8);
   }
 
-  // ── Input (Google Maps Style) ──
-  let soundEnabled = false, audioStarted = false;
-  function ensureAudio() { if (!audioStarted) { audioStarted = true; initAudio(); } }
-  const sb = document.getElementById('sound-btn'); if (sb) sb.onclick = () => {
-    soundEnabled = !soundEnabled; ensureAudio(); if (audioCtx) audioCtx.resume(); sb.classList.toggle('is-on', soundEnabled);
-  };
-  const db = document.getElementById('drift-btn'); if (db) db.onclick = () => { driftEnabled = !driftEnabled; db.classList.toggle('is-on', driftEnabled); };
+  function ensureAudio() {
+    if (!audioStarted) { audioStarted = true; initAudio(); }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  }
 
-  let lastX = 0, lastY = 0, isDragging = false, lastDist = 0, isPinching = false, lastCenter = null;
-
-  canvas.onwheel = e => { e.preventDefault(); const factor = e.deltaY > 0 ? 1.05 : 0.95; targetZoom = Math.max(1e-15, Math.min(2.0, targetZoom * factor)); };
-
-  canvas.ontouchstart = e => {
-    ensureAudio(); if (audioCtx) audioCtx.resume();
-    if (e.touches.length === 1) {
-      isDragging = true; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
-      // Tap energy burst
-      targetMorphEnergy += 0.8;
-    }
-    if (e.touches.length === 2) {
-      isPinching = true;
-      lastDist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
-      lastCenter = { x: (e.touches[0].clientX + e.touches[1].clientX)/2, y: (e.touches[0].clientY + e.touches[1].clientY)/2 };
-    }
+  // ── UI buttons ─────────────────────────────────────────────────────────────
+  const sb = document.getElementById('sound-btn');
+  if (sb) sb.onclick = () => {
+    soundEnabled = !soundEnabled;
+    ensureAudio();
+    sb.classList.toggle('is-on', soundEnabled);
   };
 
-  canvas.ontouchmove = e => {
-    if (e.touches.length === 1 && isDragging) {
-      const dx = e.touches[0].clientX - lastX, dy = e.touches[0].clientY - lastY;
+  const db = document.getElementById('drift-btn');
+  if (db) db.onclick = () => {
+    driftEnabled = !driftEnabled;
+    db.classList.toggle('is-on', driftEnabled);
+  };
+
+  // ── Input: Desktop mouse ───────────────────────────────────────────────────
+  let isDragging = false;
+  let dragLastX = 0, dragLastY = 0;
+  let dragVelX  = 0, dragVelY  = 0; // screen px/s during drag (for inertia)
+
+  canvas.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    isDragging = true;
+    dragLastX = e.clientX; dragLastY = e.clientY;
+    dragVelX = 0; dragVelY = 0;
+    canvas.style.cursor = 'grabbing';
+    vx = 0; vy = 0; // cancel inertia
+    ensureAudio();
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (isDragging) {
+      const dx = e.clientX - dragLastX;
+      const dy = e.clientY - dragLastY;
       const minSide = Math.min(window.innerWidth, window.innerHeight);
-      targetPanX -= dx * (targetZoom / minSide); targetPanY += dy * (targetZoom / minSide);
-      lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
-      mouseTarget[0] = e.touches[0].clientX/window.innerWidth; mouseTarget[1] = 1.0 - e.touches[0].clientY/window.innerHeight;
+      const fxDelta = dx * (tzoom / minSide);
+      const fyDelta = dy * (tzoom / minSide);
+      tcx -= fxDelta;
+      tcy += fyDelta;
+      cx  -= fxDelta;
+      cy  += fyDelta;
+      // Track velocity for inertia (exponential smoothing)
+      dragVelX = dragVelX * 0.6 + dx * 0.4;
+      dragVelY = dragVelY * 0.6 + dy * 0.4;
+      dragLastX = e.clientX; dragLastY = e.clientY;
+      // Mouse influence on Julia (when not dragging it's the raw pointer)
+    } else {
+      mouseTarget[0] = e.clientX / window.innerWidth;
+      mouseTarget[1] = 1.0 - e.clientY / window.innerHeight;
     }
-    if (e.touches.length === 2) {
-      e.preventDefault();
-      const dist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
-      const center = { x: (e.touches[0].clientX + e.touches[1].clientX)/2, y: (e.touches[0].clientY + e.touches[1].clientY)/2 };
-      if (lastDist > 0) targetZoom = Math.max(1e-15, Math.min(2.0, targetZoom * (lastDist / dist)));
-      if (lastCenter) {
-        const minSide = Math.min(window.innerWidth, window.innerHeight);
-        targetPanX += (lastCenter.x - center.x) * (targetZoom / minSide); targetPanY -= (lastCenter.y - center.y) * (targetZoom / minSide);
+  });
+
+  window.addEventListener('mouseup', e => {
+    if (!isDragging) return;
+    isDragging = false;
+    canvas.style.cursor = 'grab';
+    // Convert screen px/frame → fractal units/second inertia
+    const minSide = Math.min(window.innerWidth, window.innerHeight);
+    const speed = Math.hypot(dragVelX, dragVelY);
+    if (speed > 2) {
+      // dragVel is pixels per ~16ms frame, convert to per-second
+      vx = -(dragVelX / minSide) * zoom * 60;
+      vy =  (dragVelY / minSide) * zoom * 60;
+    }
+  });
+
+  // ── Wheel zoom to cursor ───────────────────────────────────────────────────
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const factor = e.deltaY > 0 ? 1.12 : 0.88;
+    zoomToPoint(e.clientX, e.clientY, factor);
+    ensureAudio();
+  }, { passive: false });
+
+  // ── Input: Touch ───────────────────────────────────────────────────────────
+  let touchState = 'idle'; // 'idle' | 'drag' | 'pinch'
+  let t1 = null, t2 = null;
+  let lastTouchX = 0, lastTouchY = 0;
+  let lastPinchDist = 0, lastPinchMidX = 0, lastPinchMidY = 0;
+  let touchVelX = 0, touchVelY = 0;
+
+  // Double-tap detection
+  let lastTapTime = 0, lastTapX = 0, lastTapY = 0;
+  const DBL_TAP_MS = 300, DBL_TAP_PX = 40;
+
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    ensureAudio();
+
+    if (e.touches.length === 1) {
+      touchState = 'drag';
+      t1 = e.touches[0];
+      lastTouchX = t1.clientX; lastTouchY = t1.clientY;
+      touchVelX = 0; touchVelY = 0;
+      vx = 0; vy = 0; // cancel inertia on new touch
+
+      // Double-tap check
+      const now = Date.now();
+      const dx = t1.clientX - lastTapX, dy = t1.clientY - lastTapY;
+      if (now - lastTapTime < DBL_TAP_MS && Math.hypot(dx, dy) < DBL_TAP_PX) {
+        // Double-tap: zoom in 2× at tap point
+        zoomToPoint(t1.clientX, t1.clientY, 0.5);
+        targetMorphEnergy += 0.6;
+        lastTapTime = 0;
+      } else {
+        lastTapTime = now;
+        lastTapX = t1.clientX; lastTapY = t1.clientY;
+        // Single tap burst
+        targetMorphEnergy += 0.4;
       }
-      lastDist = dist; lastCenter = center;
-    }
-  };
-  canvas.ontouchend = () => { isDragging = false; isPinching = false; lastDist = 0; lastCenter = null; };
-  window.onmousemove = e => { if (!isDragging) { mouseTarget[0] = e.clientX/window.innerWidth; mouseTarget[1] = 1.0 - e.clientY/window.innerHeight; } };
 
+    } else if (e.touches.length === 2) {
+      touchState = 'pinch';
+      vx = 0; vy = 0;
+      const a = e.touches[0], b = e.touches[1];
+      lastPinchDist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+      lastPinchMidX = (a.clientX + b.clientX) * 0.5;
+      lastPinchMidY = (a.clientY + b.clientY) * 0.5;
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+
+    if (touchState === 'drag' && e.touches.length === 1) {
+      const touch = e.touches[0];
+      const dx = touch.clientX - lastTouchX;
+      const dy = touch.clientY - lastTouchY;
+      const minSide = Math.min(window.innerWidth, window.innerHeight);
+      const fxD = dx * (tzoom / minSide);
+      const fyD = dy * (tzoom / minSide);
+      tcx -= fxD; tcy += fyD;
+      cx  -= fxD; cy  += fyD;
+      touchVelX = touchVelX * 0.6 + dx * 0.4;
+      touchVelY = touchVelY * 0.6 + dy * 0.4;
+      lastTouchX = touch.clientX; lastTouchY = touch.clientY;
+      mouseTarget[0] = touch.clientX / window.innerWidth;
+      mouseTarget[1] = 1.0 - touch.clientY / window.innerHeight;
+
+    } else if (touchState === 'pinch' && e.touches.length >= 2) {
+      const a = e.touches[0], b = e.touches[1];
+      const dist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+      const midX = (a.clientX + b.clientX) * 0.5;
+      const midY = (a.clientY + b.clientY) * 0.5;
+
+      if (lastPinchDist > 0) {
+        const factor = lastPinchDist / dist; // shrink fingers → zoom out
+        zoomToPoint(midX, midY, factor);
+      }
+
+      // Pan by midpoint movement
+      const dx = midX - lastPinchMidX;
+      const dy = midY - lastPinchMidY;
+      const minSide = Math.min(window.innerWidth, window.innerHeight);
+      tcx -= dx * (tzoom / minSide);
+      tcy += dy * (tzoom / minSide);
+      cx  -= dx * (tzoom / minSide);
+      cy  += dy * (tzoom / minSide);
+
+      lastPinchDist = dist;
+      lastPinchMidX = midX; lastPinchMidY = midY;
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', e => {
+    if (touchState === 'drag' && e.touches.length === 0) {
+      const minSide = Math.min(window.innerWidth, window.innerHeight);
+      const speed = Math.hypot(touchVelX, touchVelY);
+      if (speed > 2) {
+        vx = -(touchVelX / minSide) * zoom * 60;
+        vy =  (touchVelY / minSide) * zoom * 60;
+      }
+    }
+    touchState = e.touches.length >= 2 ? 'pinch' : (e.touches.length === 1 ? 'drag' : 'idle');
+  }, { passive: true });
+
+  // ── Drift mode ─────────────────────────────────────────────────────────────
+  let driftT = 0;
+
+  // ── Render loop ────────────────────────────────────────────────────────────
   function frame(ts) {
-    const dt = lastFrameTime ? Math.min((ts - lastFrameTime) * 0.001, 0.1) : 0.016; lastFrameTime = ts;
-    if (driftEnabled) {
-      targetZoom *= (1.0 - 0.08 * dt); if (targetZoom < 0.0000001) targetZoom = 1.2;
-      const orbit = ts * 0.00015; targetPanX = 0.2 * Math.sin(orbit) * Math.cos(orbit * 0.5); targetPanY = 0.15 * Math.cos(orbit * 1.2);
-    }
-    morphEnergy += (targetMorphEnergy - morphEnergy) * 0.05;
-    targetMorphEnergy *= (1.0 - 1.0 * dt); // decay energy
+    const dt = lastFrameTime ? Math.min((ts - lastFrameTime) * 0.001, 0.1) : 0.016;
+    lastFrameTime = ts;
 
-    smoothMouse[0] += (mouseTarget[0] - smoothMouse[0]) * 0.035; smoothMouse[1] += (mouseTarget[1] - smoothMouse[1]) * 0.035;
-    for (let i=0; i<3; i++) { themeColA[i] += (targetColA[i]-themeColA[i])*0.02; themeColB[i] += (targetColB[i]-themeColB[i])*0.02; themeColC[i] += (targetColC[i]-themeColC[i])*0.02; }
-    zoom += (targetZoom - zoom) * 0.08; panX += (targetPanX - panX) * 0.1; panY += (targetPanY - panY) * 0.1;
+    // ── Drift mode: slow orbital zoom keeping exploration feel ──────────────
+    if (driftEnabled && !isDragging && touchState === 'idle') {
+      driftT += dt;
+      // Very slow zoom in, reset at deep limit
+      tzoom *= Math.pow(0.985, dt * 60);
+      if (tzoom < 3e-8) { tzoom = 3.0; tcx = -0.5; tcy = 0.0; }
+      // Gentle orbit around current centre
+      tcx += Math.sin(driftT * 0.07) * zoom * 0.0003;
+      tcy += Math.cos(driftT * 0.11) * zoom * 0.0003;
+    }
+
+    // ── Inertia ─────────────────────────────────────────────────────────────
+    if (!isDragging && touchState === 'idle') {
+      const friction = Math.pow(0.88, dt * 60); // friction per second
+      vx *= friction; vy *= friction;
+      if (Math.abs(vx) > 1e-10 || Math.abs(vy) > 1e-10) {
+        tcx += vx * dt; tcy += vy * dt;
+      }
+    }
+
+    // ── Smooth interpolation ─────────────────────────────────────────────────
+    const ease = 1.0 - Math.pow(0.05, dt * 60); // ~0.95^frame → ~0.05 remaining
+    cx   += (tcx   - cx)   * ease;
+    cy   += (tcy   - cy)   * ease;
+    zoom += (tzoom - zoom) * ease;
+
+    // ── Mouse influence ──────────────────────────────────────────────────────
+    smoothMouse[0] += (mouseTarget[0] - smoothMouse[0]) * 0.04;
+    smoothMouse[1] += (mouseTarget[1] - smoothMouse[1]) * 0.04;
+
+    // ── Theme colours ────────────────────────────────────────────────────────
+    for (let i = 0; i < 3; i++) {
+      themeColA[i] += (targetColA[i] - themeColA[i]) * 0.025;
+      themeColB[i] += (targetColB[i] - themeColB[i]) * 0.025;
+      themeColC[i] += (targetColC[i] - themeColC[i]) * 0.025;
+    }
+
+    // ── Morph energy decay ───────────────────────────────────────────────────
+    morphEnergy     += (targetMorphEnergy - morphEnergy) * 0.07;
+    targetMorphEnergy *= Math.pow(0.25, dt);
+
+    // ── Audio ────────────────────────────────────────────────────────────────
     updateAudio(dt);
 
-    gl.uniform1f(uT, ts*0.001); gl.uniform2f(uRes, W, H); gl.uniform2f(uMouse, smoothMouse[0], smoothMouse[1]);
-    gl.uniform1f(uZoom, zoom); gl.uniform2f(uPan, panX, panY);
-    gl.uniform3f(uColA, themeColA[0], themeColA[1], themeColA[2]); gl.uniform3f(uColB, themeColB[0], themeColB[1], themeColB[2]); gl.uniform3f(uColC, themeColC[0], themeColC[1], themeColC[2]);
-    gl.uniform1f(uAudioPhase, audioPhase); gl.uniform1f(uMorphEnergy, morphEnergy);
+    // ── Adaptive iterations ──────────────────────────────────────────────────
+    const maxIter = calcMaxIter(zoom);
+
+    // ── Draw ─────────────────────────────────────────────────────────────────
+    gl.uniform1f(uT,       ts * 0.001);
+    gl.uniform2f(uRes,     W, H);
+    gl.uniform2f(uMouse,   smoothMouse[0], smoothMouse[1]);
+    gl.uniform1f(uZoom,    zoom);
+    gl.uniform2f(uCentre,  cx, cy);
+    gl.uniform3f(uColA,    themeColA[0], themeColA[1], themeColA[2]);
+    gl.uniform3f(uColB,    themeColB[0], themeColB[1], themeColB[2]);
+    gl.uniform3f(uColC,    themeColC[0], themeColC[1], themeColC[2]);
+    gl.uniform1f(uAudio,   audioPhase);
+    gl.uniform1f(uMorph,   morphEnergy);
+    gl.uniform1f(uMaxIter, maxIter);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    raf = requestAnimationFrame(frame);
+
+    requestAnimationFrame(frame);
   }
-  window.addEventListener('resize', resize); resize(); frame(0);
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  canvas.style.cursor = 'grab';
+  window.addEventListener('resize', resize);
+  resize();
+  // Expose zoom level for the depth HUD
+  function exposeState() {
+    window._fractalZoom = zoom;
+    requestAnimationFrame(exposeState);
+  }
+  requestAnimationFrame(exposeState);
+
+  requestAnimationFrame(frame);
 })();

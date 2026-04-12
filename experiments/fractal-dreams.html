@@ -6,106 +6,347 @@
   <title>Fractal Dreams — trippy.ch</title>
   <link rel="stylesheet" href="../assets/css/style.css">
   <style>
-    /* Marvel UX Overrides */
-    .experiment-view { background: #050208; }
-    .top-controls {
-      position: fixed;
-      top: 1.5rem;
-      right: 1.5rem;
-      z-index: 1000;
-      display: flex;
-      gap: 0.8rem;
-      align-items: center;
-    }
-    .info-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      border: 1px solid rgba(255,255,255,0.2);
-      background: rgba(0,0,0,0.4);
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-family: serif;
-      font-style: italic;
-      font-weight: bold;
-      transition: all 0.3s ease;
-      backdrop-filter: blur(8px);
-    }
-    .info-icon:hover { border-color: var(--teal); color: var(--teal); }
-    
-    /* Reposition buttons for UX */
-    #sound-btn, #drift-btn, #theme-btn, #contrast-btn {
-      position: static !important; /* Reset from global style */
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #050208;
     }
 
-    .bottom-info {
-      position: fixed;
-      bottom: 2rem;
-      left: 2rem;
-      z-index: 100;
-      pointer-events: none;
-      transition: opacity 0.5s ease;
-    }
-    .bottom-info h1 { font-size: 1.5rem; font-weight: 300; letter-spacing: 0.1em; color: #fff; margin: 0; }
-    .bottom-info .tag { color: var(--teal); font-size: 0.7rem; text-transform: uppercase; }
-
-    /* Modal for info */
-    .info-modal {
+    #fractal-canvas {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.85);
-      z-index: 2000;
-      display: none;
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none; /* hand off all touch to JS */
+    }
+
+    /* ── Top-right controls ────────────────────────────────── */
+    .top-controls {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 200;
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .ctrl-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(0,0,0,0.55);
+      color: rgba(255,255,255,0.6);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
       align-items: center;
       justify-content: center;
-      padding: 2rem;
+      transition: border-color 0.25s, color 0.25s, box-shadow 0.25s;
       backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      font-family: inherit;
+      letter-spacing: 0.03em;
+      user-select: none;
     }
-    .info-modal.is-active { display: flex; }
-    .info-content {
-      max-width: 500px;
-      color: #eee;
-      line-height: 1.6;
+    .ctrl-btn:hover {
+      border-color: var(--violet, #a855f7);
+      color: #fff;
     }
-    .info-content h2 { color: var(--teal); font-size: 1.2rem; margin-top: 1.5rem; }
-    .close-modal { position: absolute; top: 2rem; right: 2rem; font-size: 2rem; color: #fff; cursor: pointer; }
+    .ctrl-btn.is-on {
+      color: var(--teal, #2dd4bf);
+      border-color: var(--teal, #2dd4bf);
+      box-shadow: 0 0 12px rgba(45,212,191,0.35);
+    }
+
+    /* Theme button gets the gradient treatment */
+    #theme-btn {
+      background: linear-gradient(135deg, var(--purple,#7c3aed), var(--pink,#ec4899), var(--teal,#2dd4bf));
+      background-size: 300% 300%;
+      animation: themeGrad 4s ease infinite;
+      border-color: transparent;
+      color: #fff;
+      font-size: 1.1rem;
+    }
+    @keyframes themeGrad {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Info button */
+    #info-btn {
+      font-family: Georgia, serif;
+      font-style: italic;
+      font-weight: bold;
+      font-size: 1rem;
+      border-radius: 50%;
+    }
+
+    /* ── Bottom-left: title + depth HUD ───────────────────── */
+    .bottom-left {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 1.5rem;
+      z-index: 200;
+      pointer-events: none;
+    }
+    .exp-tag {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--teal, #2dd4bf);
+      margin-bottom: 0.2rem;
+    }
+    .exp-title {
+      font-size: 1.4rem;
+      font-weight: 300;
+      letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.9);
+      text-shadow: 0 0 30px rgba(124,58,237,0.5);
+      margin: 0 0 0.4rem;
+    }
+    .depth-hud {
+      font-size: 0.72rem;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 0.05em;
+      transition: color 0.5s;
+    }
+
+    /* ── Back link ─────────────────────────────────────────── */
+    .back-link {
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 200;
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.4);
+      text-decoration: none;
+      letter-spacing: 0.05em;
+      transition: color 0.25s;
+      backdrop-filter: blur(6px);
+      background: rgba(0,0,0,0.3);
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .back-link:hover { color: var(--teal, #2dd4bf); }
+
+    /* ── Slide-in info panel ───────────────────────────────── */
+    .info-panel {
+      position: fixed;
+      top: 0; right: 0;
+      width: min(380px, 100vw);
+      height: 100%;
+      background: rgba(5, 2, 8, 0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-left: 1px solid rgba(124,58,237,0.2);
+      z-index: 500;
+      transform: translateX(100%);
+      transition: transform 0.4s cubic-bezier(0.25, 0, 0, 1);
+      overflow-y: auto;
+      padding: 2rem 1.75rem;
+      box-sizing: border-box;
+    }
+    .info-panel.is-open {
+      transform: translateX(0);
+    }
+    .info-panel h2 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--teal, #2dd4bf);
+      margin: 1.5rem 0 0.5rem;
+      font-weight: 500;
+    }
+    .info-panel h2:first-of-type { margin-top: 0.5rem; }
+    .info-panel p {
+      font-size: 0.9rem;
+      line-height: 1.7;
+      color: rgba(255,255,255,0.55);
+      margin: 0 0 0.5rem;
+    }
+    .info-panel .panel-title {
+      font-size: 1.4rem;
+      font-weight: 300;
+      letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.9);
+      margin-bottom: 0.25rem;
+    }
+    .info-panel .panel-tag {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--teal, #2dd4bf);
+      margin-bottom: 1.25rem;
+      display: block;
+    }
+    .close-panel {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      color: rgba(255,255,255,0.4);
+      font-size: 1.4rem;
+      border: none;
+      background: none;
+      transition: color 0.2s;
+      line-height: 1;
+    }
+    .close-panel:hover { color: #fff; }
+
+    .hint-row {
+      display: flex;
+      align-items: baseline;
+      gap: 0.6rem;
+      margin-bottom: 0.5rem;
+    }
+    .hint-icon {
+      font-size: 1.1rem;
+      flex-shrink: 0;
+      width: 1.6rem;
+      text-align: center;
+    }
+    .hint-text {
+      font-size: 0.88rem;
+      color: rgba(255,255,255,0.5);
+      line-height: 1.5;
+    }
+
+    .panel-divider {
+      border: none;
+      border-top: 1px solid rgba(124,58,237,0.15);
+      margin: 1.5rem 0;
+    }
+
+    .source-link {
+      display: inline-block;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.3);
+      text-decoration: none;
+      margin-top: 0.5rem;
+      transition: color 0.25s;
+    }
+    .source-link:hover { color: var(--purple, #7c3aed); }
+
+    /* Panel overlay (click outside to close) */
+    .panel-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 499;
+      display: none;
+    }
+    .panel-overlay.is-active { display: block; }
   </style>
 </head>
 <body class="experiment-view">
   <div id="page-transition" class="page-transition"></div>
-  
-  <div class="top-controls">
-    <button id="drift-btn" title="Toggle Auto-Drift">Auto</button>
-    <button id="sound-btn" title="Toggle sound">♪</button>
-    <button id="theme-btn" title="Randomize theme">✦</button>
-    <div class="info-icon" onclick="document.getElementById('modal').classList.add('is-active')">i</div>
-  </div>
 
   <canvas id="fractal-canvas"></canvas>
 
-  <div class="bottom-info">
-    <span class="tag">webgl · fractal</span>
-    <h1>Fractal Dreams</h1>
+  <!-- Back -->
+  <a href="../experiments.html" class="back-link">↞ experiments</a>
+
+  <!-- Top-right controls -->
+  <div class="top-controls">
+    <button id="drift-btn" class="ctrl-btn" title="Auto-Drift">Auto</button>
+    <button id="sound-btn" class="ctrl-btn" title="Toggle sound">♪</button>
+    <button id="theme-btn" class="ctrl-btn" title="Randomize theme">✦</button>
+    <button id="info-btn"  class="ctrl-btn" title="Info & controls">i</button>
   </div>
 
-  <div id="modal" class="info-modal">
-    <div class="close-modal" onclick="document.getElementById('modal').classList.remove('is-active')">×</div>
-    <div class="info-content">
-      <a href="../experiments.html" style="color:var(--fg-muted); display:block; margin-bottom: 1rem;">↞ back to experiments</a>
-      <h2>How to interact</h2>
-      <p>📱 One finger to morph. 🤏 Pinch to control <strong>flight speed</strong>. 🚀 Use <strong>Auto</strong> for a constant drift.</p>
-      <h2>Interpretation</h2>
-      <p>This is a <strong>Fractal Tunnel</strong>. Instead of zooming, the geometry is 2x larger and washes over you in a continuous Z-plane expansion. This eliminates speed jitter and allows for a perfectly stable, infinite fly-through experience.</p>
-      <h2>How it's done</h2>
-      <p>A WebGL fragment shader calculates millions of iterations per second on your GPU. The audio is a 12-voice harmonic engine tuned to 432Hz.</p>
-    </div>
+  <!-- Bottom-left: title + depth HUD -->
+  <div class="bottom-left">
+    <div class="exp-tag">webgl · julia set · fractal</div>
+    <h1 class="exp-title">Fractal Dreams</h1>
+    <div class="depth-hud" id="depth-hud">zoom ×1.0</div>
   </div>
 
-<script src="../assets/js/fractal-dreams.js"></script>
-<script src="../assets/js/main.js"></script>
-<script>document.getElementById('page-transition').classList.add('is-active');requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('page-transition').classList.remove('is-active')));</script>
+  <!-- Info panel overlay -->
+  <div class="panel-overlay" id="panel-overlay"></div>
+
+  <!-- Slide-in info panel -->
+  <div class="info-panel" id="info-panel">
+    <button class="close-panel" id="close-panel">×</button>
+    <p class="panel-title">Fractal Dreams</p>
+    <span class="panel-tag">WebGL · Julia Set · 432 Hz</span>
+
+    <h2>How to explore</h2>
+    <div class="hint-row"><span class="hint-icon">🖱</span><span class="hint-text"><strong>Drag</strong> to pan anywhere in the fractal</span></div>
+    <div class="hint-row"><span class="hint-icon">⚲</span><span class="hint-text"><strong>Scroll wheel</strong> to zoom — always zooms to your cursor</span></div>
+    <div class="hint-row"><span class="hint-icon">👆</span><span class="hint-text"><strong>Drag</strong> on mobile to pan</span></div>
+    <div class="hint-row"><span class="hint-icon">🤌</span><span class="hint-text"><strong>Pinch</strong> to zoom — centred on your fingers</span></div>
+    <div class="hint-row"><span class="hint-icon">👆👆</span><span class="hint-text"><strong>Double-tap</strong> to zoom in</span></div>
+    <div class="hint-row"><span class="hint-icon">✦</span><span class="hint-text"><strong>Tap/click</strong> anywhere for a colour burst</span></div>
+    <div class="hint-row"><span class="hint-icon">🚀</span><span class="hint-text"><strong>Auto</strong> lets the fractal drift endlessly on its own</span></div>
+    <div class="hint-row"><span class="hint-icon">🎵</span><span class="hint-text"><strong>Sound</strong> enables the Shepard-tone engine tuned to 432 Hz</span></div>
+
+    <hr class="panel-divider">
+
+    <h2>What you're seeing</h2>
+    <p>A Julia set — a fractal born from iterating <em>z → z² + c</em> across the complex plane. The constant <em>c</em> drifts slowly over time, guided subtly by your cursor, causing the shape to breathe and morph.</p>
+
+    <h2>How it's rendered</h2>
+    <p>Every pixel is computed in real time on your GPU via a WebGL fragment shader. The iteration count adapts as you zoom deeper — at 1× you get ~80 iterations, at extreme depth up to 900 — keeping detail crisp without wasting GPU budget at the surface.</p>
+
+    <h2>The sound</h2>
+    <p>A 12-voice Shepard tone engine: an auditory illusion of endlessly ascending pitch, tuned to 432 Hz. It mirrors the feeling of infinite fractal depth.</p>
+
+    <hr class="panel-divider">
+    <a href="https://github.com/menschenkreis/trippy.ch" class="source-link" target="_blank" rel="noopener">view source on GitHub ↗</a>
+  </div>
+
+  <script src="../assets/js/fractal-dreams.js"></script>
+  <script src="../assets/js/main.js"></script>
+  <script>
+    // ── Depth HUD ────────────────────────────────────────────────────────────
+    (function () {
+      const hud = document.getElementById('depth-hud');
+      if (!hud) return;
+      // Poll zoom from the shader module — expose it via a global
+      setInterval(() => {
+        const z = window._fractalZoom;
+        if (z == null) return;
+        const mag = 3.0 / z;
+        let label;
+        if (mag < 1000) label = `zoom ×${mag.toFixed(1)}`;
+        else if (mag < 1e6) label = `zoom ×${(mag/1000).toFixed(2)}K`;
+        else if (mag < 1e9) label = `zoom ×${(mag/1e6).toFixed(2)}M`;
+        else if (mag < 1e12) label = `zoom ×${(mag/1e9).toFixed(2)}G`;
+        else label = `zoom ×${mag.toExponential(2)}`;
+        hud.textContent = label;
+      }, 200);
+    })();
+
+    // ── Info panel toggle ────────────────────────────────────────────────────
+    (function () {
+      const panel   = document.getElementById('info-panel');
+      const overlay = document.getElementById('panel-overlay');
+      const openBtn = document.getElementById('info-btn');
+      const closeBtn= document.getElementById('close-panel');
+
+      function open()  { panel.classList.add('is-open'); overlay.classList.add('is-active'); }
+      function close() { panel.classList.remove('is-open'); overlay.classList.remove('is-active'); }
+
+      if (openBtn)  openBtn.onclick  = open;
+      if (closeBtn) closeBtn.onclick = close;
+      if (overlay)  overlay.onclick  = close;
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+    })();
+
+    // ── Page transition ──────────────────────────────────────────────────────
+    document.getElementById('page-transition').classList.add('is-active');
+    requestAnimationFrame(() => requestAnimationFrame(() =>
+      document.getElementById('page-transition').classList.remove('is-active')
+    ));
+  </script>
 </body>
 </html>
