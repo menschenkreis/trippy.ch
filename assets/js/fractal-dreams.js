@@ -301,8 +301,8 @@ void main(){
       const dx = e.clientX - dragLastX;
       const dy = e.clientY - dragLastY;
       const minSide = Math.min(window.innerWidth, window.innerHeight);
-      const fxDelta = dx * (tzoom / minSide);
-      const fyDelta = dy * (tzoom / minSide);
+      const fxDelta = dx * (zoom / minSide);
+      const fyDelta = dy * (zoom / minSide);
       tcx -= fxDelta;
       tcy -= fyDelta;
       cx  -= fxDelta;
@@ -395,8 +395,8 @@ void main(){
       const dx = touch.clientX - lastTouchX;
       const dy = touch.clientY - lastTouchY;
       const minSide = Math.min(window.innerWidth, window.innerHeight);
-      const fxD = dx * (tzoom / minSide);
-      const fyD = dy * (tzoom / minSide);
+      const fxD = dx * (zoom / minSide);
+      const fyD = dy * (zoom / minSide);
       tcx -= fxD; tcy -= fyD;
       cx  -= fxD; cy  -= fyD;
       touchVelX = touchVelX * 0.6 + dx * 0.4;
@@ -420,10 +420,10 @@ void main(){
       const dx = midX - lastPinchMidX;
       const dy = midY - lastPinchMidY;
       const minSide = Math.min(window.innerWidth, window.innerHeight);
-      tcx -= dx * (tzoom / minSide);
-      tcy -= dy * (tzoom / minSide);
-      cx  -= dx * (tzoom / minSide);
-      cy  -= dy * (tzoom / minSide);
+      tcx -= dx * (zoom / minSide);
+      tcy -= dy * (zoom / minSide);
+      cx  -= dx * (zoom / minSide);
+      cy  -= dy * (zoom / minSide);
 
       lastPinchDist = dist;
       lastPinchMidX = midX; lastPinchMidY = midY;
@@ -471,10 +471,11 @@ void main(){
     }
 
     // ── Smooth interpolation ─────────────────────────────────────────────────
-    const ease = 1.0 - Math.pow(0.05, dt * 60); // ~0.95^frame → ~0.05 remaining
-    cx   += (tcx   - cx)   * ease;
-    cy   += (tcy   - cy)   * ease;
-    zoom += (tzoom - zoom) * ease;
+    // Pan is applied directly (no lag), only zoom is eased for smoothness
+    cx   = tcx;
+    cy   = tcy;
+    const zoomEase = 1.0 - Math.pow(0.08, dt * 60); // snappy zoom
+    zoom += (tzoom - zoom) * zoomEase;
 
     // ── Mouse influence ──────────────────────────────────────────────────────
     smoothMouse[0] += (mouseTarget[0] - smoothMouse[0]) * 0.04;
