@@ -108,11 +108,13 @@ void main(){
   vec2 uv=(gl_FragCoord.xy-0.5*res)/min(res.x,res.y);
   uv=uv*zoom+pan;
 
+  float depthFactor=1.0/(1.0+log2(max(zoom,1.0))*0.15);
+
   // Julia set constant — slow, zen drift
   float a=t*0.04;
   vec2 c=vec2(
-    -0.7+0.28*cos(a)+mouse.x*0.12,
-    0.27+0.22*sin(a*1.3)+mouse.y*0.12
+    -0.7+0.28*cos(a)+mouse.x*0.12*depthFactor,
+    0.27+0.22*sin(a*1.3)+mouse.y*0.12*depthFactor
   );
 
   vec2 z=uv;
@@ -327,8 +329,10 @@ void main(){
       if (lastPinchCenter) {
         const moveX = (center.x - lastPinchCenter.x) / window.innerWidth;
         const moveY = (center.y - lastPinchCenter.y) / window.innerHeight;
-        targetPanX -= moveX * zoom * 1.5;
-        targetPanY += moveY * zoom * 1.5;
+        // Scale pan sensitivity inversely with zoom depth for consistent feel
+        const depthScale = Math.min(1.0, 1.0 / Math.sqrt(zoom));
+        targetPanX -= moveX * zoom * 1.5 * depthScale;
+        targetPanY += moveY * zoom * 1.5 * depthScale;
       }
       lastPinchDist = dist;
       lastPinchCenter = center;
