@@ -251,36 +251,38 @@ void main(){
     float fres = pow(1.0-max(dot(-rd,n),0.0),3.0);
 
     // Vibrant colour from position + orbit trap + time
-    float h1 = fract(p.x*0.3 + p.y*0.2 + p.z*0.15 + t*0.05 + u_seed);
-    float h2 = fract(dot(n,vec3(1))*1.5 + u_seed*0.5);
-    float h3 = clamp(trap*0.5, 0.0, 1.0);
-    float h4 = fract(fbm(p*2.0 + t*0.1)*3.0);
+    float h1 = fract(p.x*0.5 + p.y*0.3 + p.z*0.25 + t*0.08 + u_seed);
+    float h2 = fract(dot(n,vec3(1.0))*2.0 + u_seed*0.7);
+    float h3 = clamp(trap*0.4, 0.0, 1.0);
+    float h4 = fract(fbm(p*2.5 + t*0.12)*4.0);
 
-    // Boost saturation
-    vec3 c1 = mix(vec3(dot(u_col1,vec3(0.299,0.587,0.114))), u_col1, 2.0);
-    vec3 c2 = mix(vec3(dot(u_col2,vec3(0.299,0.587,0.114))), u_col2, 2.2);
-    vec3 c3 = mix(vec3(dot(u_col3,vec3(0.299,0.587,0.114))), u_col3, 1.8);
+    // Heavy saturation boost
+    vec3 c1 = mix(vec3(dot(u_col1,vec3(0.299,0.587,0.114))), u_col1, 3.0);
+    vec3 c2 = mix(vec3(dot(u_col2,vec3(0.299,0.587,0.114))), u_col2, 3.0);
+    vec3 c3 = mix(vec3(dot(u_col3,vec3(0.299,0.587,0.114))), u_col3, 2.5);
 
-    col = c1*(0.3+0.7*h1);
-    col = mix(col, c2, h2*0.5);
-    col = mix(col, c3, h3*0.4);
-    col = mix(col, c1*1.3+c2*0.7, h4*0.3);
+    // Base colour — full strength, high contrast mixing
+    col = c1 * (0.4 + 0.6*h1);
+    col = mix(col, c2*1.3, h2*0.6);
+    col = mix(col, c3*1.2, h3*0.5);
+    col = mix(col, c1*1.5+c2*1.0, h4*0.35);
 
-    // Apply lighting
-    col *= (0.12 + 0.88*diff1)*ao;
-    col += c2 * diff2 * 0.25; // second light tint
-    col += c2 * spec * 0.8;
-    col += c3 * fres * 0.4;
+    // Lighting — brighter ambient, stronger diffuse
+    col *= (0.25 + 0.75*diff1) * (0.6 + 0.4*ao);
+    col += c2 * diff2 * 0.35;
+    col += c2 * spec * 1.2;
+    col += c3 * fres * 0.6;
 
-    // Emissive in cavities
+    // Emissive — stronger
     float cavity = 1.0-ao;
-    col += c1*cavity*cavity*0.6;
-    col += c3*cavity*0.2;
+    col += c1 * cavity * cavity * 0.8;
+    col += c2 * cavity * 0.4;
+    col += c3 * cavity * 0.3;
 
-    // Fog
-    float fog = 1.0-exp(-totalDist*0.04);
-    vec3 fogCol = mix(vec3(0.01,0.005,0.02), c3*0.1, 0.5+0.5*sin(t*0.1));
-    col = mix(col, fogCol, fog*fog);
+    // Lighter fog — preserve colour
+    float fog = 1.0-exp(-totalDist*0.025);
+    vec3 fogCol = mix(vec3(0.01,0.005,0.02), c3*0.15, 0.5+0.5*sin(t*0.1));
+    col = mix(col, fogCol, fog*fog*0.7);
 
   } else {
     // Skybox
@@ -288,12 +290,14 @@ void main(){
   }
 
   // ── Post ─────────────────────────────────────────────────────────────
-  col *= 1.0-0.25*dot(uv,uv);
-  float ca = length(uv)*0.004;
+  col *= 1.0-0.2*dot(uv,uv);
+  float ca = length(uv)*0.005;
   col.r *= 1.0+ca; col.b *= 1.0-ca;
-  col += (hash2(uv*u_res+fract(t*100.0))-0.5)*0.012;
-  col = col/(col+0.2);
-  col = pow(col, vec3(0.92));
+  col += (hash2(uv*u_res+fract(t*100.0))-0.5)*0.01;
+  // Brighter tone mapping
+  col = pow(max(col,vec3(0.0)),vec3(0.85));
+  col = col/(col+0.15);
+  col = pow(col, vec3(0.88));
 
   gl_FragColor = vec4(col,1.0);
 }
