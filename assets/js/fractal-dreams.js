@@ -548,16 +548,16 @@ void main(){
       }
 
       // Smooth velocity toward the steering target
-      const steerStrength = 0.6;
-      driftVx += (driftSteerX * steerStrength - driftVx) * Math.min(dt * 0.75, 1);
-      driftVy += (driftSteerY * steerStrength - driftVy) * Math.min(dt * 0.75, 1);
+      const steerStrength = 0.3;
+      driftVx += (driftSteerX * steerStrength - driftVx) * Math.min(dt * 0.375, 1);
+      driftVy += (driftSteerY * steerStrength - driftVy) * Math.min(dt * 0.375, 1);
 
       // Advance position
       tcx += driftVx * dt;
       tcy += driftVy * dt;
 
       // Slow zoom — follows boundary depth naturally
-      tzoom *= Math.pow(0.9935, dt * 60);
+      tzoom *= Math.pow(0.9967, dt * 60);
       tlogZoom = Math.log(Math.max(tzoom, 1e-14));
       if (tzoom < 1e-8) { tzoom = 3.0; tlogZoom = Math.log(3.0); tcx = -0.5; tcy = 0.0; driftVx = 0; driftVy = 0; lastSampleTs = -9999; }
     }
