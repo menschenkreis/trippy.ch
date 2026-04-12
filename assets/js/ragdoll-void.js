@@ -198,32 +198,29 @@ function collideRagdollSphere(ragdoll, sphere){
 let ragdolls = [];
 let spheres = [];
 let time = 0;
+let cameraY = 0; // camera offset — follows the ragdoll's descent
+let fallSpeed = 0; // how deep the ragdoll has fallen
 
-// Spawn initial — centered at top
-ragdolls.push(new Ragdoll(W/2, -80));
-for(let i=0;i<8;i++) spawnSphere();
+// Spawn initial
+ragdolls.push(new Ragdoll(W/2, 0));
+for(let i=0;i<8;i++) spawnSphereAtDepth(i * 120 + Math.random()*80);
 
-function spawnSphere(){
+function spawnSphereAtDepth(yWorld){
   spheres.push(new Sphere(
     Math.random()*W,
-    Math.random()*H,
+    yWorld,
     15 + Math.random()*40
   ));
 }
 
 function spawnSphereNear(x,y){
-  spheres.push(new Sphere(
-    x + (Math.random()-0.5)*100,
-    y + (Math.random()-0.5)*100,
-    15 + Math.random()*40
-  ));
+  spawnSphereAtDepth(y + (Math.random()-0.5)*100);
 }
 
 // ── Input ────────────────────────────────────────────────────────────────
 canvas.addEventListener('pointerdown', e => {
   const x = e.clientX, y = e.clientY;
   touchX = x; touchY = y;
-  // Find closest ragdoll particle
   for(const r of ragdolls){
     const p = r.closestParticle(x,y);
     if(p){
@@ -231,7 +228,7 @@ canvas.addEventListener('pointerdown', e => {
       dragRagdoll = r;
       dragParticle = p;
       dragOffsetX = p.x-x; dragOffsetY = p.y-y;
-      // Pin all particles to freeze the ragdoll
+      // Freeze ragdoll
       for(const pp of r.particles){ pp._wasPinned = pp.pinned; pp.pinned = true; }
       break;
     }
@@ -239,28 +236,25 @@ canvas.addEventListener('pointerdown', e => {
 });
 canvas.addEventListener('pointermove', e => {
   touchX = e.clientX; touchY = e.clientY;
-  if(isDragging && dragRagdoll){
-    const dx = e.clientX - touchX, dy = e.clientY - touchY;
-    // Move entire ragdoll by the drag delta
+  if(isDragging && dragRagdoll && dragParticle){
+    // Move grabbed particle to finger position (in screen coords)
+    const targetX = e.clientX + dragOffsetX;
+    const targetY = e.clientY + dragOffsetY;
+    const dx = targetX - dragParticle.x;
+    const dy = targetY - dragParticle.y;
+    // Move entire ragdoll by the delta
     for(const p of dragRagdoll.particles){
       p.x += dx; p.y += dy;
-      p.ox = p.x; p.oy = p.y; // kill velocity
+      p.ox = p.x; p.oy = p.y;
     }
-    touchX = e.clientX; touchY = e.clientY;
+    // Adjust camera so ragdoll stays centered vertically
+    const head = dragRagdoll.particles[0];
+    cameraY += (head.y - cameraY - H*0.35) * 0.15;
   }
 });
 function releaseDrag(){
   if(isDragging && dragRagdoll){
-    // Unpin all particles
     for(const p of dragRagdoll.particles){ p.pinned = p._wasPinned || false; }
-    // Re-center: gently shift ragdoll toward screen centre
-    const head = dragRagdoll.particles[0];
-    const centerX = W/2;
-    const offsetX = centerX - head.x;
-    for(const p of dragRagdoll.particles){
-      p.x += offsetX;
-      p.ox += offsetX;
-    }
   }
   isDragging = false;
   dragRagdoll = null;
@@ -271,14 +265,16 @@ canvas.addEventListener('pointercancel', releaseDrag);
 
 // ── Buttons ───────────────────────────────────────────────────────────────
 document.getElementById('add-btn').onclick = () => {
-  ragdolls.push(new Ragdoll(W/2, -80));
+  const headY = ragdolls[0] ? ragdolls[0].particles[0].y : 0;
+  ragdolls.push(new Ragdoll(W/2, headY - 50));
 };
 document.getElementById('theme-btn').onclick = () => setTheme(themeIdx+1);
 document.getElementById('reset-btn').onclick = () => {
   isDragging = false; dragRagdoll = null; dragParticle = null;
-  ragdolls = [new Ragdoll(W/2, -80)];
+  cameraY = 0; fallSpeed = 0;
+  ragdolls = [new Ragdoll(W/2, 0)];
   spheres = [];
-  for(let i=0;i<8;i++) spawnSphere();
+  for(let i=0;i<8;i++) spawnSphereAtDepth(i*120+Math.random()*80);
 };
 
 // ── Sacred Geometry Drawing ──────────────────────────────────────────────
@@ -358,45 +354,41 @@ function drawPolygon(cx, cy, radius, sides, rotation, alpha){
 }
 
 function drawBackground(){
-  // Gradient background
+  // Gradient background — screen-space
   const grad = ctx.createRadialGradient(W/2,H/2,0, W/2,H/2,Math.max(W,H)*0.7);
-  grad.addColorStop(0, theme.bg === '#0a0a0f' ? '#0e0e18' : '#0c1018');
+  grad.addColorStop(0, '#0e0e18');
   grad.addColorStop(1, theme.bg);
+  // Fill screen-space first (behind world)
+  ctx.save();
+  ctx.setTransform(dpr,0,0,dpr,0,0); // screen space
   ctx.fillStyle = grad;
   ctx.fillRect(0,0,W,H);
+  ctx.restore();
 
-  // Subtle grid
+  // Subtle grid — world space, scrolls with camera
   const a = theme.accent;
   ctx.strokeStyle = `rgba(${a[0]},${a[1]},${a[2]},0.03)`;
   ctx.lineWidth = 0.5;
   const gridSize = 60;
-  const offsetX = (time*10) % gridSize;
-  const offsetY = (time*15) % gridSize;
-  for(let x = -gridSize+offsetX; x < W+gridSize; x += gridSize){
-    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+  const startY = Math.floor(cameraY / gridSize) * gridSize;
+  for(let x = 0; x < W; x += gridSize){
+    ctx.beginPath(); ctx.moveTo(x, cameraY-10); ctx.lineTo(x, cameraY+H+10); ctx.stroke();
   }
-  for(let y = -gridSize+offsetY; y < H+gridSize; y += gridSize){
+  for(let y = startY; y < cameraY+H+gridSize; y += gridSize){
     ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
   }
 
-  // Sacred geometry — large, faded, slowly rotating
-  const cx = W/2, cy = H/2;
+  // Sacred geometry — world space, scrolls
+  const cx = W/2, cy = cameraY + H*0.5;
   const pulse = 0.7 + 0.3*Math.sin(time*0.3);
 
   drawFlowerOfLife(cx, cy, 120*pulse, 0.04);
   drawMetatronsCube(cx, cy, 180*pulse, 0.025);
   drawGoldenSpiral(cx, cy, 250, time*0.1, 0.035);
 
-  // Nested rotating polygons
   for(let i=0;i<4;i++){
     drawPolygon(cx, cy, 100+i*60, 3+i, time*0.05*(i%2===0?1:-1), 0.02+i*0.005);
   }
-
-  // Corner sacred geometry
-  drawFlowerOfLife(0, 0, 80, 0.03);
-  drawFlowerOfLife(W, H, 80, 0.03);
-  drawGoldenSpiral(W, 0, 150, -time*0.08, 0.025);
-  drawGoldenSpiral(0, H, 150, time*0.12, 0.025);
 }
 
 function drawSphere(s){
@@ -540,27 +532,29 @@ function drawRagdoll(ragdoll){
   }
 }
 
-// ── Infinite void: recycle offscreen objects ─────────────────────────────
+// ── Camera follows ragdoll + spawn spheres ahead ──────────────────────
+function updateCamera(){
+  if(ragdolls.length > 0){
+    const head = ragdolls[0].particles[0];
+    // Smoothly follow the ragdoll's head, keeping it at ~35% from top
+    const targetCam = head.y - H * 0.35;
+    cameraY += (targetCam - cameraY) * 0.08;
+  }
+  // Spawn new spheres ahead of the camera
+  const aheadY = cameraY + H + 200;
+ while(spheres.length < 12){
+    spawnSphereAtDepth(aheadY + Math.random()*300);
+  }
+}
+
 function recycleObjects(){
-  const margin = 200;
-  // Spheres that fall too far offscreen wrap
-  for(const s of spheres){
-    if(s.y > H + margin + s.r){ s.y = -margin; s.x = Math.random()*W; s.vy = 0; }
-    if(s.y < -margin - s.r){ s.y = H + margin; s.x = Math.random()*W; s.vy = 0; }
-    if(s.x > W + margin + s.r){ s.x = -margin; s.vy = 0; }
-    if(s.x < -margin - s.r){ s.x = W + margin; s.vy = 0; }
+  const behindY = cameraY - 300;
+  spheres = spheres.filter(s => s.y > behindY);
+  // Keep spawning
+  const aheadY = cameraY + H + 100;
+  while(spheres.length < 10){
+    spawnSphereAtDepth(aheadY + Math.random()*400);
   }
-  // Ragdolls that fall too far: respawn centered at top
-  for(const r of ragdolls){
-    if(r.particles[0].y > H + 300){
-      const fresh = new Ragdoll(W/2, -80);
-      // Copy over arrays
-      r.particles = fresh.particles;
-      r.constraints = fresh.constraints;
-    }
-  }
-  // Spawn new spheres if too few
-  while(spheres.length < 10) spawnSphere();
 }
 
 // ── Main loop ────────────────────────────────────────────────────────────
@@ -585,25 +579,27 @@ function frame(now){
     }
   }
 
+  updateCamera();
   recycleObjects();
 
   // ── Draw ───────────────────────────────────────────────────────────
+  ctx.save();
+  ctx.translate(0, -cameraY); // camera transform
+
   drawBackground();
-
-  // Spheres
   for(const s of spheres) drawSphere(s);
-
-  // Ragdolls
   for(const r of ragdolls) drawRagdoll(r);
 
-  // Drag indicator
+  ctx.restore();
+
+  // Draw UI elements in screen space (no camera transform)
   if(isDragging && dragParticle){
-    ctx.strokeStyle = `rgba(${theme.accent2[0]},${theme.accent2[1]},${theme.accent2[2]},0.2)`;
+ ctx.strokeStyle = `rgba(${theme.accent2[0]},${theme.accent2[1]},${theme.accent2[2]},0.15)`;
     ctx.lineWidth = 1;
     ctx.setLineDash([4,4]);
     ctx.beginPath();
     ctx.moveTo(touchX, touchY);
-    ctx.lineTo(dragParticle.x, dragParticle.y);
+    ctx.lineTo(dragParticle.x, dragParticle.y - cameraY);
     ctx.stroke();
     ctx.setLineDash([]);
   }
