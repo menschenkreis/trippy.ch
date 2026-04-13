@@ -524,23 +524,36 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     osc2.start(now); osc2.stop(now + duration * 1.5 + 0.1);
 
   } else if (type === 'challenge') {
-    // Low, distorted, slightly dissonant thud
+    // Heavy, resonant crystalline "gong" - impactful yet harmonic
     const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const sub = audioCtx.createOscillator();
     const gain1 = audioCtx.createGain();
-    osc1.type = 'sawtooth';
-    osc1.frequency.setValueAtTime(freq * 0.25, now); // 2 octaves down
-    osc1.frequency.exponentialRampToValueAtTime(freq * 0.125, now + 0.1); // pitch dive
+    
+    osc1.type = 'sine';
+    osc2.type = 'triangle';
+    sub.type = 'sine';
+    
+    // Use harmonic base (note from current scale) but drop it 2 octaves
+    const baseNote = freq * 0.25; 
+    osc1.frequency.setValueAtTime(baseNote, now);
+    osc2.frequency.setValueAtTime(baseNote * 1.5, now); // perfect fifth
+    sub.frequency.setValueAtTime(baseNote * 0.5, now); // sub bass
     
     gain1.gain.setValueAtTime(0, now);
-    gain1.gain.linearRampToValueAtTime(vol * 0.8, now + 0.01);
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.5); // fast decay
+    gain1.gain.linearRampToValueAtTime(vol * 1.5, now + 0.02); // quick but not instant attack
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + duration * 2.0); // long resonance
     
     osc1.connect(gain1);
+    osc2.connect(gain1);
+    sub.connect(gain1);
     gain1.connect(panner);
     panner.connect(masterGain);
     if(delayNode) panner.connect(delayNode);
     
-    osc1.start(now); osc1.stop(now + duration * 0.5 + 0.1);
+    osc1.start(now); osc1.stop(now + duration * 2.0 + 0.1);
+    osc2.start(now); osc2.stop(now + duration * 2.0 + 0.1);
+    sub.start(now); sub.stop(now + duration * 2.0 + 0.1);
 
   } else if (type === 'yinyang') {
     // Balanced dual-tone fading smoothly
@@ -908,18 +921,20 @@ function collideRagdollSphere(ragdoll, sphere, dt){
       });
     }
 
-    // Portal trigger
+    // Portal trigger - Reimagined as "Shattering the Void"
     if(sphere.type === 'challenge' && !portal){
       const h = (sphere.hue + time * 40) % 360;
       portal = {
         x: sphere.x, y: sphere.y, r: sphere.r,
         progress: 0, hue: h, phase: 'expanding',
-        sparks: Array.from({length:30}, (_,i)=>({
-          angle: i * TAU / 60,
-          speed: 300 + Math.random() * 500,
+        // Shards instead of sparks
+        shards: Array.from({length:12}, (_,i)=>({
+          angle: i * TAU / 12,
           dist: 0,
-          size: 1 + Math.random() * 2.5,
-          hue: (h + i * 6) % 360,
+          speed: 150 + Math.random() * 200,
+          rot: Math.random() * TAU,
+          rotSpd: (Math.random()-0.5) * 0.2,
+          size: 15 + Math.random() * 20,
           life: 1,
         })),
         targetAccent: [60+Math.random()*180|0, 60+Math.random()*180|0, 60+Math.random()*180|0],
@@ -2272,12 +2287,15 @@ function frame(now){
 
   // ── Update Portal ──
   if(portal){
-    for(const sp of portal.sparks){
-      sp.angle += rawDt * 1.8;
-      sp.dist += sp.speed * rawDt;
-      sp.life -= rawDt * 0.6;
+    if(portal.shards){
+      for(const sh of portal.shards){
+        sh.life -= rawDt * 0.6;
+        sh.rot += sh.rotSpd;
+        sh.dist += sh.speed * rawDt;
+        sh.speed *= 0.98;
+      }
+      portal.shards = portal.shards.filter(sh => sh.life > 0);
     }
-    portal.sparks = portal.sparks.filter(sp => sp.life > 0);
 
     if(portal.phase === 'expanding'){
       portal.progress += rawDt * 0.55;
@@ -2406,64 +2424,45 @@ function frame(now){
       const p = portal.progress;
       const ease = p < 0.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2;
 
-      // Spiraling sacred geometry rings (2, no shadowBlur)
-      for(let ring = 0; ring < 2; ring++){
-        const ringR = pr * (0.7 + ring * 0.25);
-        const ringAlpha = ease * (0.5 - ring * 0.12);
-        const ringHue = (h + ring * 40 + time * 80) % 360;
-        const segments = 6 + ring * 2;
+      // Shatter shards - geometric debris
+      for(const sh of (portal.shards || [])){
+        const spx = sx + Math.cos(sh.angle) * sh.dist;
+        const spy = sy + Math.sin(sh.angle) * sh.dist;
+        const sa = sh.life * ease * 0.6;
         ctx.save();
-        ctx.translate(sx, sy);
-        ctx.rotate(time * (1.5 + ring * 0.5) * (ring % 2 ? -1 : 1));
-        // Double-stroke fake glow
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = `hsla(${ringHue},90%,60%,${ringAlpha * 0.2})`;
+        ctx.translate(spx, spy);
+        ctx.rotate(sh.rot);
+        ctx.strokeStyle = `hsla(${h}, 90%, 75%, ${sa})`;
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        for(let i = 0; i <= segments; i++){
-          const a = i * TAU / segments;
-          const wobble = Math.sin(time * 3 + i + ring) * ringR * 0.08;
-          const d = ringR + wobble;
-          if(i===0) ctx.moveTo(Math.cos(a)*d, Math.sin(a)*d);
-          else ctx.lineTo(Math.cos(a)*d, Math.sin(a)*d);
-        }
-        ctx.closePath(); ctx.stroke();
-        ctx.lineWidth = 1.2;
-        ctx.strokeStyle = `hsla(${ringHue},90%,75%,${ringAlpha})`;
-        ctx.beginPath();
-        for(let i = 0; i <= segments; i++){
-          const a = i * TAU / segments;
-          const wobble = Math.sin(time * 3 + i + ring) * ringR * 0.08;
-          const d = ringR + wobble;
-          if(i===0) ctx.moveTo(Math.cos(a)*d, Math.sin(a)*d);
-          else ctx.lineTo(Math.cos(a)*d, Math.sin(a)*d);
-        }
+        const ss = sh.size;
+        ctx.moveTo(-ss/2, -ss/2); ctx.lineTo(ss/2, 0); ctx.lineTo(-ss/2, ss/2);
         ctx.closePath(); ctx.stroke();
         ctx.restore();
       }
 
-      // Vortex tunnel rings (3 instead of 5, no shadowBlur)
-      const tunnelR = pr * 0.95;
+      // ── IMPLODING RINGS (Reimagined) ──
+      // Instead of expanding out, they suck into the point of impact
       for(let i = 0; i < 3; i++){
-        const t = (i / 4 + time * 0.5) % 1;
-        const tr = tunnelR * t;
-        const tAlpha = ease * (1 - t) * 0.3;
-        ctx.strokeStyle = `hsla(${(h + t * 120) % 360},85%,60%,${tAlpha})`;
-        ctx.lineWidth = 1;
+        const t = (1 - (i / 3 + time * 0.4) % 1);
+        const tr = pr * 1.8 * t;
+        const tAlpha = ease * (1 - t) * 0.4;
+        ctx.strokeStyle = `hsla(${(h + t * 60) % 360},80%,70%,${tAlpha})`;
+        ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.arc(sx, sy, tr, 0, TAU); ctx.stroke();
       }
 
-      // Portal sparks (no shadowBlur for performance)
-      for(const sp of portal.sparks){
-        const spx = sx + Math.cos(sp.angle) * sp.dist;
-        const spy = sy + Math.sin(sp.angle) * sp.dist;
-        const sa = sp.life * ease;
-        ctx.fillStyle = `hsla(${sp.hue},90%,70%,${sa})`;
-        ctx.beginPath(); ctx.arc(spx, spy, sp.size * sp.life, 0, TAU); ctx.fill();
-      }
-      ctx.shadowBlur = 0;
+      // Soft implosion pulse
+      const pulseA = ease * 0.3 * (1 - p);
+      const pg = ctx.createRadialGradient(sx, sy, 0, sx, sy, pr * 2);
+      pg.addColorStop(0, `hsla(${h}, 100%, 60%, 0)`);
+      pg.addColorStop(0.8, `hsla(${h}, 100%, 70%, ${pulseA * 0.2})`);
+      pg.addColorStop(1, `hsla(${h}, 100%, 60%, 0)`);
+      ctx.fillStyle = pg;
+      ctx.fillRect(sx - pr * 2, sy - pr * 2, pr * 4, pr * 4);
 
       // Inner darkening void
-      const voidAlpha = ease * 0.5;
+      const voidAlpha = ease * 0.6;
       const vg = ctx.createRadialGradient(sx, sy, 0, sx, sy, pr * 0.6);
       vg.addColorStop(0, `hsla(${(h+180)%360},60%,5%,${voidAlpha})`);
       vg.addColorStop(0.7, `hsla(${h},50%,8%,${voidAlpha * 0.3})`);
