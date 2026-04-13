@@ -69,6 +69,18 @@ function autoSave(now){
   }
 }
 
+// ── Update Journey Panel (IIFE scope — called from restoreFromSave & frame) ──
+function updateJourneyPanel(){
+  const el = document.getElementById('journey-log');
+  if(!el || journeyLog.length === 0) return;
+  let html = '';
+  for(let i = journeyLog.length - 1; i >= 0; i--){
+    const e = journeyLog[i];
+    html += `<div class="journey-entry"><div class="journey-icon">${e.label.startsWith('Year') || e.label === 'Birth' ? '📖' : '🎯'}</div><div class="journey-entry-text"><strong>${e.label}</strong> — ${e.text}</div></div>`;
+  }
+  el.innerHTML = html;
+}
+
 function restoreFromSave(data){
   cameraY = data.cameraY || 0;
   score = data.score || 0;
@@ -206,16 +218,29 @@ const lifeChapters = [
   { depth: 100, label: 'Flow', text: 'Life is not a problem to be solved, but a reality to be experienced.' },
   { depth: 200, label: 'Resistance', text: 'The obstacle is the path. Every collision is an awakening.' },
   { depth: 500, label: 'Descent', text: 'To fall is to surrender. To surrender is to find the rhythm of the void.' },
+  { depth: 750, label: 'Perspective', text: 'Depth is merely height seen from a different point of view.' },
   { depth: 1000, label: 'Year 1', text: 'A thousand meters of wonder. The world is finally becoming real.' },
+  { depth: 1250, label: 'Curiosity', text: 'We do not travel to find ourselves, but to find how much there is to lose.' },
   { age: 2, label: 'Year 2', text: 'Learning to walk. Every fall is a discovery.' },
+  { depth: 2250, label: 'Momentum', text: 'Gravity is just a long conversation between you and the earth.' },
   { age: 3, label: 'Year 3', text: 'Why? Why? Why? The universe is infinite questions.' },
+  { depth: 3250, label: 'Stillness', text: 'The faster you fall, the more still the center of your being must become.' },
   { age: 4, label: 'Year 4', text: 'Imagination runs wild. Everything is alive.' },
+  { depth: 4250, label: 'Echo', text: 'The void does not answer, it only reflects the light you bring into it.' },
   { age: 5, label: 'Year 5', text: 'The first day of something bigger.' },
+  { depth: 5250, label: 'Unity', text: 'There are no separate objects, only different frequencies of the same descent.' },
   { age: 6, label: 'Year 6', text: 'Friendships form. The world gets wider.' },
+  { depth: 6250, label: 'Shadow', text: 'Light is only meaningful when it has something to bounce off of.' },
   { age: 7, label: 'Year 7', text: 'Things fall away. But they make room for what comes next.' },
+  { depth: 7250, label: 'Eternity', text: 'A single moment of presence is deeper than a kilometer of distance.' },
   { age: 8, label: 'Year 8', text: 'Reading opens doors to a thousand worlds.' },
+  { depth: 8250, label: 'Gravity', text: 'Love is the only force stronger than the pull of the void.' },
   { age: 9, label: 'Year 9', text: 'Almost double digits. Time starts to feel real.' },
+  { depth: 9250, label: 'Impermanence', text: 'Nothing stays, yet nothing is ever truly lost in the Great Flow.' },
   { age: 10, label: 'Year 10', text: 'A whole decade. You have no idea how fast this goes.' },
+  { depth: 10250, label: 'Wisdom', text: 'Knowledge is counting the meters; wisdom is feeling the air.' },
+  { depth: 10500, label: 'Trust', text: 'The void has caught you every time you have fallen so far.' },
+  { depth: 10750, label: 'Presence', text: 'You are not falling through the void; you are the void experiencing itself.' },
   { age: 12, label: 'Year 12', text: 'A turning point. Everything begins to change.' },
   { age: 13, label: 'Year 13', text: 'The void gets deeper.' },
   { age: 15, label: 'Year 15', text: 'First love. First heartbreak. The obstacles get sharper.' },
@@ -2630,16 +2655,7 @@ function frame(now){
   }
 
   // ── Update Journey Panel ──
-  function updateJourneyPanel(){
-    const el = document.getElementById('journey-log');
-    if(!el || journeyLog.length === 0) return;
-    let html = '';
-    for(let i = journeyLog.length - 1; i >= 0; i--){
-      const e = journeyLog[i];
-      html += `<div class="journey-entry"><div class="journey-icon">${e.label.startsWith('Year') || e.label === 'Birth' ? '📖' : '🎯'}</div><div class="journey-entry-text"><strong>${e.label}</strong> — ${e.text}</div></div>`;
-    }
-    el.innerHTML = html;
-  }
+  // updateJourneyPanel defined at IIFE scope (see above)
 
   // ── Chapter Logic (unified) ──
   for(let ci = 0; ci < lifeChapters.length; ci++){
