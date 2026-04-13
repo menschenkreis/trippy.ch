@@ -2771,7 +2771,7 @@ function frame(now){
     for(const l of lines) maxW = Math.max(maxW, ctx.measureText(l.trim()).width);
     const bw = maxW + padX * 2;
     const bh = lines.length * lineH + padY * 2;
-    const bx = W/2, by = H * 0.42;
+    const bx = W/2, by = H * 0.18;
 
     // ── Animated Thought Bubble (Organic Shape) ──
     ctx.translate(bx, by);
