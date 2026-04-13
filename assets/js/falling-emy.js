@@ -938,8 +938,9 @@ function frame(now){
   const rawDt = Math.min((now - lastTime)/1000, 0.033);
   lastTime = now;
 
-  // Smoothly interpolate time scale
-  timeScale += (targetTimeScale - timeScale) * 0.12;
+  // Smoothly interpolate time scale (much faster transition but still eased)
+  const ease = (targetTimeScale < timeScale) ? 0.45 : 0.15;
+  timeScale += (targetTimeScale - timeScale) * ease;
 
   time += rawDt;
   const dt = (rawDt * timeScale) / SUBSTEPS;
