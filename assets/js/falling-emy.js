@@ -73,7 +73,8 @@ let milestoneSlowMo = 0;
 
 // ── Life Chapters ──
 const lifeChapters = [
-  { age: 1, text: "The first breath. Pure awareness. No past, no future." },
+  { age: 0, text: "The first breath. Pure awareness. No past, no future." },
+  { age: 1, text: "Year one. Every sensation is brand new." },
   { age: 2, text: "Learning to walk. Every fall is a discovery." },
   { age: 3, text: "Why? Why? Why? The universe is infinite questions." },
   { age: 4, text: "Imagination runs wild. Everything is alive." },
@@ -758,7 +759,7 @@ function collideRagdollSphere(ragdoll, sphere, dt){
       portal = {
         x: sphere.x, y: sphere.y, r: sphere.r,
         progress: 0, hue: h, phase: 'expanding',
-        sparks: Array.from({length:60}, (_,i)=>({
+        sparks: Array.from({length:30}, (_,i)=>({
           angle: i * TAU / 60,
           speed: 300 + Math.random() * 500,
           dist: 0,
@@ -775,10 +776,10 @@ function collideRagdollSphere(ragdoll, sphere, dt){
 
 // ── Impact particles ─────────────────────────────────────────────────────
 let particles = [];
-const MAX_PARTICLES = 300;
+const MAX_PARTICLES = 150;
 
 function spawnImpactParticles(x, y, hue){
-  const count = 12 + Math.floor(Math.random()*12); // more particles like fireworks
+  const count = 6 + Math.floor(Math.random()*6);
   for(let i=0;i<count;i++){
     if(particles.length >= MAX_PARTICLES) particles.shift();
     const angle = Math.random() * TAU;
@@ -901,14 +902,12 @@ function drawScoreElements(){
       size = f.size;
     }
     ctx.fillStyle = `hsla(${f.hue},90%,70%,${alpha})`;
-    ctx.shadowColor = `hsla(${f.hue},90%,60%,${alpha * 0.7})`;
-    ctx.shadowBlur = 6;
     ctx.beginPath();
     ctx.arc(sx, sy, size, 0, TAU);
     ctx.fill();
     // Trail
     if(f.phase === 'arc'){
-      const trailLen = 3;
+      const trailLen = 2;
       for(let t = 1; t <= trailLen; t++){
         const ta = alpha * (1 - t / (trailLen + 1)) * 0.5;
         const tx = sx - f.vx * 0.008 * t;
@@ -925,31 +924,16 @@ function drawScoreElements(){
 
 function drawParticles(){
   ctx.save();
-  ctx.globalCompositeOperation = 'screen'; // additive blending for bright sparks
+  ctx.globalCompositeOperation = 'screen';
   for(const p of particles){
-    const alpha = p.life * (p.life > 0.5 ? 1.0 : p.life * 2.0); // fade out at end
-    const twinkle = 0.5 + 0.5 * Math.sin(time * 15 + p.hue);
-    const s = p.size * (0.8 + 0.4 * twinkle);
-
-    // Glow
-    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, s*6);
-    grad.addColorStop(0, `hsla(${p.hue},90%,60%,${alpha*0.6})`);
-    grad.addColorStop(1, `hsla(${p.hue},90%,40%,0)`);
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(p.x, p.y, s*6, 0, TAU); ctx.fill();
-
+    const alpha = p.life * (p.life > 0.5 ? 1.0 : p.life * 2.0);
+    const s = p.size * (0.8 + 0.2 * Math.sin(time * 12 + p.hue));
+    // Soft glow (single larger circle, no gradient)
+    ctx.fillStyle = `hsla(${p.hue},85%,60%,${alpha * 0.3})`;
+    ctx.beginPath(); ctx.arc(p.x, p.y, s * 4, 0, TAU); ctx.fill();
     // Core
-    ctx.fillStyle = `hsla(${p.hue},100%,90%,${alpha})`;
+    ctx.fillStyle = `hsla(${p.hue},100%,85%,${alpha})`;
     ctx.beginPath(); ctx.arc(p.x, p.y, s, 0, TAU); ctx.fill();
-
-    // Cross sparkle
-    if(p.sparkle && p.life > 0.5){
-      const len = s * 5 * p.life;
-      ctx.strokeStyle = `hsla(${p.hue},80%,90%,${alpha*0.5})`;
-      ctx.lineWidth = 0.5;
-      ctx.beginPath(); ctx.moveTo(p.x-len, p.y); ctx.lineTo(p.x+len, p.y); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(p.x, p.y-len); ctx.lineTo(p.x, p.y+len); ctx.stroke();
-    }
   }
   ctx.restore();
 }
@@ -1984,8 +1968,8 @@ function frame(now){
       const p = portal.progress;
       const ease = p < 0.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2;
 
-      // Spiraling sacred geometry rings
-      for(let ring = 0; ring < 3; ring++){
+      // Spiraling sacred geometry rings (2 instead of 3)
+      for(let ring = 0; ring < 2; ring++){
         const ringR = pr * (0.7 + ring * 0.25);
         const ringAlpha = ease * (0.5 - ring * 0.12);
         const ringHue = (h + ring * 40 + time * 80) % 360;
@@ -1995,8 +1979,8 @@ function frame(now){
         ctx.rotate(time * (1.5 + ring * 0.5) * (ring % 2 ? -1 : 1));
         ctx.strokeStyle = `hsla(${ringHue},90%,65%,${ringAlpha})`;
         ctx.lineWidth = 1.5 - ring * 0.3;
-        ctx.shadowColor = `hsla(${ringHue},90%,60%,${ringAlpha * 0.8})`;
-        ctx.shadowBlur = 20;
+        ctx.shadowColor = `hsla(${ringHue},90%,60%,${ringAlpha * 0.4})`;
+        ctx.shadowBlur = 10;
         ctx.beginPath();
         for(let i = 0; i <= segments; i++){
           const a = i * TAU / segments;
@@ -2024,7 +2008,7 @@ function frame(now){
 
       // Vortex tunnel rings
       const tunnelR = pr * 0.95;
-      for(let i = 0; i < 8; i++){
+      for(let i = 0; i < 5; i++){
         const t = (i / 8 + time * 0.5) % 1;
         const tr = tunnelR * t;
         const tAlpha = ease * (1 - t) * 0.3;
@@ -2034,14 +2018,12 @@ function frame(now){
         ctx.beginPath(); ctx.arc(sx, sy, tr, 0, TAU); ctx.stroke();
       }
 
-      // Portal sparks
+      // Portal sparks (no shadowBlur for performance)
       for(const sp of portal.sparks){
         const spx = sx + Math.cos(sp.angle) * sp.dist;
         const spy = sy + Math.sin(sp.angle) * sp.dist;
         const sa = sp.life * ease;
         ctx.fillStyle = `hsla(${sp.hue},90%,70%,${sa})`;
-        ctx.shadowColor = `hsla(${sp.hue},90%,60%,${sa})`;
-        ctx.shadowBlur = 8;
         ctx.beginPath(); ctx.arc(spx, spy, sp.size * sp.life, 0, TAU); ctx.fill();
       }
       ctx.shadowBlur = 0;
@@ -2055,9 +2037,9 @@ function frame(now){
       ctx.fillStyle = vg;
       ctx.fillRect(0, 0, W, H);
 
-      // Outer chromatic ring (screen blend)
+      // Outer chromatic ring (screen blend, 2 instead of 3)
       ctx.globalCompositeOperation = 'screen';
-      for(let c = 0; c < 3; c++){
+      for(let c = 0; c < 2; c++){
         const cHue = (h + c * 40) % 360;
         const cR = pr * (0.92 + c * 0.06);
         const cg = ctx.createRadialGradient(sx, sy, cR * 0.9, sx, sy, cR * 1.1);
@@ -2085,7 +2067,7 @@ function frame(now){
       const flashEase = flash * flash;
 
       // White flash
-      ctx.fillStyle = `rgba(255,255,255,${flashEase * 0.7})`;
+      ctx.fillStyle = `rgba(255,255,255,${flashEase * 0.4})`;
       ctx.fillRect(0, 0, W, H);
 
       // Chromatic scan lines
@@ -2099,13 +2081,13 @@ function frame(now){
         }
       }
 
-      // Radial light rays
-      const rayAlpha = flashEase * 0.25;
+      // Radial light rays (reduced)
+      const rayAlpha = flashEase * 0.15;
       if(rayAlpha > 0.01){
         ctx.save();
         ctx.globalCompositeOperation = 'screen';
         ctx.translate(sx, sy);
-        for(let i = 0; i < 16; i++){
+        for(let i = 0; i < 8; i++){
           const a = (i / 16) * TAU + time * 0.3;
           const rayLen = Math.max(W, H) * 1.5;
           const rayW = 0.04 + Math.sin(time * 2 + i) * 0.02;
@@ -2232,13 +2214,13 @@ function frame(now){
       const mLabel = m >= 1000 ? (m/1000) + ' km' : m + ' m';
       milestoneText = {text: mLabel, life: 2.0};
       playMilestoneChord();
-      // Spawn celebration particles (screen space)
-      for(let i = 0; i < 40; i++){
+      // Spawn celebration particles (screen space) — reduced
+      for(let i = 0; i < 20; i++){
         particles.push({
           x: W/2, y: H/2 + cameraY,
           vx: (Math.random()-0.5)*300, vy: (Math.random()-0.5)*300,
           life: 1.5 + Math.random(), decay: 0.4 + Math.random()*0.3,
-          size: 3 + Math.random()*4, hue: Math.random()*360, sparkle: true,
+          size: 2 + Math.random()*2, hue: Math.random()*360, sparkle: false,
         });
       }
     }
@@ -2257,7 +2239,8 @@ function frame(now){
 
   // Life Chapters
   for(const ch of lifeChapters){
-    if(depthMeters >= ch.age * 1000 && lastChapter < ch.age){
+    const triggerDepth = ch.age * 1000;
+    if(depthMeters >= triggerDepth && lastChapter < ch.age){
       lastChapter = ch.age;
       chapterSlowMo = 1.0;
       chapterDisplay = {text: ch.text, life: 6.0, phase: 'fadein'};
