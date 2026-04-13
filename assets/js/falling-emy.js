@@ -1571,7 +1571,8 @@ function drawKaleidoscope(cx, cy, radius, folds, rotation, hueOffset, alpha, par
 
 function drawStarfield(parallax){
   // Deterministic star positions based on grid cells
-  const starSpacing = 80;
+  const isDistant = parallax < 0.1;
+  const starSpacing = isDistant ? 120 : 80;
   const scrollY = cameraY * parallax;
   const startCellY = Math.floor(scrollY / starSpacing) - 1;
   const endCellY = startCellY + Math.ceil(H / starSpacing) + 2;
@@ -1586,8 +1587,8 @@ function drawStarfield(parallax){
       const h2 = (((seed * 83492791) >>> 0) % 1000) / 1000;
       const h3 = (((seed * 49297347) >>> 0) % 1000) / 1000;
 
-      // Only ~40% of cells have a star
-      if(h1 > 0.4) continue;
+      // Only ~40% of cells have a star (distant layer: 30%)
+      if(h1 > (isDistant ? 0.3 : 0.4)) continue;
 
       const sx = cx * starSpacing + h2 * starSpacing;
       const sy = cy * starSpacing + h3 * starSpacing - scrollY;
@@ -1596,9 +1597,9 @@ function drawStarfield(parallax){
       if(sx < -5 || sx > W+5 || sy < -5 || sy > H+5) continue;
 
       // Star properties from hash
-      const brightness = 0.3 + h1 * 0.7; // Brighter range
-      const size = 0.8 + h3 * 2.0; // Slightly larger
-      const twinkleSpeed = 1.2 + h2 * 5.0;
+      const brightness = isDistant ? (0.15 + h1 * 0.4) : (0.3 + h1 * 0.7);
+      const size = isDistant ? (0.4 + h3 * 0.8) : (0.8 + h3 * 2.0);
+      const twinkleSpeed = isDistant ? (0.5 + h2 * 2.0) : (1.2 + h2 * 5.0);
       const twinklePhase = h1 * TAU * 10;
 
       // Twinkle
@@ -1616,8 +1617,8 @@ function drawStarfield(parallax){
       ctx.arc(sx, sy, size * (0.6 + 0.4 * twinkle), 0, TAU);
       ctx.fill();
 
-      // Bright stars get a subtle cross sparkle
-      if(brightness > 0.3 && twinkle > 0.7){
+      // Bright stars get a subtle cross sparkle (skip for distant layer)
+      if(!isDistant && brightness > 0.3 && twinkle > 0.7){
         const sparkle = (twinkle - 0.7) / 0.3 * 0.15;
         ctx.strokeStyle = `hsla(${hue},${sat}%,${light}%,${sparkle})`;
         ctx.lineWidth = 0.5;
@@ -1643,7 +1644,8 @@ function drawBackground(){
   // Stars (screen space — must reset transform since we're inside camera transform)
   ctx.save();
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  drawStarfield(0.15);
+  drawStarfield(0.05); // distant tiny stars — very slow parallax
+  drawStarfield(0.15); // closer stars
   ctx.restore();
 
   // ── Parallax kaleidoscope layers (screen-space, different scroll speeds) ──
