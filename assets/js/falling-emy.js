@@ -684,19 +684,24 @@ function collideRagdollSphere(ragdoll, sphere, dt){
 
     // ── Collision Harmonics ──
     harmonyIndex = (harmonyIndex + 1) % pentatonicScale.length;
-    if(comboCount > 1 && audioCtx && !isMuted){
+    if(comboCount > 1 && audioCtx && !isMuted && now - lastImpactTime > 0.08){
       const hNow = audioCtx.currentTime;
       const hFreq = 220 * Math.pow(2, pentatonicScale[Math.min(comboCount-1, pentatonicScale.length-1)]/12);
       const hOsc = audioCtx.createOscillator();
       const hGain = audioCtx.createGain();
-      hOsc.type = 'sine';
+      const hFilter = audioCtx.createBiquadFilter();
+      hOsc.type = 'triangle';
       hOsc.frequency.setValueAtTime(hFreq, hNow);
+      hFilter.type = 'lowpass';
+      hFilter.frequency.setValueAtTime(hFreq * 3, hNow);
+      hFilter.frequency.exponentialRampToValueAtTime(hFreq * 1.5, hNow + 0.3);
+      hFilter.Q.value = 1;
       hGain.gain.setValueAtTime(0, hNow);
-      hGain.gain.linearRampToValueAtTime(0.15, hNow + 0.02);
-      hGain.gain.exponentialRampToValueAtTime(0.001, hNow + 0.4);
-      hOsc.connect(hGain); hGain.connect(masterGain);
+      hGain.gain.linearRampToValueAtTime(0.06, hNow + 0.06);
+      hGain.gain.exponentialRampToValueAtTime(0.001, hNow + 0.8);
+      hOsc.connect(hFilter); hFilter.connect(hGain); hGain.connect(masterGain);
       if(delayNode) hGain.connect(delayNode);
-      hOsc.start(hNow); hOsc.stop(hNow + 0.5);
+      hOsc.start(hNow); hOsc.stop(hNow + 0.9);
     }
 
     // ── Power-Up Activation ──
