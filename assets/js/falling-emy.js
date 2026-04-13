@@ -36,6 +36,10 @@ const SUBSTEPS = 2;
 let tiltEnabled = false;
 let gravityX = 0, gravityY = GRAVITY;
 let isDragging = false;
+
+// ── Portal System ──
+let portal = null;
+
 let isSlowed = false;
 let timeScale = 1.0;
 let targetTimeScale = 1.0;
@@ -547,6 +551,16 @@ function collideRagdollSphere(ragdoll, sphere, dt){
     spawnImpactParticles(sphere.x, sphere.y, sphere.hue);
     playImpactSound(impactData.maxForce, sphere.hue, sphere.x, sphere.type, sphere.sacredType);
     sphere.impactFlash = 1.0;
+    if(sphere.type === 'challenge' && !portal){
+      portal = {
+        x: sphere.x, y: sphere.y, r: sphere.r,
+        progress: 0,
+        hue: (sphere.hue + time * 40) % 360,
+        phase: 'expanding',
+        targetAccent: [60+Math.random()*180|0, 60+Math.random()*180|0, 60+Math.random()*180|0],
+        targetAccent2: [60+Math.random()*180|0, 60+Math.random()*180|0, 60+Math.random()*180|0],
+      };
+    }
   }
 }
 
@@ -737,6 +751,7 @@ tiltBtn.onclick = () => {
 document.getElementById('reset-btn').onclick = () => {
   isDragging = false; dragRagdoll = null; dragParticle = null;
   cameraY = 0; fallSpeed = 0;
+  portal = null;
   ragdolls = [new Ragdoll(W/2, 0, 'emy')];
   spheres = [];
   for(let i=0;i<8;i++) spawnSphereAtDepth(i*120+Math.random()*80);
@@ -1463,6 +1478,26 @@ function frame(now){
   updateCamera();
   recycleObjects();
 
+  // ── Update Portal ──
+  if(portal){
+    if(portal.phase === 'expanding'){
+      portal.progress += rawDt * 0.8;
+      portal.r += rawDt * 1200;
+      if(portal.progress >= 1){
+        portal.phase = 'holding'; portal.progress = 0;
+        window.manualThemeSet = true;
+        theme.accent = portal.targetAccent;
+        theme.accent2 = portal.targetAccent2;
+      }
+    } else if(portal.phase === 'holding'){
+      portal.progress += rawDt * 2.5;
+      if(portal.progress >= 1){ portal.phase = 'fading'; portal.progress = 0; }
+    } else if(portal.phase === 'fading'){
+      portal.progress += rawDt * 1.5;
+      if(portal.progress >= 1) portal = null;
+    }
+  }
+
   // ── Draw ───────────────────────────────────────────────────────────
   ctx.save();
   ctx.translate(0, -cameraY); // camera transform
@@ -1473,6 +1508,55 @@ function frame(now){
   drawParticles();
 
   ctx.restore();
+
+  // ── Portal Overlay (screen space) ──
+  if(portal){
+    const sx = portal.x;
+    const sy = portal.y - cameraY;
+    const pr = portal.r;
+    let alpha;
+    if(portal.phase === 'expanding') alpha = Math.min(portal.progress * 1.5, 1);
+    else if(portal.phase === 'holding') alpha = 1;
+    else alpha = 1 - portal.progress;
+
+    if(alpha > 0.01){
+      // Ring glow (screen blend)
+      const ringA = (portal.phase === 'expanding') ? alpha * 0.8
+        : (portal.phase === 'holding') ? 0.3 * (1 - portal.progress)
+        : alpha * 0.3;
+      if(ringA > 0.01){
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        const rg = ctx.createRadialGradient(sx, sy, pr*0.85, sx, sy, pr*1.15);
+        rg.addColorStop(0, `hsla(${portal.hue},90%,60%,0)`);
+        rg.addColorStop(0.4, `hsla(${portal.hue},90%,70%,${ringA*0.6})`);
+        rg.addColorStop(0.6, `hsla(${(portal.hue+60)%360},90%,70%,${ringA*0.4})`);
+        rg.addColorStop(1, `hsla(${(portal.hue+120)%360},90%,60%,0)`);
+        ctx.fillStyle = rg;
+        ctx.fillRect(sx-pr*1.5, sy-pr*1.5, pr*3, pr*3);
+        // Inner swirl fill
+        const ia = alpha * (portal.phase === 'expanding' ? 0.35
+          : portal.phase === 'holding' ? 0.12*(1-portal.progress)
+          : alpha * 0.12);
+        ctx.globalCompositeOperation = 'source-over';
+        const ig = ctx.createRadialGradient(sx, sy, 0, sx, sy, pr*0.9);
+        ig.addColorStop(0, `hsla(${(portal.hue+180)%360},80%,20%,${ia})`);
+        ig.addColorStop(0.5, `hsla(${portal.hue},70%,15%,${ia*0.5})`);
+        ig.addColorStop(1, `hsla(${(portal.hue+90)%360},60%,10%,0)`);
+        ctx.fillStyle = ig;
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+      }
+      // Color wash during hold/fade
+      if(portal.phase === 'holding' || portal.phase === 'fading'){
+        const wa = (portal.phase === 'holding') ? 0.06*(1-portal.progress) : 0.06*alpha;
+        if(wa > 0.005){
+          ctx.fillStyle = `hsla(${(portal.hue+180)%360},50%,50%,${wa})`;
+          ctx.fillRect(0, 0, W, H);
+        }
+      }
+    }
+  }
 
   // ── Depth Meter & Sunrise Overlay ──
   const depthMeters = Math.max(0, cameraY / 100);
