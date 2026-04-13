@@ -128,6 +128,8 @@ class Sphere {
       this.r = 35 + Math.random()*25;
     } else if(type === 'heart'){
       this.r = 25 + Math.random()*15;
+    } else if(type === 'chakra'){
+      this.r = 28 + Math.random()*20;
     } else {
       this.r = r || (15 + Math.random()*35);
     }
@@ -138,6 +140,7 @@ class Sphere {
     this.hue = Math.random()*360;
     this.segments = 3 + Math.floor(Math.random()*5); // sacred geometry sides
     this.sacredType = Math.floor(Math.random() * 3); // 0: polygon, 1: seed of life, 2: metatron
+    this.chakraLevel = Math.floor(Math.random() * 7); // 0-6 for the 7 chakras
     this.impactFlash = 0;
   }
   update(dt){
@@ -350,28 +353,53 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     
     osc1.start(now); osc1.stop(now + duration * 0.5 + 0.1);
 
-  } else if (type === 'merkaba') {
-    // Shimmering Arpeggio (Root, Fifth, Octave)
-    const freqs = [freq, freq * 1.5, freq * 2];
-    freqs.forEach((f, i) => {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(f, now);
-      
-      const tStart = now + i * 0.08; // stagger the notes
-      gain.gain.setValueAtTime(0, tStart);
-      gain.gain.linearRampToValueAtTime(vol * 0.4, tStart + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.001, tStart + duration);
-      
-      osc.connect(gain);
-      gain.connect(panner);
-      panner.connect(masterGain);
-      if(delayNode) panner.connect(delayNode);
-      
-      osc.start(tStart);
-      osc.stop(tStart + duration + 0.1);
-    });
+  } else if (type === 'yinyang') {
+    // Balanced dual-tone fading smoothly
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    osc1.type = 'sine';
+    osc2.type = 'sine';
+    osc1.frequency.setValueAtTime(freq, now);
+    osc2.frequency.setValueAtTime(freq * 1.5, now);
+    
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(vol * 0.7, now + 0.1);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration * 1.5);
+    
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(panner);
+    panner.connect(masterGain);
+    if(delayNode) panner.connect(delayNode);
+    
+    osc1.start(now); osc1.stop(now + duration * 1.5 + 0.1);
+    osc2.start(now); osc2.stop(now + duration * 1.5 + 0.1);
+
+  } else if (type === 'chakra') {
+    // Singing bowl resonance
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    osc1.type = 'sine';
+    osc2.type = 'sine';
+    osc1.frequency.setValueAtTime(freq, now);
+    osc2.frequency.setValueAtTime(freq * 0.99, now); // slight beat frequency
+    
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(vol * 0.8, now + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration * 2.0);
+    
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(panner);
+    panner.connect(masterGain);
+    if(delayNode) panner.connect(delayNode);
+    
+    osc1.start(now); osc1.stop(now + duration * 2.0 + 0.1);
+    osc2.start(now); osc2.stop(now + duration * 2.0 + 0.1);
 
   } else if (type === 'vesica') {
     // Deep Choir Pad (Filtered sawtooth + sub oscillator)
@@ -609,8 +637,9 @@ function spawnSphereAtDepth(yWorld, forceType=null){
     // Reduced frequency of special obstacles (approx 1.5% each)
     const r = Math.random();
     if (r < 0.015) type = 'heart';
-    else if (r < 0.030) type = 'merkaba';
+    else if (r < 0.030) type = 'yinyang';
     else if (r < 0.045) type = 'vesica';
+    else if (r < 0.060) type = 'chakra';
   }
 
   spheres.push(new Sphere(
@@ -1009,41 +1038,104 @@ function drawSphere(s){
     ctx.closePath();
     ctx.stroke();
 
-  } else if (s.type === 'merkaba') {
-    const hue = (60 + time*15 + s.hue) % 360; 
+  } else if (s.type === 'yinyang') {
+    const hue = (time*10 + s.hue) % 360; 
     ctx.rotate(time * 0.5 + s.rotation);
     
-    // Golden Glow
+    // Glow
     const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.6);
     grad.addColorStop(0, `hsla(${hue},90%,60%,0.15)`);
     grad.addColorStop(1, `hsla(${hue},90%,60%,0)`);
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(0,0,r*1.6,0,TAU); ctx.fill();
 
-    ctx.strokeStyle = `hsla(${hue},90%,70%,0.9)`;
+    // Yin Yang
     ctx.lineWidth = 1.5;
+    ctx.strokeStyle = `hsla(${hue},90%,70%,0.9)`;
+    
+    // Outer circle
+    ctx.beginPath(); ctx.arc(0,0,r,0,TAU); ctx.stroke();
+    
+    // S-curve
+    ctx.beginPath();
+    ctx.arc(0, -r/2, r/2, 1.5*PI, 0.5*PI, false);
+    ctx.arc(0, r/2, r/2, 1.5*PI, 0.5*PI, true);
+    ctx.stroke();
 
-    // Draw two interlocking triangles (Star of David / 2D projection of Merkaba)
-    const drawTri = (rotOffset) => {
+    // Dots
+    ctx.fillStyle = `hsla(${hue},90%,70%,0.9)`;
+    ctx.beginPath(); ctx.arc(0, -r/2, r*0.15, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, r/2, r*0.15, 0, TAU); ctx.stroke();
+
+  } else if (s.type === 'chakra') {
+    const colors = [0, 30, 60, 120, 240, 275, 300]; // Red, Orange, Yellow, Green, Blue, Indigo, Violet
+    const petalsCount = [4, 6, 10, 12, 16, 2, 24];
+    const idx = s.chakraLevel;
+    const hue = colors[idx];
+    ctx.rotate(time * 0.2 + s.rotation);
+
+    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+    grad.addColorStop(0, `hsla(${hue},80%,60%,0.2)`);
+    grad.addColorStop(1, `hsla(${hue},80%,60%,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
+
+    ctx.strokeStyle = `hsla(${hue},80%,65%,0.9)`;
+    ctx.fillStyle = `hsla(${hue},80%,65%,0.1)`;
+    ctx.lineWidth = 1.0;
+    
+    const petals = petalsCount[idx];
+    for(let i=0; i<petals; i++){
       ctx.beginPath();
-      for(let i=0; i<=3; i++) {
-        const a = i * TAU/3 + rotOffset;
-        if(i===0) ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r);
-        else ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
-      }
+      const a = i * TAU / petals;
+      ctx.moveTo(0,0);
+      const cpDist = r * 1.2;
+      const cpAngleOffset = TAU / petals * 0.5;
+      ctx.quadraticCurveTo(
+        Math.cos(a - cpAngleOffset) * cpDist, Math.sin(a - cpAngleOffset) * cpDist,
+        Math.cos(a) * r, Math.sin(a) * r
+      );
+      ctx.quadraticCurveTo(
+        Math.cos(a + cpAngleOffset) * cpDist, Math.sin(a + cpAngleOffset) * cpDist,
+        0, 0
+      );
+      ctx.fill();
       ctx.stroke();
-    };
+    }
 
-    drawTri(0);
-    drawTri(PI/3);
-
-    // Inner glowing ring
-    ctx.strokeStyle = `hsla(${hue},80%,50%,0.5)`;
+    ctx.fillStyle = `rgba(10,10,15,0.8)`;
+    ctx.beginPath(); ctx.arc(0,0,r*0.5,0,TAU); ctx.fill();
     ctx.beginPath(); ctx.arc(0,0,r*0.5,0,TAU); ctx.stroke();
     
-    // Core dot
-    ctx.fillStyle = `hsla(${hue},100%,80%,0.8)`;
-    ctx.beginPath(); ctx.arc(0,0,3,0,TAU); ctx.fill();
+    ctx.lineWidth = 1.5;
+    if(idx === 0 || idx === 2) {
+       ctx.beginPath();
+       for(let i=0;i<3;i++) {
+         const ta = i * TAU/3 + PI/2;
+         if(i===0) ctx.moveTo(Math.cos(ta)*r*0.4, Math.sin(ta)*r*0.4);
+         else ctx.lineTo(Math.cos(ta)*r*0.4, Math.sin(ta)*r*0.4);
+       }
+       ctx.closePath(); ctx.stroke();
+    } else if (idx === 3 || idx === 5) {
+       for(let t=0; t<2; t++){
+         ctx.beginPath();
+         for(let i=0;i<3;i++) {
+           const ta = i * TAU/3 + t*PI/3 + PI/2;
+           if(i===0) ctx.moveTo(Math.cos(ta)*r*0.4, Math.sin(ta)*r*0.4);
+           else ctx.lineTo(Math.cos(ta)*r*0.4, Math.sin(ta)*r*0.4);
+         }
+         ctx.closePath(); ctx.stroke();
+       }
+    } else if (idx === 1) {
+       ctx.beginPath();
+       ctx.arc(0, r*0.1, r*0.25, 0, PI);
+       ctx.stroke();
+    } else if (idx === 4) {
+       ctx.beginPath(); ctx.arc(0,0,r*0.3,0,TAU); ctx.stroke();
+    }
+    
+    ctx.fillStyle = `hsla(${hue},90%,80%,0.8)`;
+    ctx.beginPath(); ctx.arc(0,0,2.5,0,TAU); ctx.fill();
 
   } else if (s.type === 'vesica') {
     const hue = (280 + time*10 + s.hue) % 360; 
