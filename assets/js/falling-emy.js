@@ -904,7 +904,7 @@ function collideRagdollSphere(ragdoll, sphere, dt){
 // ── Impact particles ─────────────────────────────────────────────────────
 let particles = [];
 let shockwaves = [];
-const MAX_PARTICLES = 80;
+const MAX_PARTICLES = 120;
 const MAX_SHOCKWAVES = 6;
 let particleCount = 0;
 
@@ -948,19 +948,72 @@ function spawnImpactParticles(x, y, hue, force){
     });
     particleCount++;
   }
+
+  // ── Firework rockets (small, rise then burst) ──
+  const fwCount = 2 + Math.floor(intensity * 0.3);
+  for(let i = 0; i < fwCount; i++){
+    if(particleCount >= MAX_PARTICLES) break;
+    const angle = -PI/2 + (Math.random()-0.5) * PI * 0.8;
+    const speed = 80 + Math.random() * 60;
+    particles.push({
+      x: x + (Math.random()-0.5) * 10,
+      y,
+      vx: Math.cos(angle) * speed * 0.4,
+      vy: Math.sin(angle) * speed,
+      life: 1.0,
+      decay: 0.6 + Math.random() * 0.3,
+      size: 1.2,
+      hue: (hue + Math.random() * 120) % 360,
+      type: 'firework',
+      burstTimer: 0.15 + Math.random() * 0.15,
+      burstHue: (hue + Math.random() * 180) % 360,
+      didBurst: false,
+    });
+    particleCount++;
+  }
 }
 
 function updateParticles(dt){
   let writeIdx = 0;
   for(let i = 0; i < particleCount; i++){
     const p = particles[i];
-    const grav = p.type === 'ember' ? 25 : 55;
+    const grav = p.type === 'ember' ? 25 : (p.type === 'firework' ? 40 : 55);
     p.vy += grav * dt;
     p.x += p.vx * dt;
     p.y += p.vy * dt;
     p.vx *= 0.96;
     p.vy *= 0.96;
     p.life -= p.decay * dt;
+
+    // Firework burst into glitter
+    if(p.type === 'firework' && !p.didBurst){
+      p.burstTimer -= dt;
+      if(p.burstTimer <= 0){
+        p.didBurst = true;
+        p.life = 0; // kill the rocket
+        const bHue = p.burstHue;
+        const bCount = 6 + Math.floor(Math.random() * 4);
+        for(let b = 0; b < bCount; b++){
+          if(writeIdx >= MAX_PARTICLES) break;
+          const ba = (b / bCount) * TAU + Math.random() * 0.3;
+          const bs = 30 + Math.random() * 50;
+          const bp = {
+            x: p.x, y: p.y,
+            vx: Math.cos(ba) * bs,
+            vy: Math.sin(ba) * bs,
+            life: 1.0,
+            decay: 1.0 + Math.random() * 0.8,
+            size: 0.4 + Math.random() * 0.5,
+            hue: (bHue + b * 15) % 360,
+            type: 'glitter',
+          };
+          particles[writeIdx] = bp;
+          writeIdx++;
+        }
+        continue;
+      }
+    }
+
     if(p.life > 0){
       if(writeIdx !== i) particles[writeIdx] = p;
       writeIdx++;
@@ -1093,6 +1146,12 @@ function drawParticles(){
       const twinkle = Math.sin(time * 15 + p.hue * 0.1) * 0.5 + 0.5;
       ctx.fillStyle = `hsla(${p.hue},100%,85%,${alpha * (0.3 + twinkle * 0.7)})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.6 + twinkle * 0.4), 0, TAU); ctx.fill();
+    } else if(p.type === 'firework'){
+      // Tiny bright rocket dot with short trail
+      ctx.fillStyle = `hsla(${p.hue},100%,90%,${alpha * 0.2})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 2, 0, TAU); ctx.fill();
+      ctx.fillStyle = `hsla(${p.hue},100%,95%,${alpha})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 0.6, 0, TAU); ctx.fill();
     }
   }
   ctx.restore();
