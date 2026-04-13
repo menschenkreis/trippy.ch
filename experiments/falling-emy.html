@@ -18,13 +18,22 @@
     .bottom-left{position:fixed;bottom:1.5rem;left:1.5rem;z-index:200;pointer-events:none}
     .exp-tag{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.18em;color:rgba(140,100,255,0.5);margin-bottom:0.15rem}
     .exp-title{font-size:1.1rem;font-weight:200;letter-spacing:0.12em;color:rgba(255,255,255,0.6);text-shadow:0 0 20px rgba(140,100,255,0.2);margin:0}
-    .info-panel{position:fixed;top:0;right:0;width:min(360px,100vw);height:100%;background:rgba(8,8,14,0.95);backdrop-filter:blur(20px);border-left:1px solid rgba(140,100,255,0.15);z-index:500;transform:translateX(100%);transition:transform 0.4s cubic-bezier(0.25,0,0,1);overflow-y:auto;padding:2rem 1.75rem;box-sizing:border-box}
+    
+    .info-panel{position:fixed;top:0;right:0;width:min(420px, 100vw);height:100%;background:rgba(8,8,14,0.96);backdrop-filter:blur(25px);border-left:1px solid rgba(140,100,255,0.15);z-index:500;transform:translateX(100%);transition:transform 0.4s cubic-bezier(0.25,0,0,1);overflow-y:auto;padding:2rem 1.75rem;box-sizing:border-box}
     .info-panel.is-open{transform:translateX(0)}
-    .info-panel h2{font-size:0.7rem;text-transform:uppercase;letter-spacing:0.15em;color:rgba(140,100,255,0.6);margin:1.5rem 0 0.5rem;font-weight:400}
+    .info-panel h2{font-size:0.75rem;text-transform:uppercase;letter-spacing:0.15em;color:rgba(140,100,255,0.7);margin:1.8rem 0 0.8rem;font-weight:400;border-bottom:1px solid rgba(140,100,255,0.1);padding-bottom:0.3rem}
     .info-panel h2:first-of-type{margin-top:0.5rem}
-    .info-panel p{font-size:0.85rem;line-height:1.7;color:rgba(255,255,255,0.4);margin:0 0 0.5rem}
-    .panel-title{font-size:1.3rem;font-weight:200;letter-spacing:0.1em;color:rgba(255,255,255,0.7);margin-bottom:0.2rem}
-    .panel-tag{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.15em;color:rgba(140,100,255,0.5);margin-bottom:1rem;display:block}
+    .info-panel p{font-size:0.88rem;line-height:1.7;color:rgba(255,255,255,0.45);margin:0 0 1rem}
+    .panel-title{font-size:1.5rem;font-weight:200;letter-spacing:0.1em;color:rgba(255,255,255,0.8);margin-bottom:0.2rem}
+    .panel-tag{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.15em;color:rgba(140,100,255,0.6);margin-bottom:1.2rem;display:block}
+    
+    /* ── Symbols Grid ── */
+    .symbols-grid { display: grid; grid-template-columns: 80px 1fr; gap: 1.5rem; margin: 1.5rem 0; align-items: center; }
+    .symbol-box { width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(140,100,255,0.1); }
+    .symbol-box svg { width: 60px; height: 60px; filter: drop-shadow(0 0 8px rgba(140,100,255,0.4)); }
+    .symbol-desc h3 { font-size: 0.9rem; margin: 0 0 0.2rem; color: rgba(255,255,255,0.7); font-weight: 400; letter-spacing: 0.05em; }
+    .symbol-desc p { font-size: 0.8rem; margin: 0; line-height: 1.5; color: rgba(255,255,255,0.35); }
+
     .close-panel{position:absolute;top:1rem;right:1rem;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(255,255,255,0.3);font-size:1.2rem;border:none;background:none;transition:color 0.2s}
     .close-panel:hover{color:rgba(255,255,255,0.7)}
     .hint-row{display:flex;align-items:baseline;gap:0.5rem;margin-bottom:0.4rem}
@@ -57,16 +66,89 @@
   <div class="info-panel" id="info-panel">
     <button class="close-panel" id="close-panel">×</button>
     <p class="panel-title">Falling Emy</p>
-    <span class="panel-tag">Canvas 2D · Verlet Physics · Sacred Geometry</span>
+    <span class="panel-tag">Canvas 2D · Verlet Physics · Life Lessons</span>
+    
+    <h2>The Journey</h2>
+    <p>We all fall through time. Sometimes we drift, sometimes we crash. <strong>Falling Emy</strong> is a meditation on the descent — the frictionless movement through the obstacles, challenges, and heartbreaks that define a life.</p>
+    
     <h2>How to play</h2>
-    <div class="hint-row"><span class="hint-icon">👆</span><span class="hint-text"><strong>Drag</strong> the ragdoll by any body part</span></div>
-    <div class="hint-row"><span class="hint-icon">📱</span><span class="hint-text"><strong>Tilt</strong> your phone to shift gravity</span></div>
-    <div class="hint-row"><span class="hint-icon">+</span><span class="hint-text"><strong>Add</strong> more ragdolls to the void</span></div>
-    <div class="hint-row"><span class="hint-icon">✦</span><span class="hint-text"><strong>Theme</strong> cycles sacred geometry styles</span></div>
-    <div class="hint-row"><span class="hint-icon">⟳</span><span class="hint-text"><strong>Reset</strong> clears everything</span></div>
-    <hr class="panel-divider">
-    <h2>What's happening</h2>
-    <p>Emy and procedurally generated friends fall through an infinite void filled with frictionless spheres. Grab them to freeze time and reposition them. Sacred geometry patterns (flower of life, Metatron's cube, golden spirals) pulse softly in the background.</p>
+    <div class="hint-row"><span class="hint-icon">👆</span><span class="hint-text"><strong>Hold</strong> to slow time and <strong>drag</strong> Emy to reposition her.</span></div>
+    <div class="hint-row"><span class="hint-icon">📱</span><span class="hint-text">Enable <strong>tilt</strong> to steer gravity with your device.</span></div>
+    <div class="hint-row"><span class="hint-icon">+</span><span class="hint-text">Add more souls to the void.</span></div>
+
+    <h2>The Symbols of Life</h2>
+    
+    <div class="symbols-grid">
+      <div class="symbol-box">
+        <svg viewBox="0 0 100 100">
+          <path d="M50 85 C50 85 15 60 15 35 A18 18 0 0 1 50 25 A18 18 0 0 1 85 35 C85 60 50 85 50 85" fill="none" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="symbol-desc">
+        <h3>Heart</h3>
+        <p>Rare moments of love and connection. They play a warm, ringing major chord. Gentle reminders of what matters most.</p>
+      </div>
+    </div>
+
+    <div class="symbols-grid">
+      <div class="symbol-box">
+        <svg viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="35" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M50 15 A17.5 17.5 0 0 0 50 50 A17.5 17.5 0 0 1 50 85" fill="none" stroke="currentColor" stroke-width="2"/>
+          <circle cx="50" cy="32.5" r="5" fill="currentColor"/>
+          <circle cx="50" cy="67.5" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <div class="symbol-desc">
+        <h3>Yin Yang</h3>
+        <p>Balance between light and dark, action and stillness. Emitting dual harmonic tones that echo through the void.</p>
+      </div>
+    </div>
+
+    <div class="symbols-grid">
+      <div class="symbol-box">
+        <svg viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="30" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M50 20 L30 80 L80 43 L20 43 L70 80 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="symbol-desc">
+        <h3>Challenge</h3>
+        <p>Difficult roadblocks that spawn every 100 meters. Sharp, chaotic, and loud — forcing you to adapt your path or take the hit.</p>
+      </div>
+    </div>
+
+    <div class="symbols-grid">
+      <div class="symbol-box">
+        <svg viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="18" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="50" cy="28" r="18" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="50" cy="72" r="18" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="31" cy="39" r="18" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="69" cy="39" r="18" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="31" cy="61" r="18" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="69" cy="61" r="18" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <div class="symbol-desc">
+        <h3>Sacred Geometry</h3>
+        <p>The patterns of existence: Seed of Life, Metatron's Cube, and perfect Polygons. The crystalline structure of the universe.</p>
+      </div>
+    </div>
+
+    <div class="symbols-grid">
+      <div class="symbol-box">
+        <svg viewBox="0 0 100 100">
+          <path d="M50 20 L50 80 M20 50 L80 50 M30 30 L70 70 M70 30 L30 70" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="50" cy="50" r="35" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="2 3"/>
+        </svg>
+      </div>
+      <div class="symbol-desc">
+        <h3>Chakras</h3>
+        <p>Seven energy centers, from Root to Crown. They resonate like singing bowls, each color a different frequency of being.</p>
+      </div>
+    </div>
+
     <hr class="panel-divider">
     <a href="https://github.com/menschenkreis/trippy.ch" class="source-link" target="_blank" rel="noopener">view source on GitHub ↗</a>
   </div>
