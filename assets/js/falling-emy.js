@@ -845,18 +845,18 @@ function collideRagdollSphere(ragdoll, sphere, dt){
 
     // Glitter burst instead of text popup
     const glitterIntensity = Math.min(impactData.maxForce || 3, 10);
-    const glitterCount = Math.min(6 + Math.floor(glitterIntensity * 1.5), 12);
+    const glitterCount = Math.min(4 + Math.floor(glitterIntensity * 0.8), 8);
     for(let gi = 0; gi < glitterCount; gi++){
       if(particleCount >= MAX_PARTICLES) break;
       const ga = Math.random() * TAU;
-      const gs = 20 + Math.random() * 50;
+      const gs = 18 + Math.random() * 45;
       particles[particleCount++] = {
         x: sphere.x, y: sphere.y,
         vx: Math.cos(ga) * gs,
-        vy: Math.sin(ga) * gs - 30,
+        vy: Math.sin(ga) * gs - 25,
         life: 1.0,
-        decay: 1.2 + Math.random() * 0.6,
-        size: 0.4 + Math.random() * 0.6,
+        decay: 1.0 + Math.random() * 0.5,
+        size: 0.5 + Math.random() * 0.7,
         hue: (sphere.hue + Math.random() * 80 - 40 + 360) % 360,
         type: 'glitter',
       };
@@ -909,61 +909,93 @@ let particleCount = 0;
 
 function spawnImpactParticles(x, y, hue, force){
   const intensity = Math.min(force || 3, 10);
-  const burstCount = Math.min(6 + Math.floor(intensity * 1.2), 14);
   const hue2 = (hue + 120) % 360;
   const hue3 = (hue + 240) % 360;
 
-  for(let i=0;i<burstCount;i++){
+  // Sparks
+  const sparkCount = Math.min(5 + Math.floor(intensity * 1.0), 11);
+  for(let i = 0; i < sparkCount; i++){
     if(particleCount >= MAX_PARTICLES) break;
-    const angle = (i / burstCount) * TAU + (Math.random()-0.5)*0.5;
-    const speed = 60 + Math.random() * 110 * (intensity / 5);
+    const angle = (i / sparkCount) * TAU + (Math.random()-0.5)*0.5;
+    const speed = 55 + Math.random() * 100 * (intensity / 5);
     particles[particleCount++] = {
       x, y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed - 20,
       life: 1.0,
       decay: 0.7 + Math.random() * 0.6,
-      size: 1.2 + Math.random() * 2.5 * (intensity / 5),
+      size: 1.0 + Math.random() * 2.2 * (intensity / 5),
       hue: [hue, hue2, hue3][i % 3] + Math.random() * 40 - 20,
       type: 'spark',
     };
   }
 
-  // 2–3 embers for warmth
-  const emberCount = 2 + Math.floor(intensity * 0.2);
-  for(let e = 0; e < emberCount; e++){
+  // Streaks — fast, directional, trippy
+  const streakCount = Math.min(2 + Math.floor(intensity * 0.4), 4);
+  for(let i = 0; i < streakCount; i++){
     if(particleCount >= MAX_PARTICLES) break;
-    const angle = Math.random() * TAU;
-    const speed = 15 + Math.random() * 35;
+    const angle = (Math.random()) * TAU;
+    const speed = 80 + Math.random() * 120;
     particles[particleCount++] = {
       x, y,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 30,
+      vy: Math.sin(angle) * speed - 15,
       life: 1.0,
-      decay: 0.3 + Math.random() * 0.25,
-      size: 2.5 + Math.random() * 2.5,
+      decay: 1.2 + Math.random() * 0.8,
+      size: 1.0 + Math.random() * 1.5,
+      hue: (hue + i * 45) % 360,
+      type: 'streak',
+    };
+  }
+
+  // Expanding rings — 1–2 max, very cheap
+  const ringCount = intensity > 3 ? 2 : 1;
+  for(let i = 0; i < ringCount; i++){
+    if(particleCount >= MAX_PARTICLES) break;
+    particles[particleCount++] = {
+      x, y,
+      vx: 0, vy: 0,
+      life: 1.0,
+      decay: 0.9 + Math.random() * 0.4,
+      size: 3 + Math.random() * 3,
+      hue: (hue + i * 60) % 360,
+      type: 'ring',
+    };
+  }
+
+  // 1–2 embers for warmth
+  if(particleCount < MAX_PARTICLES){
+    const angle = Math.random() * TAU;
+    const speed = 12 + Math.random() * 28;
+    particles[particleCount++] = {
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 25,
+      life: 1.0,
+      decay: 0.3 + Math.random() * 0.2,
+      size: 2.5 + Math.random() * 2,
       hue: hue + Math.random() * 60 - 30,
       type: 'ember',
     };
   }
 
-  // ── Firework rockets (rise then burst) ──
-  const fwCount = 3 + Math.floor(intensity * 0.5);
+  // Firework rockets
+  const fwCount = 2 + Math.floor(intensity * 0.35);
   for(let i = 0; i < fwCount; i++){
     if(particleCount >= MAX_PARTICLES) break;
     const angle = -PI/2 + (Math.random()-0.5) * PI * 0.9;
-    const speed = 100 + Math.random() * 80;
+    const speed = 95 + Math.random() * 75;
     particles[particleCount++] = {
-      x: x + (Math.random()-0.5) * 14,
+      x: x + (Math.random()-0.5) * 12,
       y,
-      vx: Math.cos(angle) * speed * 0.45,
+      vx: Math.cos(angle) * speed * 0.4,
       vy: Math.sin(angle) * speed,
       life: 1.0,
-      decay: 0.5 + Math.random() * 0.25,
-      size: 1.6,
+      decay: 0.55 + Math.random() * 0.25,
+      size: 1.4,
       hue: (hue + Math.random() * 120) % 360,
       type: 'firework',
-      burstTimer: 0.12 + Math.random() * 0.14,
+      burstTimer: 0.12 + Math.random() * 0.13,
       burstHue: (hue + Math.random() * 180) % 360,
       didBurst: false,
     };
@@ -975,7 +1007,7 @@ function updateParticles(dt){
   let writeIdx = 0;
   for(let i = 0; i < particleCount; i++){
     const p = particles[i];
-    const grav = p.type === 'ember' ? 25 : (p.type === 'firework' ? 40 : 55);
+    const grav = p.type === 'ring' ? 0 : (p.type === 'ember' ? 25 : (p.type === 'firework' ? 40 : 55));
     p.vy += grav * dt;
     p.x += p.vx * dt;
     p.y += p.vy * dt;
@@ -989,19 +1021,21 @@ function updateParticles(dt){
       if(p.burstTimer <= 0){
         p.life = 0; // kill rocket
         const bHue = p.burstHue;
-        const bCount = 9 + Math.floor(Math.random() * 5);
+        const bCount = 7 + Math.floor(Math.random() * 4);
         for(let b = 0; b < bCount; b++){
           const ba = (b / bCount) * TAU + Math.random() * 0.3;
-          const bs = 50 + Math.random() * 80;
+          const bs = 45 + Math.random() * 70;
+          // Mix glitter and streak for variety
+          const bType = b % 3 === 0 ? 'streak' : 'glitter';
           burstQueue.push({
             x: p.x, y: p.y,
             vx: Math.cos(ba) * bs,
             vy: Math.sin(ba) * bs,
             life: 1.0,
-            decay: 0.8 + Math.random() * 0.7,
-            size: 0.6 + Math.random() * 0.8,
-            hue: (bHue + b * 15) % 360,
-            type: 'glitter',
+            decay: 0.8 + Math.random() * 0.6,
+            size: 0.6 + Math.random() * 0.9,
+            hue: (bHue + b * 18) % 360,
+            type: bType,
           });
         }
       }
@@ -1121,39 +1155,74 @@ function drawParticles(){
   ctx.save();
   ctx.globalCompositeOperation = 'screen';
 
-  // ── Draw particles ──
   for(let pi = 0; pi < particleCount; pi++){
     const p = particles[pi];
     const alpha = p.life * (p.life > 0.5 ? 1.0 : p.life * 2.0);
 
     if(p.type === 'spark'){
-      // Outer glow
-      ctx.fillStyle = `hsla(${p.hue},100%,65%,${alpha * 0.3})`;
+      // Outer haze
+      ctx.fillStyle = `hsla(${p.hue},100%,65%,${alpha * 0.28})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 4.5, 0, TAU); ctx.fill();
-      // Mid glow
-      ctx.fillStyle = `hsla(${p.hue},100%,75%,${alpha * 0.55})`;
+      // Mid
+      ctx.fillStyle = `hsla(${p.hue},100%,80%,${alpha * 0.5})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 2, 0, TAU); ctx.fill();
       // Core
-      ctx.fillStyle = `hsla(${p.hue},100%,95%,${alpha})`;
+      ctx.fillStyle = `hsla(${p.hue},100%,98%,${alpha})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill();
 
     } else if(p.type === 'ember'){
-      ctx.fillStyle = `hsla(${p.hue},95%,60%,${alpha * 0.25})`;
+      ctx.fillStyle = `hsla(${p.hue},95%,60%,${alpha * 0.22})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 4, 0, TAU); ctx.fill();
-      ctx.fillStyle = `hsla(${p.hue},90%,70%,${alpha * 0.5})`;
+      ctx.fillStyle = `hsla(${p.hue},90%,72%,${alpha * 0.5})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 2, 0, TAU); ctx.fill();
-      ctx.fillStyle = `hsla(${p.hue},80%,95%,${alpha})`;
+      ctx.fillStyle = `hsla(${p.hue},80%,98%,${alpha})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 0.5, 0, TAU); ctx.fill();
+
     } else if(p.type === 'glitter'){
-      const twinkle = Math.sin(time * 15 + p.hue * 0.1) * 0.5 + 0.5;
-      ctx.fillStyle = `hsla(${p.hue},100%,85%,${alpha * (0.3 + twinkle * 0.7)})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.6 + twinkle * 0.4), 0, TAU); ctx.fill();
+      // 4-pointed star — cheap, trippy, no trig call per frame
+      const r = p.size * (0.5 + p.life * 0.5);
+      const r2 = r * 0.35;
+      ctx.fillStyle = `hsla(${p.hue},100%,88%,${alpha})`;
+      ctx.beginPath();
+      for(let s = 0; s < 8; s++){
+        const a = s * PI / 4 + p.hue * 0.017; // slight rotation per hue
+        const d = s % 2 === 0 ? r : r2;
+        if(s === 0) ctx.moveTo(p.x + Math.cos(a)*d, p.y + Math.sin(a)*d);
+        else ctx.lineTo(p.x + Math.cos(a)*d, p.y + Math.sin(a)*d);
+      }
+      ctx.closePath(); ctx.fill();
+      // Small halo
+      ctx.fillStyle = `hsla(${(p.hue+60)%360},100%,80%,${alpha * 0.3})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r * 1.4, 0, TAU); ctx.fill();
+
+    } else if(p.type === 'streak'){
+      // A line segment streaking in its velocity direction
+      const len = p.size * 6;
+      const spd = Math.sqrt(p.vx*p.vx + p.vy*p.vy) || 1;
+      const nx = p.vx/spd, ny = p.vy/spd;
+      ctx.strokeStyle = `hsla(${p.hue},100%,85%,${alpha})`;
+      ctx.lineWidth = p.size * 0.7;
+      ctx.beginPath();
+      ctx.moveTo(p.x - nx*len, p.y - ny*len);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      // Bright tip
+      ctx.fillStyle = `hsla(${p.hue},100%,98%,${alpha})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 0.5, 0, TAU); ctx.fill();
+
+    } else if(p.type === 'ring'){
+      // Expanding ring — cheap, beautiful
+      const r = p.size * (2 + (1 - p.life) * 8);
+      ctx.strokeStyle = `hsla(${p.hue},100%,75%,${alpha * 0.7})`;
+      ctx.lineWidth = p.size * 0.6 * p.life;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.stroke();
+
     } else if(p.type === 'firework'){
-      // Tiny bright rocket dot with short trail
-      ctx.fillStyle = `hsla(${p.hue},100%,90%,${alpha * 0.2})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 2, 0, TAU); ctx.fill();
-      ctx.fillStyle = `hsla(${p.hue},100%,95%,${alpha})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 0.6, 0, TAU); ctx.fill();
+      // Tiny bright rocket with halo
+      ctx.fillStyle = `hsla(${p.hue},100%,90%,${alpha * 0.25})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 2.5, 0, TAU); ctx.fill();
+      ctx.fillStyle = `hsla(${p.hue},100%,98%,${alpha})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 0.7, 0, TAU); ctx.fill();
     }
   }
   ctx.restore();
@@ -2224,13 +2293,14 @@ function frame(now){
     wr.radius += rawDt * 150;
     wr.life -= rawDt * 0.8;
     if(wr.life <= 0){ waveRings.splice(i, 1); continue; }
-    ctx.strokeStyle = `hsla(200,80%,65%,${wr.life * 0.6})`;
-    ctx.lineWidth = 2 * wr.life;
-    ctx.shadowColor = `hsla(200,90%,60%,${wr.life * 0.4})`;
-    ctx.shadowBlur = 10;
+    // No shadowBlur — use double-stroke for cheap glow
+    ctx.lineWidth = 4 * wr.life;
+    ctx.strokeStyle = `hsla(200,80%,65%,${wr.life * 0.15})`;
+    ctx.beginPath(); ctx.arc(wr.x, wr.y, wr.radius, 0, TAU); ctx.stroke();
+    ctx.lineWidth = 1.5 * wr.life;
+    ctx.strokeStyle = `hsla(200,90%,80%,${wr.life * 0.55})`;
     ctx.beginPath(); ctx.arc(wr.x, wr.y, wr.radius, 0, TAU); ctx.stroke();
   }
-  ctx.shadowBlur = 0;
 
   // Trail effect: spawn sparks from ragdoll head
   if(activeEffects.trail > 0){
@@ -2247,20 +2317,20 @@ function frame(now){
     }
   }
 
-  // Pulse effect: golden ring around head
+  // Pulse effect: golden ring around head (no shadowBlur — double stroke)
   if(activeEffects.pulse > 0){
     activeEffects.pulse -= rawDt;
     const pAlpha = Math.min(activeEffects.pulse / 0.5, 1.0) * 0.7;
     const pPulse = 30 + 15 * Math.sin(time * 8);
-    ctx.strokeStyle = `hsla(45,90%,60%,${pAlpha})`;
-    ctx.lineWidth = 3;
-    ctx.shadowColor = `hsla(45,90%,55%,${pAlpha * 0.6})`;
-    ctx.shadowBlur = 15;
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = `hsla(45,90%,55%,${pAlpha * 0.25})`;
     ctx.beginPath(); ctx.arc(headX, headY, pPulse, 0, TAU); ctx.stroke();
-    ctx.strokeStyle = `hsla(45,80%,70%,${pAlpha * 0.4})`;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = `hsla(45,90%,70%,${pAlpha})`;
+    ctx.beginPath(); ctx.arc(headX, headY, pPulse, 0, TAU); ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = `hsla(45,80%,80%,${pAlpha * 0.4})`;
     ctx.beginPath(); ctx.arc(headX, headY, pPulse * 1.5, 0, TAU); ctx.stroke();
-    ctx.shadowBlur = 0;
   }
 
   // Magnet effect: repulsion field visualization
@@ -2306,7 +2376,7 @@ function frame(now){
       const p = portal.progress;
       const ease = p < 0.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2;
 
-      // Spiraling sacred geometry rings (2 instead of 3)
+      // Spiraling sacred geometry rings (2, no shadowBlur)
       for(let ring = 0; ring < 2; ring++){
         const ringR = pr * (0.7 + ring * 0.25);
         const ringAlpha = ease * (0.5 - ring * 0.12);
@@ -2315,10 +2385,9 @@ function frame(now){
         ctx.save();
         ctx.translate(sx, sy);
         ctx.rotate(time * (1.5 + ring * 0.5) * (ring % 2 ? -1 : 1));
-        ctx.strokeStyle = `hsla(${ringHue},90%,65%,${ringAlpha})`;
-        ctx.lineWidth = 1.5 - ring * 0.3;
-        ctx.shadowColor = `hsla(${ringHue},90%,60%,${ringAlpha * 0.4})`;
-        ctx.shadowBlur = 10;
+        // Double-stroke fake glow
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = `hsla(${ringHue},90%,60%,${ringAlpha * 0.2})`;
         ctx.beginPath();
         for(let i = 0; i <= segments; i++){
           const a = i * TAU / segments;
@@ -2328,31 +2397,28 @@ function frame(now){
           else ctx.lineTo(Math.cos(a)*d, Math.sin(a)*d);
         }
         ctx.closePath(); ctx.stroke();
-        if(ring === 0){
-          ctx.lineWidth = 0.5;
-          ctx.globalAlpha = ringAlpha * 0.4;
-          for(let i = 0; i < segments; i++){
-            for(let j = i+2; j < segments; j++){
-              const a1 = i*TAU/segments, a2 = j*TAU/segments;
-              ctx.beginPath();
-              ctx.moveTo(Math.cos(a1)*ringR, Math.sin(a1)*ringR);
-              ctx.lineTo(Math.cos(a2)*ringR, Math.sin(a2)*ringR);
-              ctx.stroke();
-            }
-          }
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = `hsla(${ringHue},90%,75%,${ringAlpha})`;
+        ctx.beginPath();
+        for(let i = 0; i <= segments; i++){
+          const a = i * TAU / segments;
+          const wobble = Math.sin(time * 3 + i + ring) * ringR * 0.08;
+          const d = ringR + wobble;
+          if(i===0) ctx.moveTo(Math.cos(a)*d, Math.sin(a)*d);
+          else ctx.lineTo(Math.cos(a)*d, Math.sin(a)*d);
         }
+        ctx.closePath(); ctx.stroke();
         ctx.restore();
       }
 
-      // Vortex tunnel rings
+      // Vortex tunnel rings (3 instead of 5, no shadowBlur)
       const tunnelR = pr * 0.95;
-      for(let i = 0; i < 5; i++){
-        const t = (i / 8 + time * 0.5) % 1;
+      for(let i = 0; i < 3; i++){
+        const t = (i / 4 + time * 0.5) % 1;
         const tr = tunnelR * t;
         const tAlpha = ease * (1 - t) * 0.3;
         ctx.strokeStyle = `hsla(${(h + t * 120) % 360},85%,60%,${tAlpha})`;
         ctx.lineWidth = 1;
-        ctx.shadowBlur = 0;
         ctx.beginPath(); ctx.arc(sx, sy, tr, 0, TAU); ctx.stroke();
       }
 
