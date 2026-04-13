@@ -86,6 +86,7 @@ let journeyLog = []; // {label, text}
 let chapterDisplay = null; // {text, life, phase}
 let chapterSlowMo = 0;
 let lastChapter = -1;
+let firedChapters = new Set();
 
 const lifeChapters = [
   { age: 0.1, label: 'Birth', text: 'No past. But so much future ahead.' },
@@ -1107,7 +1108,8 @@ document.getElementById('reset-btn').onclick = () => {
   activeEffects = { wave: 0, trail: 0, pulse: 0, magnet: 0 };
   waveRings = [];
   journeyLog = []; updateJourneyPanel();
-  lastChapter = -1; chapterDisplay = null; chapterSlowMo = 0;
+  firedChapters = new Set();
+  chapterDisplay = null; chapterSlowMo = 0;
   ragdolls = [new Ragdoll(W/2, 0, 'emy')];
   spheres = [];
   for(let i=0;i<8;i++) spawnSphereAtDepth(i*120+Math.random()*80);
@@ -2328,10 +2330,11 @@ function frame(now){
   }
 
   // ── Chapter Logic (unified) ──
-  for(const ch of lifeChapters){
+  for(let ci = 0; ci < lifeChapters.length; ci++){
+    const ch = lifeChapters[ci];
     const triggerDepth = ch.age * 1000;
-    if(depthMeters >= triggerDepth && lastChapter < lifeChapters.indexOf(ch)){
-      lastChapter = lifeChapters.indexOf(ch);
+    if(depthMeters >= triggerDepth && !firedChapters.has(ci)){
+      firedChapters.add(ci);
       if(!chapterDisplay){
         const isMilestone = ch.label.endsWith('km') || ch.label.endsWith('m');
         chapterSlowMo = isMilestone ? 0.5 : 1.0;
@@ -2339,7 +2342,20 @@ function frame(now){
         journeyLog.push({label: ch.label, text: ch.text});
         updateJourneyPanel();
         playMilestoneChord();
-        if(isMilestone){
+        // Birth gets special golden particle burst
+        if(ch.label === 'Birth'){
+          for(let i = 0; i < 30; i++){
+            const angle = (i / 30) * TAU;
+            particles.push({
+              x: W/2 + cameraY * 0 + (ragdolls[0] ? ragdolls[0].particles[0].x : W/2),
+              y: (ragdolls[0] ? ragdolls[0].particles[0].y : 0),
+              vx: Math.cos(angle) * (100 + Math.random()*150),
+              vy: Math.sin(angle) * (100 + Math.random()*150) - 50,
+              life: 2.0 + Math.random(), decay: 0.3 + Math.random()*0.2,
+              size: 1.5 + Math.random()*2, hue: 40 + Math.random()*30, sparkle: false,
+            });
+          }
+        } else if(isMilestone){
           for(let i = 0; i < 20; i++){
             particles.push({
               x: W/2, y: H/2 + cameraY,
@@ -2373,17 +2389,20 @@ function frame(now){
     const maxLife = chapterDisplay.life > 3 ? 6.0 : 2.5;
     const isShort = maxLife < 3;
     let cAlpha;
-    const fadeDur = isShort ? 0.5 : 0.8;
+    const fadeDur = isBirth ? 1.2 : (isShort ? 0.5 : 0.8);
     if(chapterDisplay.phase === 'fadein') cAlpha = Math.min((maxLife - chapterDisplay.life) / fadeDur, 1);
     else if(chapterDisplay.phase === 'hold') cAlpha = 1.0;
     else cAlpha = chapterDisplay.life / 2.0;
     cAlpha = Math.max(0, Math.min(1, cAlpha));
     const elapsed = maxLife - chapterDisplay.life;
     const words = chapterDisplay.text.split(' ');
-    const a = theme.accent2;
+    const isBirth = chapterDisplay.text === 'No past. But so much future ahead.';
+    const a = isBirth ? [255, 200, 100] : theme.accent2;
+    const borderA = isBirth ? 0.5 : 0.3;
+    const fillA = isBirth ? 0.15 : 0.1;
     ctx.save();
     ctx.textAlign = 'center';
-    ctx.font = isShort ? '300 1rem sans-serif' : '300 0.9rem sans-serif';
+    ctx.font = isBirth ? '300 1rem sans-serif' : (isShort ? '300 1rem sans-serif' : '300 0.9rem sans-serif');
     const maxLineW = Math.min(W * 0.75, isShort ? 500 : 420);
     const lines = []; let line = '';
     for(const w of words){
@@ -2399,12 +2418,12 @@ function frame(now){
     const bw = maxW + padX * 2;
     const bh = lines.length * lineH + padY * 2;
     const bx = W/2, by = H * 0.42;
-    ctx.fillStyle = `rgba(${a[0]},${a[1]},${a[2]},${cAlpha * 0.1})`;
-    ctx.strokeStyle = `rgba(${a[0]},${a[1]},${a[2]},${cAlpha * 0.3})`;
+    ctx.fillStyle = `rgba(${a[0]},${a[1]},${a[2]},${cAlpha * fillA})`;
+    ctx.strokeStyle = `rgba(${a[0]},${a[1]},${a[2]},${cAlpha * borderA})`;
     ctx.lineWidth = 1;
     roundRect(ctx, bx - bw/2, by - bh/2, bw, bh, 14);
     ctx.fill(); ctx.stroke();
-    ctx.fillStyle = `rgba(${a[0]},${a[1]},${a[2]},${cAlpha * 0.1})`;
+    ctx.fillStyle = `rgba(${a[0]},${a[1]},${a[2]},${cAlpha * fillA})`;
     ctx.beginPath();
     ctx.moveTo(bx - 12, by + bh/2);
     ctx.lineTo(bx, by + bh/2 + 16);
@@ -2417,10 +2436,13 @@ function frame(now){
       const lineWords = lines[li].trim().split(' ');
       let lx = bx - maxW / 2;
       for(let wi = 0; wi < lineWords.length; wi++){
-        const wordStart = wordIdx * 0.12;
+        const wordStagger = isBirth ? 0.25 : 0.12;
+        const wordStart = wordIdx * wordStagger;
         const wordElapsed = Math.max(0, elapsed - wordStart);
-        const wAlpha = Math.min(wordElapsed / 0.3, 1) * cAlpha;
-        const bounce = wordElapsed < 0.35 ? Math.sin(wordElapsed / 0.35 * PI) * 3 : 0;
+        const wFade = isBirth ? 0.5 : 0.3;
+        const wBounceDur = isBirth ? 0.5 : 0.35;
+        const wAlpha = Math.min(wordElapsed / wFade, 1) * cAlpha;
+        const bounce = wordElapsed < wBounceDur ? Math.sin(wordElapsed / wBounceDur * PI) * 4 : 0;
         const ww = ctx.measureText(lineWords[wi] + ' ').width;
         ctx.fillStyle = `rgba(255,255,255,${wAlpha * 0.85})`;
         ctx.fillText(lineWords[wi], lx, startY + li * lineH - bounce);
