@@ -18,10 +18,10 @@ window.addEventListener('resize', resize); resize();
 
 // ── Theme ────────────────────────────────────────────────────────────────
 const themes = [
-  { accent:[140,100,255], accent2:[255,100,180], bg:'#0a0a0f', name:'violet' },
-  { accent:[100,220,255], accent2:[255,180,100], bg:'#080c10', name:'aqua' },
-  { accent:[255,140,60],  accent2:[255,80,120],  bg:'#0f0a08', name:'ember' },
-  { accent:[80,255,160],  accent2:[180,100,255], bg:'#080f0a', name:'jade' },
+  { accent:[160,120,255], accent2:[255,140,200], bg:'#101018', name:'violet' },
+  { accent:[120,240,255], accent2:[255,200,140], bg:'#0d1418', name:'aqua' },
+  { accent:[255,160,80],  accent2:[255,100,140], bg:'#18100d', name:'ember' },
+  { accent:[100,255,180], accent2:[200,120,255], bg:'#0d1810', name:'jade' },
 ];
 let themeIdx = 0;
 let theme = themes[0];
@@ -184,8 +184,8 @@ class Ragdoll {
   constructor(x, y, name){
     this.name = name || generateName();
     this.hue = Math.random() * 360;
-    this.accent = hslToRgbArr(this.hue, 0.85, 0.6);
-    this.accent2 = hslToRgbArr((this.hue + 40)%360, 0.9, 0.75);
+    this.accent = hslToRgbArr(this.hue, 0.95, 0.7);
+    this.accent2 = hslToRgbArr((this.hue + 40)%360, 1.0, 0.8);
 
     this.particles = [];
     this.constraints = [];
@@ -821,19 +821,19 @@ function drawKaleidoscope(cx, cy, radius, folds, rotation, hueOffset, alpha, par
   for(let i=0;i<folds;i++){
     const angle1 = i * TAU / folds + rotation;
     const angle2 = (i + 0.5) * TAU / folds + rotation;
-    const hue = (hueOffset + i * (360/folds) + time*20) % 360;
-    const hue2 = (hue + 40) % 360;
-    const r1 = radius * (0.6 + 0.4*Math.sin(time*0.4 + i*0.8));
-    const r2 = radius * (0.4 + 0.3*Math.cos(time*0.3 + i*1.1));
+    const hue = (hueOffset + i * (360/folds) + time*25) % 360;
+    const hue2 = (hue + 50) % 360;
+    const r1 = radius * (0.6 + 0.4*Math.sin(time*0.5 + i*0.8));
+    const r2 = radius * (0.4 + 0.3*Math.cos(time*0.4 + i*1.1));
 
-    // Petal glow
+    // Petal glow - more vibrant
     const grad = ctx.createRadialGradient(
       cx + Math.cos(angle1)*r1*0.3, cy + Math.sin(angle1)*r1*0.3, 0,
       cx, cy, radius
     );
-    grad.addColorStop(0, `hsla(${hue},70%,55%,${alpha*1.5})`);
-    grad.addColorStop(0.5, `hsla(${hue2},60%,40%,${alpha*0.6})`);
-    grad.addColorStop(1, `hsla(${hue},50%,20%,0)`);
+    grad.addColorStop(0, `hsla(${hue},90%,65%,${alpha*2.0})`);
+    grad.addColorStop(0.5, `hsla(${hue2},80%,50%,${alpha*0.8})`);
+    grad.addColorStop(1, `hsla(${hue},70%,30%,0)`);
     ctx.fillStyle = grad;
 
     // Draw petal shape
@@ -890,19 +890,19 @@ function drawStarfield(parallax){
       if(sx < -5 || sx > W+5 || sy < -5 || sy > H+5) continue;
 
       // Star properties from hash
-      const brightness = 0.15 + h1 * 0.6; // 0.15 - 0.39
-      const size = 0.5 + h3 * 1.5;
-      const twinkleSpeed = 1.0 + h2 * 4.0;
+      const brightness = 0.3 + h1 * 0.7; // Brighter range
+      const size = 0.8 + h3 * 2.0; // Slightly larger
+      const twinkleSpeed = 1.2 + h2 * 5.0;
       const twinklePhase = h1 * TAU * 10;
 
       // Twinkle
       const twinkle = 0.5 + 0.5 * Math.sin(time * twinkleSpeed + twinklePhase);
-      const alpha = brightness * (0.4 + 0.6 * twinkle);
+      const alpha = brightness * (0.5 + 0.5 * twinkle);
 
-      // Colour — slight variation
-      const hue = (h2 * 360 + h3 * 60 + time * 5) % 360;
-      const sat = 20 + h1 * 40; // mostly white-ish
-      const light = 70 + twinkle * 25;
+      // Colour — more saturated
+      const hue = (h2 * 360 + h3 * 60 + time * 8) % 360;
+      const sat = 40 + h1 * 60; // More vibrant color range
+      const light = 80 + twinkle * 20;
 
       // Draw star
       ctx.fillStyle = `hsla(${hue},${sat}%,${light}%,${alpha})`;
