@@ -51,9 +51,13 @@ function formatTimeAgo(ts){
 }
 
 function autoSave(now){
-  if(now - lastSaveTime > SAVE_INTERVAL && cameraY > 500){
+  const depthM = Math.max(0, cameraY / 100);
+  // Auto-save every 50m of progress
+  const lastSavedDepth = hasSaveData ? (loadProgress()?.depthMeters || 0) : 0;
+  if(depthM >= lastSavedDepth + 50){
     saveProgress();
     lastSaveTime = now;
+    hasSaveData = true;
   }
 }
 
@@ -2803,27 +2807,33 @@ window.addEventListener('load', () => {
   if(window._fe){
     const saved = window._fe.loadProgress();
     if(saved && saved.depthMeters >= 10){
-      const modal = document.getElementById('resume-modal');
-      modal.style.display='flex';
-      const rd = document.getElementById('resume-depth');
-      if(rd) rd.textContent = window._fe.formatDepth(saved.depthMeters);
-      const rm = document.getElementById('resume-meta');
-      if(rm) rm.innerHTML = `${saved.score.toLocaleString()} points<br>${window._fe.formatTimeAgo(saved.savedAt)}`;
+      // Update intro text and buttons inside the existing sequence
+      const thoughtText = document.getElementById('intro-thought-text');
+      if(thoughtText) thoughtText.textContent = "Your journey already began.";
       
-      const rb = document.getElementById('resume-btn');
-      if(rb) rb.onclick = () => {
-        window._fe.restoreFromSave(saved);
-        modal.style.display='none';
-        const intro = document.getElementById('intro-sequence');
-        if(intro){ intro.style.display='none'; intro.remove(); }
-        window.dispatchEvent(new CustomEvent('intro-complete'));
-      };
-      
-      const nb = document.getElementById('new-journey-btn');
-      if(nb) nb.onclick = () => {
-        window._fe.clearSave();
-        modal.style.display='none';
-      };
+      const embarkBtn = document.getElementById('intro-embark');
+      if(embarkBtn) {
+        embarkBtn.textContent = "Resume journey";
+        embarkBtn.dataset.resume = "true";
+      }
+
+      // Add "Embark again" button
+      const promptArea = document.getElementById('intro-prompt');
+      if(promptArea && !document.getElementById('intro-restart')) {
+        const restartBtn = document.createElement('button');
+        restartBtn.id = 'intro-restart';
+        restartBtn.textContent = "Embark again";
+        restartBtn.style.cssText = "margin-top:1rem;font-size:0.75rem;opacity:0.5;background:transparent;border:1px solid rgba(255,255,255,0.1);color:white;padding:0.4rem 1.2rem;border-radius:20px;cursor:pointer;font-family:inherit;transition:opacity 0.3s";
+        restartBtn.onmouseover = () => restartBtn.style.opacity = "0.8";
+        restartBtn.onmouseout = () => restartBtn.style.opacity = "0.5";
+        restartBtn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          window._fe.clearSave();
+          location.reload(); 
+        };
+        promptArea.appendChild(restartBtn);
+      }
     }
   }
 });
@@ -2833,6 +2843,18 @@ const introEl = document.getElementById('intro-sequence');
 if(introEl){
   const ui=[document.querySelector('.top-controls'),document.querySelector('.bottom-left'),document.querySelector('.back-link'),document.getElementById('sound-hint')];
   ui.forEach(e=>{if(e)e.style.opacity='0'; e.style.transition='opacity 1.5s ease';});
+  
+  // Custom click handler for embark to support resume
+  const embarkBtn = document.getElementById('intro-embark');
+  if(embarkBtn) {
+    embarkBtn.addEventListener('click', (e) => {
+      if(embarkBtn.dataset.resume === "true" && window._fe) {
+        const saved = window._fe.loadProgress();
+        if(saved) window._fe.restoreFromSave(saved);
+      }
+    });
+  }
+
   window.addEventListener('intro-complete',()=>{
     ui.forEach(e=>{
       if(e) {
