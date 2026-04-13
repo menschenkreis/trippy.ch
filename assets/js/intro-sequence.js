@@ -176,9 +176,9 @@
     const px = (mouseX - 0.5), py = (mouseY - 0.5);
     const minDim = Math.min(W, H);
 
-    // ── Semi-transparent background — game canvas shows through ────
+    // ── Very transparent overlay — game shows through clearly ────
     ctx.globalAlpha = 1;
-    ctx.fillStyle = 'rgba(8,6,15,0.7)';
+    ctx.fillStyle = 'rgba(8,6,15,0.35)';
     ctx.fillRect(0, 0, W, H);
 
     // Soft center glow
@@ -195,7 +195,7 @@
     ctx.save();
     ctx.translate(W/2 + px * 12, H/2 + py * 8);
     ctx.rotate(s * 0.015);
-    drawFlower(0, 0, minDim * 0.22, 0.18);
+    drawFlower(0, 0, minDim * 0.22, 0.28);
     ctx.restore();
 
     // Layer 1: Mandala of Life — center, medium depth
@@ -203,7 +203,7 @@
     ctx.fillStyle = `hsl(${240 + Math.sin(s * 0.2) * 20}, 30%, 50%)`;
     ctx.save();
     ctx.translate(W/2 + px * 25, H/2 + py * 18);
-    drawMandala(0, 0, minDim * 0.3, 0.25, s);
+    drawMandala(0, 0, minDim * 0.3, 0.35, s);
     ctx.restore();
 
     // Layer 2: Flower of Life — center-right
@@ -211,7 +211,7 @@
     ctx.save();
     ctx.translate(W * 0.68 + px * 40, H * 0.38 + py * 28);
     ctx.rotate(-s * 0.03);
-    drawFlower(0, 0, minDim * 0.11, 0.2);
+    drawFlower(0, 0, minDim * 0.11, 0.25);
     ctx.restore();
 
     // Layer 3: Metatron's Cube — center-left
@@ -220,7 +220,7 @@
     ctx.save();
     ctx.translate(W * 0.32 + px * 50, H * 0.62 + py * 35);
     ctx.rotate(s * 0.02);
-    drawMetatron(0, 0, minDim * 0.08, 0.22);
+    drawMetatron(0, 0, minDim * 0.08, 0.28);
     ctx.restore();
 
     // Layer 4: Sri Yantra — offset
@@ -228,7 +228,7 @@
     ctx.save();
     ctx.translate(W * 0.72 + px * 60, H * 0.7 + py * 42);
     ctx.rotate(-s * 0.04);
-    drawYantra(0, 0, minDim * 0.12, 0.15);
+    drawYantra(0, 0, minDim * 0.12, 0.22);
     ctx.restore();
 
     // Layer 5: Small mandala top-left
@@ -236,7 +236,7 @@
     ctx.fillStyle = `hsl(${200 + Math.sin(s * 0.22) * 20}, 25%, 43%)`;
     ctx.save();
     ctx.translate(W * 0.25 + px * 35, H * 0.3 + py * 24);
-    drawMandala(0, 0, minDim * 0.12, 0.15, s * 1.3);
+    drawMandala(0, 0, minDim * 0.12, 0.22, s * 1.3);
     ctx.restore();
 
     // Layer 6: Metatron bottom-right
@@ -245,7 +245,7 @@
     ctx.save();
     ctx.translate(W * 0.75 + px * 45, H * 0.68 + py * 32);
     ctx.rotate(s * 0.035);
-    drawMetatron(0, 0, minDim * 0.06, 0.18);
+    drawMetatron(0, 0, minDim * 0.06, 0.25);
     ctx.restore();
 
     // ── Light motes ─────────────────────────────────────────────────
