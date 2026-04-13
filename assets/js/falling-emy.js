@@ -17,6 +17,7 @@ function saveProgress(){
     const data = {
       cameraY, score, fallSpeed, time,
       nextChallengeY, nextShapeY, themeIdx,
+      journeyLog, // Save the milestones history
       depthMeters: Math.max(0, cameraY / 100),
       savedAt: Date.now(),
     };
@@ -78,6 +79,11 @@ function restoreFromSave(data){
   nextShapeY = data.nextShapeY || (cameraY + 2000);
   themeIdx = data.themeIdx || 0;
   theme = themes[themeIdx];
+  
+  // Restore journey log/milestones
+  journeyLog = data.journeyLog || [];
+  updateJourneyPanel();
+  
   // Reset transient state
   comboCount = 0; lastHitTime = 0;
   scorePopups = []; scoreFlies = [];
