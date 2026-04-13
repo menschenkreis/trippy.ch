@@ -911,8 +911,8 @@ function frame(now){
     setTheme(autoTheme);
   }
 
-  // Sunrise effect (brightens over 10 minutes)
-  const sunrise = Math.min(time / 600, 1.0);
+  // Sunrise effect (brightens over 100km / 100,000m)
+  const sunrise = Math.min(depthMeters / 100000, 1.0);
   if(sunrise > 0){
     const sunGrad = ctx.createLinearGradient(0, H, 0, 0);
     sunGrad.addColorStop(0, `rgba(255, 200, 150, ${sunrise * 0.4})`);
