@@ -84,6 +84,7 @@ let waveRings = []; // {x, y, radius, life}
 // ── Milestones ──
 const milestones = [500, 10000, 25000, 50000, 100000];
 let lastMilestone = 0;
+let journeyLog = []; // {type:'chapter'|'milestone', label, text}
 let milestoneText = null; // {text, life}
 let milestoneSlowMo = 0;
 
@@ -1112,6 +1113,7 @@ document.getElementById('reset-btn').onclick = () => {
   activeEffects = { wave: 0, trail: 0, pulse: 0, magnet: 0 };
   waveRings = [];
   lastMilestone = 0; milestoneText = null; milestoneSlowMo = 0;
+  journeyLog = []; updateJourneyPanel();
   lastChapter = 0; chapterDisplay = null; chapterSlowMo = 0;
   ragdolls = [new Ragdoll(W/2, 0, 'emy')];
   spheres = [];
@@ -2320,6 +2322,20 @@ function frame(now){
     ctx.fillText(`×${Math.min(comboCount, 10)}`, W - 20, H - 52);
   }
 
+  // ── Update Journey Panel ──
+  function updateJourneyPanel(){
+    const el = document.getElementById('journey-log');
+    if(!el) return;
+    if(journeyLog.length === 0) return;
+    let html = '';
+    for(let i = journeyLog.length - 1; i >= 0; i--){
+      const e = journeyLog[i];
+      const icon = e.type === 'chapter' ? '📖' : '🎯';
+      html += `<div class="journey-entry"><div class="journey-icon">${icon}</div><div class="journey-entry-text"><strong>${e.label}</strong> — ${e.text || e.label}</div></div>`;
+    }
+    el.innerHTML = html;
+  }
+
   // ── Milestone & Chapter Logic ──
   // Milestones
   for(const m of milestones){
@@ -2335,6 +2351,8 @@ function frame(now){
           100000: '100 km — dawn breaks',
         };
         milestoneText = {text: quips[m] || (m >= 1000 ? (m/1000) + ' km' : m + ' m'), life: 2.5};
+        journeyLog.push({type:'milestone', label: m >= 1000 ? (m/1000) + ' km' : m + ' m', text: quips[m] || ''});
+        updateJourneyPanel();
         playMilestoneChord();
       }
       // Spawn celebration particles (screen space) — reduced
@@ -2368,6 +2386,8 @@ function frame(now){
       if(!milestoneText){
         chapterSlowMo = 1.0;
         chapterDisplay = {text: ch.text, life: 6.0, phase: 'fadein'};
+        journeyLog.push({type:'chapter', label: ch.age < 1 ? 'Birth' : 'Year ' + ch.age, text: ch.text});
+        updateJourneyPanel();
         playMilestoneChord();
       }
     }

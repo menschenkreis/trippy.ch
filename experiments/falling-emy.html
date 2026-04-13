@@ -45,6 +45,10 @@
     .source-link:hover{color:rgba(140,100,255,0.6)}
     .panel-overlay{position:fixed;inset:0;z-index:499;display:none}
     .panel-overlay.is-active{display:block}
+    .journey-entry{display:flex;gap:0.8rem;margin-bottom:0.7rem;align-items:flex-start}
+    .journey-icon{width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.75rem;border-radius:50%;background:rgba(140,100,255,0.08);border:1px solid rgba(140,100,255,0.12)}
+    .journey-entry-text{font-size:0.8rem;line-height:1.5;color:rgba(255,255,255,0.4)}
+    .journey-entry-text strong{color:rgba(255,255,255,0.6);font-weight:400}
   </style>
 </head>
 <body class="experiment-view">
@@ -151,6 +155,11 @@
       </div>
     </div>
 
+    <hr class="panel-divider">
+    <h2>The Journey So Far</h2>
+    <div id="journey-log">
+      <p style="color:rgba(255,255,255,0.2);font-style:italic">Your journey hasn't begun yet...</p>
+    </div>
     <hr class="panel-divider">
     <a href="https://github.com/menschenkreis/trippy.ch" class="source-link" target="_blank" rel="noopener">view source on GitHub ↗</a>
   </div>
