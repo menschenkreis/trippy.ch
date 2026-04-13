@@ -62,13 +62,13 @@ function autoSave(now){
 }
 
 function restoreFromSave(data){
-  cameraY = data.cameraY;
-  score = data.score;
-  displayScore = data.score;
+  cameraY = data.cameraY || 0;
+  score = data.score || 0;
+  displayScore = data.score || 0;
   fallSpeed = data.fallSpeed || 0;
   time = data.time || 0;
-  nextChallengeY = data.nextChallengeY || cameraY + 10000;
-  nextShapeY = data.nextShapeY || cameraY + 2000;
+  nextChallengeY = data.nextChallengeY || (cameraY + 10000);
+  nextShapeY = data.nextShapeY || (cameraY + 2000);
   themeIdx = data.themeIdx || 0;
   theme = themes[themeIdx];
   // Reset transient state
@@ -81,14 +81,23 @@ function restoreFromSave(data){
   chapterDisplay = null; chapterSlowMo = 0;
   particles = []; shockwaves = []; particleCount = 0;
   firedChapters = new Set();
+  
+  // Re-calculate which chapters have already fired
+  const depthMeters = cameraY / 100;
+  for(let ci = 0; ci < lifeChapters.length; ci++){
+    const ch = lifeChapters[ci];
+    const triggerDepth = ch.depth !== undefined ? ch.depth : ch.age * 1000;
+    if(depthMeters >= triggerDepth) firedChapters.add(ci);
+  }
+
   // Re-create ragdoll at saved depth
   ragdolls = [new Ragdoll(W/2, cameraY, 'emy')];
   spheres = [];
   // Pre-spawn spheres in the visible range around saved position
-  const behindY = cameraY - H;
   const aheadY = cameraY + H;
+  const behindY = cameraY - H;
   for(let y = behindY; y < aheadY; y += 400 + Math.random()*400){
-    if(y > 5000) spawnSphereAtDepth(y);
+    if(y > 2500) spawnSphereAtDepth(y);
   }
   lastSaveTime = time;
 }
@@ -2847,12 +2856,15 @@ if(introEl){
   // Custom click handler for embark to support resume
   const embarkBtn = document.getElementById('intro-embark');
   if(embarkBtn) {
-    embarkBtn.addEventListener('click', (e) => {
+    embarkBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       if(embarkBtn.dataset.resume === "true" && window._fe) {
         const saved = window._fe.loadProgress();
         if(saved) window._fe.restoreFromSave(saved);
       }
-    });
+      if(typeof setPhase === 'function') setPhase('born');
+    };
   }
 
   window.addEventListener('intro-complete',()=>{
