@@ -1508,6 +1508,12 @@ function drawBackground(){
   ctx.fillRect(0,0,W,H);
   ctx.restore();
 
+  // Stars (screen space — must reset transform since we're inside camera transform)
+  ctx.save();
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  drawStarfield(0.15);
+  ctx.restore();
+
   // ── Parallax kaleidoscope layers (screen-space, different scroll speeds) ──
   // Layer 1: far background — slowest parallax
   const px1 = cameraY * 0.1;
@@ -2551,8 +2557,8 @@ function frame(now){
     const ch = lifeChapters[ci];
     const triggerDepth = ch.age * 1000;
     if(depthMeters >= triggerDepth && !firedChapters.has(ci)){
-      firedChapters.add(ci);
       if(!chapterDisplay){
+        firedChapters.add(ci);
         const isMilestone = ch.label.endsWith('km') || ch.label.endsWith('m');
         chapterSlowMo = isMilestone ? 0.5 : 1.0;
         chapterDisplay = {text: ch.text, life: isMilestone ? 2.5 : 6.0, phase: 'fadein'};
@@ -2669,9 +2675,6 @@ function frame(now){
     }
     ctx.restore();
   }
-
-  // Stars in screen space with parallax
-  drawStarfield(0.15);
 
   // Score flies & counter in screen space
   // (flies already drawn in drawScoreElements, counter drawn there too)
