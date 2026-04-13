@@ -669,10 +669,13 @@ canvas.addEventListener('pointerdown', e => {
       isDragging = true;
       dragRagdoll = r;
       dragParticle = p;
+      // Offset relative to the particle in world space
       dragOffsetX = p.x - x;
-      dragOffsetY = (p.y - cameraY) - y;
-      // Freeze ragdoll
-      for(const pp of r.particles){ pp._wasPinned = pp.pinned; pp.pinned = true; }
+      dragOffsetY = p.y - cameraY - y;
+      
+      // ONLY pin the specific particle being dragged, not the whole ragdoll
+      p._wasPinned = p.pinned;
+      p.pinned = true;
       break;
     }
   }
@@ -680,24 +683,21 @@ canvas.addEventListener('pointerdown', e => {
 canvas.addEventListener('pointermove', e => {
   touchX = e.clientX; touchY = e.clientY;
   if(isDragging && dragRagdoll && dragParticle){
-    // Move grabbed particle to finger position (convert screen to world)
+    // Convert current screen position to world position for the target
     const targetX = e.clientX + dragOffsetX;
     const targetY = e.clientY + dragOffsetY + cameraY;
-    const dx = targetX - dragParticle.x;
-    const dy = targetY - dragParticle.y;
-    // Move entire ragdoll by the delta
-    for(const p of dragRagdoll.particles){
-      p.x += dx; p.y += dy;
-      p.ox = p.x; p.oy = p.y;
-    }
-    // Adjust camera so ragdoll stays centered vertically
-    const head = dragRagdoll.particles[0];
-    cameraY += (head.y - cameraY - H*0.35) * 0.15;
+    
+    // Smoothly move the particle towards the target without pinning others
+    // This allows the rest of the body to react physics-wise
+    dragParticle.x = targetX;
+    dragParticle.y = targetY;
+    
+    // We don't adjust cameraY here anymore to prevent scrolling while dragging
   }
 });
 function releaseDrag(){
-  if(isDragging && dragRagdoll){
-    for(const p of dragRagdoll.particles){ p.pinned = p._wasPinned || false; }
+  if(isDragging && dragParticle){
+    dragParticle.pinned = dragParticle._wasPinned || false;
   }
   isDragging = false;
   isSlowed = false;
