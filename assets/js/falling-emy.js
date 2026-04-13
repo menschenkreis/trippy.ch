@@ -2493,38 +2493,38 @@ function frame(now){
       ctx.fillRect(0, 0, W, H);
     }
 
-    // ── THRESHOLD: white flash + dimension shift ──
+    // ── THRESHOLD: dimension shift ──
     else if(portal.phase === 'threshold'){
       const p = portal.progress;
       const flash = p < 0.3 ? p / 0.3 : Math.max(0, 1 - (p - 0.3) / 0.7);
       const flashEase = flash * flash;
 
-      // White flash
-      ctx.fillStyle = `rgba(255,255,255,${flashEase * 0.4})`;
+      // Soft colored pulse instead of white flash
+      ctx.fillStyle = `rgba(${portal.targetAccent[0]},${portal.targetAccent[1]},${portal.targetAccent[2]},${flashEase * 0.15})`;
       ctx.fillRect(0, 0, W, H);
 
-      // Chromatic scan lines
+      // Chromatic scan lines (reduced intensity)
       if(flash > 0.1){
-        for(let i = 0; i < 12; i++){
-          const y = (H / 12) * i + Math.sin(time * 5 + i) * 20;
-          const barH = 2 + flash * 6;
-          const barHue = (h + i * 30 + time * 100) % 360;
-          ctx.fillStyle = `hsla(${barHue},100%,70%,${flashEase * 0.3})`;
+        for(let i = 0; i < 8; i++){
+          const y = (H / 8) * i + Math.sin(time * 3 + i) * 15;
+          const barH = 1 + flash * 4;
+          const barHue = (h + i * 45 + time * 60) % 360;
+          ctx.fillStyle = `hsla(${barHue},100%,75%,${flashEase * 0.2})`;
           ctx.fillRect(0, y, W, barH);
         }
       }
 
-      // Radial light rays (reduced)
-      const rayAlpha = flashEase * 0.15;
+      // Soft Radial light rays
+      const rayAlpha = flashEase * 0.1;
       if(rayAlpha > 0.01){
         ctx.save();
         ctx.globalCompositeOperation = 'screen';
         ctx.translate(sx, sy);
-        for(let i = 0; i < 8; i++){
-          const a = (i / 16) * TAU + time * 0.3;
-          const rayLen = Math.max(W, H) * 1.5;
-          const rayW = 0.04 + Math.sin(time * 2 + i) * 0.02;
-          ctx.fillStyle = `hsla(${(h + i * 22) % 360},90%,75%,${rayAlpha})`;
+        for(let i = 0; i < 6; i++){
+          const a = (i / 12) * TAU + time * 0.2;
+          const rayLen = Math.max(W, H) * 1.2;
+          const rayW = 0.03 + Math.sin(time * 1.5 + i) * 0.01;
+          ctx.fillStyle = `hsla(${(h + i * 30) % 360},95%,80%,${rayAlpha})`;
           ctx.beginPath();
           ctx.moveTo(0, 0);
           ctx.lineTo(Math.cos(a - rayW) * rayLen, Math.sin(a - rayW) * rayLen);
@@ -2535,21 +2535,12 @@ function frame(now){
         ctx.restore();
       }
 
-      // Lingering sparks
-      for(const sp of portal.sparks){
-        const spx = sx + Math.cos(sp.angle) * sp.dist;
-        const spy = sy + Math.sin(sp.angle) * sp.dist;
-        const sa = sp.life * 0.6;
-        ctx.fillStyle = `hsla(${sp.hue},90%,70%,${sa})`;
-        ctx.beginPath(); ctx.arc(spx, spy, sp.size * sp.life, 0, TAU); ctx.fill();
-      }
-
-      // New dimension tint after midpoint
-      if(p > 0.5){
-        const tintFade = (p - 0.5) * 2;
+      // New dimension tint (seamlessly integrated)
+      if(p > 0.4){
+        const tintFade = (p - 0.4) * 1.6;
         const tg = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H)*0.7);
-        tg.addColorStop(0, `rgba(${portal.targetAccent[0]},${portal.targetAccent[1]},${portal.targetAccent[2]},${tintFade * 0.08})`);
-        tg.addColorStop(1, `rgba(0,0,0,${tintFade * 0.15})`);
+        tg.addColorStop(0, `rgba(${portal.targetAccent[0]},${portal.targetAccent[1]},${portal.targetAccent[2]},${tintFade * 0.12})`);
+        tg.addColorStop(1, `rgba(0,0,0,${tintFade * 0.2})`);
         ctx.fillStyle = tg;
         ctx.fillRect(0, 0, W, H);
       }
