@@ -623,9 +623,9 @@ footer a:hover { color: var(--pink); }
   z-index: 500;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   flex-direction: column;
-  padding-top: 18vh;
+  padding-top: 20vh;
 }
 
 #intro-canvas {
