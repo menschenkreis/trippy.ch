@@ -89,7 +89,7 @@ let lastChapter = -1;
 let firedChapters = new Set();
 
 const lifeChapters = [
-  { age: 0.1, label: 'Birth', text: 'No past. But so much future ahead.' },
+  { age: 0.05, label: 'Birth', text: 'No past. But so much future ahead.' },
   { age: 1, label: 'Year 1', text: 'Every sensation is brand new. The world is pure wonder.' },
   { age: 2, label: 'Year 2', text: 'Learning to walk. Every fall is a discovery.' },
   { age: 3, label: 'Year 3', text: 'Why? Why? Why? The universe is infinite questions.' },
@@ -980,6 +980,12 @@ ragdolls.push(new Ragdoll(W/2, 0, 'emy'));
 for(let i=0;i<8;i++) spawnSphereAtDepth(i * 120 + Math.random()*80);
 
 function spawnSphereAtDepth(yWorld, forceType=null){
+  // Shape frequency ramps from 0 at 50m to full at 100m
+  const depthM = Math.max(0, yWorld / 100);
+  if(depthM < 50) return; // no shapes before 50m
+  const spawnChance = Math.min((depthM - 50) / 50, 1.0); // 0→1 between 50-100m
+  if(!forceType && Math.random() > spawnChance) return; // thin out shapes in ramp zone
+
   let type = 'sphere';
   if (forceType) {
     type = forceType;
