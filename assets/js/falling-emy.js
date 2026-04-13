@@ -340,6 +340,7 @@ class Sphere {
     this.x = x; this.y = y;
     if(type === 'challenge'){
       this.r = 35 + Math.random()*25;
+      this.challengeVariant = Math.floor(Math.random() * 5); // 5 distinct threat shapes
     } else if(type === 'heart'){
       this.r = 25 + Math.random()*15;
     } else if(type === 'chakra'){
@@ -1962,51 +1963,135 @@ function drawSphere(s){
       ctx.stroke();
     }
   } else if(s.type === 'challenge'){
-    // Smooth crystalline challenge shape
-    const hue = (s.hue + time*25) % 360;
-    const hue2 = (hue + 140) % 360;
+    const v = s.challengeVariant || 0;
+    const hue = (s.hue + time*30) % 360;
+    const hue2 = (hue + 160) % 360;
     ctx.rotate(s.rotation);
 
-    // Warm radial glow
-    const grad = ctx.createRadialGradient(0,0,r*0.1, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(${hue},85%,55%,0.15)`);
-    grad.addColorStop(0.5, `hsla(${hue2},75%,40%,0.06)`);
+    // Menacing outer glow
+    const grad = ctx.createRadialGradient(0,0,r*0.1, 0,0,r*2);
+    grad.addColorStop(0, `hsla(${hue},90%,50%,0.18)`);
+    grad.addColorStop(0.5, `hsla(${hue2},80%,35%,0.06)`);
     grad.addColorStop(1, `hsla(${hue},80%,40%,0)`);
     ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(0,0,r*2,0,TAU); ctx.fill();
 
-    // Smooth rounded polygon with gentle pulsing
-    const sides = 7;
-    const pulse = 1 + Math.sin(time * 2) * 0.04;
-    ctx.strokeStyle = `hsla(${hue},80%,65%,0.85)`;
-    ctx.fillStyle = `hsla(${hue},60%,12%,0.9)`;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    for(let i=0; i<=sides; i++){
-      const a = i * TAU / sides;
-      const d = r * pulse;
-      if(i===0) ctx.moveTo(Math.cos(a)*d, Math.sin(a)*d);
-      else ctx.lineTo(Math.cos(a)*d, Math.sin(a)*d);
+    // Aggressive pulse
+    const pulse = 1 + Math.sin(time * 4) * 0.08 + Math.sin(time * 7) * 0.03;
+
+    if(v === 0){
+      // Serrated star — 11 jagged spikes
+      const spikes = 11;
+      ctx.strokeStyle = `hsla(${hue},85%,60%,0.9)`;
+      ctx.fillStyle = `hsla(${hue},50%,8%,0.92)`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for(let i=0; i<=spikes*2; i++){
+        const a = i * TAU / (spikes*2);
+        const base = (i%2 === 0) ? r : r * 0.38;
+        const wobble = (i%2 === 0) ? Math.sin(time*6 + i*2) * r*0.08 : 0;
+        const d = (base + wobble) * pulse;
+        if(i===0) ctx.moveTo(Math.cos(a)*d, Math.sin(a)*d);
+        else ctx.lineTo(Math.cos(a)*d, Math.sin(a)*d);
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else if(v === 1){
+      // Barbed wire ring — irregular inward/outward thorns
+      const n = 16;
+      ctx.strokeStyle = `hsla(${hue},90%,55%,0.85)`;
+      ctx.fillStyle = `hsla(${hue},55%,6%,0.9)`;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      for(let i=0; i<=n; i++){
+        const a = i * TAU / n;
+        const seed = Math.sin(i*7.3) * 0.5 + 0.5;
+        const d = r * (0.45 + seed * 0.55 + Math.sin(time*5 + i*3) * 0.06) * pulse;
+        if(i===0) ctx.moveTo(Math.cos(a)*d, Math.sin(a)*d);
+        else ctx.lineTo(Math.cos(a)*d, Math.sin(a)*d);
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else if(v === 2){
+      // Triple rotating spike layers
+      for(let layer=0; layer<3; layer++){
+        const spikes = 5 + layer * 2;
+        const layerR = r * (0.5 + layer * 0.28);
+        const layerHue = (hue + layer * 50) % 360;
+        const layerPulse = 1 + Math.sin(time * (4 + layer) + layer*2) * 0.1;
+        ctx.strokeStyle = `hsla(${layerHue},85%,${55 + layer*5}%,${0.8 - layer*0.15})`;
+        ctx.fillStyle = layer === 0 ? `hsla(${hue},50%,8%,0.9)` : 'transparent';
+        ctx.lineWidth = 1.5 - layer*0.3;
+        ctx.beginPath();
+        for(let i=0; i<=spikes*2; i++){
+          const a = i * TAU / (spikes*2) + layer * 0.15;
+          const d = (i%2===0 ? layerR : layerR*0.35) * layerPulse * pulse;
+          if(i===0) ctx.moveTo(Math.cos(a)*d, Math.sin(a)*d);
+          else ctx.lineTo(Math.cos(a)*d, Math.sin(a)*d);
+        }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+    } else if(v === 3){
+      // Shattered crystal — sharp irregular polygon with inner fracture
+      const n = 8;
+      ctx.strokeStyle = `hsla(${hue},85%,60%,0.9)`;
+      ctx.fillStyle = `hsla(${hue},45%,7%,0.92)`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for(let i=0; i<=n; i++){
+        const a = i * TAU / n;
+        const wobble = Math.sin(i*5.7 + time*3) * r * 0.15;
+        const d = (r + wobble) * pulse;
+        if(i===0) ctx.moveTo(Math.cos(a)*d, Math.sin(a)*d);
+        else ctx.lineTo(Math.cos(a)*d, Math.sin(a)*d);
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      // Inner fracture lines
+      ctx.strokeStyle = `hsla(${hue2},80%,55%,0.35)`;
+      ctx.lineWidth = 0.8;
+      for(let i=0; i<3; i++){
+        const a1 = (i/3 + 0.1) * TAU;
+        const a2 = a1 + 1.8 + Math.sin(time*2 + i) * 0.3;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a1)*r*0.15, Math.sin(a1)*r*0.15);
+        ctx.lineTo(Math.cos(a2)*r*0.85, Math.sin(a2)*r*0.85);
+        ctx.stroke();
+      }
+    } else {
+      // Pulsating void mouth — concentric spiky rings shrinking inward
+      for(let ring=0; ring<3; ring++){
+        const ringR = r * (1.1 - ring*0.3);
+        const ringHue = (hue + ring*60) % 360;
+        const ringPulse = 1 + Math.sin(time*5 + ring*1.5) * 0.12;
+        const spikes = 7 + ring*2;
+        ctx.strokeStyle = `hsla(${ringHue},90%,${60 + ring*5}%,${0.7 - ring*0.15})`;
+        ctx.fillStyle = ring===0 ? `hsla(${hue},60%,5%,0.9)` : 'transparent';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for(let i=0; i<=spikes*2; i++){
+          const a = i * TAU / (spikes*2) - ring*0.1;
+          const d = (i%2===0 ? ringR : ringR*0.4) * ringPulse * pulse;
+          if(i===0) ctx.moveTo(Math.cos(a)*d, Math.sin(a)*d);
+          else ctx.lineTo(Math.cos(a)*d, Math.sin(a)*d);
+        }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
     }
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
 
-    // Inner soft glow ring — no lines, just a luminous core
-    const ig = ctx.createRadialGradient(0,0,0, 0,0,r*0.6);
-    ig.addColorStop(0, `hsla(${hue2},90%,70%,0.12)`);
-    ig.addColorStop(0.6, `hsla(${hue},80%,50%,0.05)`);
-    ig.addColorStop(1, `hsla(${hue},80%,50%,0)`);
+    // Threatening inner core glow
+    const ig = ctx.createRadialGradient(0,0,0, 0,0,r*0.5);
+    ig.addColorStop(0, `hsla(${hue2},100%,70%,0.15)`);
+    ig.addColorStop(0.5, `hsla(${hue},80%,40%,0.05)`);
+    ig.addColorStop(1, `hsla(${hue},80%,40%,0)`);
     ctx.fillStyle = ig;
-    ctx.beginPath(); ctx.arc(0,0,r*0.6,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(0,0,r*0.5,0,TAU); ctx.fill();
 
-    // Outer soft halo ring
-    ctx.strokeStyle = `hsla(${hue2},70%,60%,0.2)`;
+    // Outer warning halo
+    const haloPulse = 0.5 + Math.sin(time * 3) * 0.5;
+    ctx.strokeStyle = `hsla(${hue},70%,55%,${0.12 + haloPulse * 0.1})`;
     ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.arc(0,0,r*1.15,0,TAU); ctx.stroke();
-    ctx.strokeStyle = `hsla(${hue},70%,55%,0.08)`;
-    ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.arc(0,0,r*1.4,0,TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0,0,r*1.2,0,TAU); ctx.stroke();
+    ctx.strokeStyle = `hsla(${hue2},60%,50%,${0.05 + haloPulse * 0.04})`;
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(0,0,r*1.5,0,TAU); ctx.stroke();
 
   } else {
     // Normal sacred geometry sphere
