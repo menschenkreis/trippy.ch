@@ -135,6 +135,7 @@ class Sphere {
     this.rotSpeed = (Math.random()-0.5)*0.02;
     this.hue = Math.random()*360;
     this.segments = 3 + Math.floor(Math.random()*5); // sacred geometry sides
+    this.sacredType = Math.floor(Math.random() * 3); // 0: polygon, 1: seed of life, 2: metatron
   }
   update(dt){
     this.rotation += this.rotSpeed;
@@ -929,39 +930,78 @@ function drawSphere(s){
     const hue = (s.hue + time*15) % 360;
     ctx.rotate(s.rotation);
 
-    // Outer polygon
-    ctx.strokeStyle = `hsla(${hue},60%,55%,0.25)`;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for(let i=0;i<=s.segments;i++){
-      const angle = i*TAU/s.segments;
-      const px = Math.cos(angle)*r, py = Math.sin(angle)*r;
-      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
-    }
-    ctx.stroke();
-
-    // Inner sacred geometry
-    ctx.strokeStyle = `hsla(${hue},50%,50%,0.12)`;
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    for(let i=0;i<=s.segments;i++){
-      const angle = i*TAU/s.segments + PI/s.segments;
-      const px = Math.cos(angle)*r*0.5, py = Math.sin(angle)*r*0.5;
-      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
-    }
-    ctx.stroke();
-
-    // Connecting lines
-    if(s.segments >= 5){
-      ctx.strokeStyle = `hsla(${hue},40%,45%,0.08)`;
+    if(s.sacredType === 0){
+      // Polygon with internal lines
+      ctx.strokeStyle = `hsla(${hue},60%,55%,0.25)`;
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      for(let i=0;i<s.segments;i++){
-        const a1 = i*TAU/s.segments;
-        const a2 = ((i+Math.floor(s.segments/2))%s.segments)*TAU/s.segments;
-        ctx.moveTo(Math.cos(a1)*r, Math.sin(a1)*r);
-        ctx.lineTo(Math.cos(a2)*r, Math.sin(a2)*r);
+      for(let i=0;i<=s.segments;i++){
+        const angle = i*TAU/s.segments;
+        const px = Math.cos(angle)*r, py = Math.sin(angle)*r;
+        if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
       }
       ctx.stroke();
+
+      ctx.strokeStyle = `hsla(${hue},50%,50%,0.12)`;
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      for(let i=0;i<=s.segments;i++){
+        const angle = i*TAU/s.segments + PI/s.segments;
+        const px = Math.cos(angle)*r*0.5, py = Math.sin(angle)*r*0.5;
+        if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+
+      if(s.segments >= 5){
+        ctx.strokeStyle = `hsla(${hue},40%,45%,0.08)`;
+        ctx.beginPath();
+        for(let i=0;i<s.segments;i++){
+          const a1 = i*TAU/s.segments;
+          const a2 = ((i+Math.floor(s.segments/2))%s.segments)*TAU/s.segments;
+          ctx.moveTo(Math.cos(a1)*r, Math.sin(a1)*r);
+          ctx.lineTo(Math.cos(a2)*r, Math.sin(a2)*r);
+        }
+        ctx.stroke();
+      }
+    } 
+    else if(s.sacredType === 1){
+      // Seed of Life
+      ctx.strokeStyle = `hsla(${hue},60%,55%,0.25)`;
+      ctx.lineWidth = 1;
+      const sr = r * 0.5; // sub radius
+      ctx.beginPath(); ctx.arc(0,0,sr,0,TAU); ctx.stroke();
+      for(let i=0;i<6;i++){
+        ctx.beginPath();
+        ctx.arc(Math.cos(i*PI/3)*sr, Math.sin(i*PI/3)*sr, sr, 0, TAU);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = `hsla(${hue},60%,55%,0.15)`;
+      ctx.beginPath(); ctx.arc(0,0,r,0,TAU); ctx.stroke();
+    }
+    else if(s.sacredType === 2){
+      // Simplified Metatron / Cube
+      ctx.strokeStyle = `hsla(${hue},60%,55%,0.25)`;
+      ctx.lineWidth = 1;
+      const pts = [];
+      const mR = r * 0.8;
+      for(let i=0;i<6;i++){
+        pts.push([Math.cos(i*PI/3)*mR, Math.sin(i*PI/3)*mR]);
+      }
+      pts.push([0,0]);
+      ctx.beginPath();
+      for(let i=0;i<pts.length-1;i++){
+        for(let j=i+1;j<pts.length;j++){
+          ctx.moveTo(pts[i][0], pts[i][1]);
+          ctx.lineTo(pts[j][0], pts[j][1]);
+        }
+      }
+      ctx.stroke();
+      
+      ctx.fillStyle = `hsla(${hue},60%,60%,0.2)`;
+      for(const pt of pts){
+        ctx.beginPath(); ctx.arc(pt[0], pt[1], r*0.15, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(pt[0], pt[1], r*0.15, 0, TAU); ctx.stroke();
+      }
     }
 
     // Inner circle
