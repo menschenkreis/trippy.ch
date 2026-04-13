@@ -664,12 +664,13 @@ canvas.addEventListener('pointerdown', e => {
   targetTimeScale = 0.05;
   isSlowed = true;
   for(const r of ragdolls){
-    const p = r.closestParticle(x,y);
+    const p = r.closestParticle(x, y + cameraY); // Check against world coordinates
     if(p){
       isDragging = true;
       dragRagdoll = r;
       dragParticle = p;
-      dragOffsetX = p.x-x; dragOffsetY = p.y-y;
+      dragOffsetX = p.x - x;
+      dragOffsetY = (p.y - cameraY) - y;
       // Freeze ragdoll
       for(const pp of r.particles){ pp._wasPinned = pp.pinned; pp.pinned = true; }
       break;
@@ -679,9 +680,9 @@ canvas.addEventListener('pointerdown', e => {
 canvas.addEventListener('pointermove', e => {
   touchX = e.clientX; touchY = e.clientY;
   if(isDragging && dragRagdoll && dragParticle){
-    // Move grabbed particle to finger position (in screen coords)
+    // Move grabbed particle to finger position (convert screen to world)
     const targetX = e.clientX + dragOffsetX;
-    const targetY = e.clientY + dragOffsetY;
+    const targetY = e.clientY + dragOffsetY + cameraY;
     const dx = targetX - dragParticle.x;
     const dy = targetY - dragParticle.y;
     // Move entire ragdoll by the delta
