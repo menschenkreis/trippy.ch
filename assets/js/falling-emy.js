@@ -805,142 +805,71 @@ function collideRagdollSphere(ragdoll, sphere, dt){
 
 // ── Impact particles ─────────────────────────────────────────────────────
 let particles = [];
-let shockwaves = []; // expanding ring effects
-const MAX_PARTICLES = 400;
+let shockwaves = [];
+const MAX_PARTICLES = 150;
 
 function spawnImpactParticles(x, y, hue, force){
-  const intensity = Math.min(force || 3, 15);
-  const burstCount = 8 + Math.floor(intensity * 2.5);
+  const intensity = Math.min(force || 3, 10);
+  const burstCount = 4 + Math.floor(intensity * 1.2);
   const hue2 = (hue + 120) % 360;
   const hue3 = (hue + 240) % 360;
 
   // ── Shockwave ring ──
   shockwaves.push({
-    x, y, radius: 5, maxRadius: 30 + intensity * 12,
-    life: 1.0, decay: 1.8 + intensity * 0.1,
-    hue, lineWidth: 2 + intensity * 0.5,
+    x, y, radius: 5, maxRadius: 25 + intensity * 8,
+    life: 1.0, decay: 2.0,
+    hue, lineWidth: 1.5 + intensity * 0.3,
   });
-  // Secondary ring (delayed feel via smaller start)
-  if(intensity > 2){
-    shockwaves.push({
-      x, y, radius: 2, maxRadius: 20 + intensity * 8,
-      life: 0.7, decay: 2.2,
-      hue: hue2, lineWidth: 1.5,
-    });
-  }
 
   // ── Primary burst sparks ──
   for(let i=0;i<burstCount;i++){
     if(particles.length >= MAX_PARTICLES) particles.shift();
     const angle = (i / burstCount) * TAU + (Math.random()-0.5)*0.5;
-    const speed = 60 + Math.random() * 120 * (intensity / 5);
+    const speed = 40 + Math.random() * 80 * (intensity / 5);
     const sparkHue = [hue, hue2, hue3][i % 3] + Math.random() * 30 - 15;
     particles.push({
       x, y,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 20,
+      vy: Math.sin(angle) * speed - 15,
       life: 1.0,
-      decay: 0.6 + Math.random() * 0.8,
-      size: 1 + Math.random() * 2.5 * (intensity / 5),
+      decay: 0.8 + Math.random() * 0.8,
+      size: 0.8 + Math.random() * 2 * (intensity / 5),
       hue: sparkHue,
       type: 'spark',
-      trail: [],
     });
   }
 
-  // ── Glowing embers (larger, slower, longer-lived) ──
-  const emberCount = 3 + Math.floor(intensity * 0.8);
+  // ── A couple embers ──
+  const emberCount = 1 + Math.floor(intensity * 0.4);
   for(let i=0;i<emberCount;i++){
     if(particles.length >= MAX_PARTICLES) particles.shift();
     const angle = Math.random() * TAU;
-    const speed = 15 + Math.random() * 50;
+    const speed = 10 + Math.random() * 30;
     particles.push({
       x, y,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 40,
+      vy: Math.sin(angle) * speed - 30,
       life: 1.0,
-      decay: 0.25 + Math.random() * 0.3,
-      size: 3 + Math.random() * 4,
+      decay: 0.3 + Math.random() * 0.3,
+      size: 2.5 + Math.random() * 2.5,
       hue: hue + Math.random() * 60 - 30,
       type: 'ember',
     });
-  }
-
-  // ── Micro starburst (tiny fast dots) ──
-  if(intensity > 3){
-    const microCount = 6 + Math.floor(Math.random() * 8);
-    for(let i=0;i<microCount;i++){
-      if(particles.length >= MAX_PARTICLES) particles.shift();
-      const angle = Math.random() * TAU;
-      const speed = 150 + Math.random() * 200;
-      particles.push({
-        x, y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 0.6 + Math.random() * 0.4,
-        decay: 1.5 + Math.random(),
-        size: 0.5 + Math.random() * 0.8,
-        hue: Math.random() * 360, // rainbow micros
-        type: 'micro',
-      });
-    }
-  }
-
-  // ── Spiral trail particles (wrap around collision point) ──
-  if(intensity > 5){
-    const spiralCount = 12;
-    for(let i=0;i<spiralCount;i++){
-      if(particles.length >= MAX_PARTICLES) particles.shift();
-      const angle = (i / spiralCount) * TAU;
-      const speed = 40 + i * 8;
-      particles.push({
-        x, y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 1.0,
-        decay: 0.5,
-        size: 1.5 + Math.random(),
-        hue: (hue + i * 30) % 360,
-        type: 'spiral',
-        spiralAngle: angle,
-        spiralSpeed: 3 + Math.random() * 2,
-      });
-    }
   }
 }
 
 function updateParticles(dt){
   for(let i = particles.length-1; i >= 0; i--){
     const p = particles[i];
-
-    // Spiral type: add angular velocity
-    if(p.type === 'spiral'){
-      const cos = Math.cos(p.spiralSpeed * dt);
-      const sin = Math.sin(p.spiralSpeed * dt);
-      const nvx = p.vx * cos - p.vy * sin;
-      const nvy = p.vx * sin + p.vy * cos;
-      p.vx = nvx * 0.97;
-      p.vy = nvy * 0.97;
-    }
-
-    // Store trail for sparks
-    if(p.type === 'spark'){
-      p.trail.push({x: p.x, y: p.y});
-      if(p.trail.length > 5) p.trail.shift();
-    }
-
-    const grav = p.type === 'ember' ? 30 : (p.type === 'micro' ? 0 : 60);
+    const grav = p.type === 'ember' ? 25 : 55;
     p.vy += grav * dt;
     p.x += p.vx * dt;
     p.y += p.vy * dt;
-    const friction = p.type === 'micro' ? 0.92 : 0.96;
-    p.vx *= friction;
-    p.vy *= friction;
+    p.vx *= 0.96;
+    p.vy *= 0.96;
     p.life -= p.decay * dt;
     if(p.life <= 0) particles.splice(i, 1);
   }
-
-  // Update shockwaves
   for(let i = shockwaves.length-1; i >= 0; i--){
     const sw = shockwaves[i];
     sw.radius += (sw.maxRadius - sw.radius) * 4 * dt;
@@ -1076,62 +1005,27 @@ function drawParticles(){
   }
   ctx.shadowBlur = 0;
 
-  // ── Draw particles by type ──
+  // ── Draw particles ──
   for(const p of particles){
     const alpha = p.life * (p.life > 0.5 ? 1.0 : p.life * 2.0);
 
     if(p.type === 'spark'){
-      // Trail
-      if(p.trail.length > 1){
-        for(let t = 0; t < p.trail.length - 1; t++){
-          const ta = alpha * (t / p.trail.length) * 0.3;
-          ctx.strokeStyle = `hsla(${p.hue},90%,65%,${ta})`;
-          ctx.lineWidth = p.size * (t / p.trail.length);
-          ctx.beginPath();
-          ctx.moveTo(p.trail[t].x, p.trail[t].y);
-          ctx.lineTo(p.trail[t+1].x, p.trail[t+1].y);
-          ctx.stroke();
-        }
-      }
       // Glow
-      ctx.fillStyle = `hsla(${p.hue},85%,60%,${alpha * 0.25})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 3.5, 0, TAU); ctx.fill();
+      ctx.fillStyle = `hsla(${p.hue},85%,60%,${alpha * 0.2})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 3, 0, TAU); ctx.fill();
       // Core
       ctx.fillStyle = `hsla(${p.hue},100%,85%,${alpha})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill();
 
     } else if(p.type === 'ember'){
-      // Large soft glow
-      const pulse = 0.8 + 0.2 * Math.sin(time * 8 + p.hue);
-      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 3 * pulse);
-      grad.addColorStop(0, `hsla(${p.hue},80%,70%,${alpha * 0.5})`);
-      grad.addColorStop(0.5, `hsla(${p.hue},90%,50%,${alpha * 0.15})`);
-      grad.addColorStop(1, `hsla(${p.hue},80%,40%,0)`);
-      ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 3 * pulse, 0, TAU); ctx.fill();
-      // Bright core
+      // Soft glow (no radialGradient — cheaper)
+      ctx.fillStyle = `hsla(${p.hue},80%,55%,${alpha * 0.15})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 3, 0, TAU); ctx.fill();
+      ctx.fillStyle = `hsla(${p.hue},80%,65%,${alpha * 0.3})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 1.5, 0, TAU); ctx.fill();
+      // Core
       ctx.fillStyle = `hsla(${p.hue},60%,90%,${alpha * 0.9})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 0.4, 0, TAU); ctx.fill();
-
-    } else if(p.type === 'micro'){
-      // Tiny rainbow dot
-      ctx.fillStyle = `hsla(${p.hue},100%,80%,${alpha})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill();
-
-    } else if(p.type === 'spiral'){
-      // Glowing spiral dot with trail
-      ctx.fillStyle = `hsla(${p.hue},90%,70%,${alpha * 0.2})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 4, 0, TAU); ctx.fill();
-      ctx.fillStyle = `hsla(${p.hue},100%,85%,${alpha})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill();
-
-    } else {
-      // Legacy fallback
-      const s = p.size * (0.8 + 0.2 * Math.sin(time * 12 + p.hue));
-      ctx.fillStyle = `hsla(${p.hue},85%,60%,${alpha * 0.3})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, s * 4, 0, TAU); ctx.fill();
-      ctx.fillStyle = `hsla(${p.hue},100%,85%,${alpha})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, s, 0, TAU); ctx.fill();
     }
   }
   ctx.restore();
