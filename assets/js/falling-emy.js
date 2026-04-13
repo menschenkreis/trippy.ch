@@ -1240,7 +1240,7 @@ let nextChallengeY = 10000;
 ragdolls.push(new Ragdoll(W/2, 0, 'emy'));
 // No initial spheres — intro handles the first moments
 
-let nextShapeY = 5000; // first shape allowed at 50m
+let nextShapeY = 2500; // first shape allowed at 25m
 
 function spawnSphereAtDepth(yWorld, forceType=null){
   let type = 'sphere';
@@ -1377,7 +1377,7 @@ document.getElementById('reset-btn').onclick = () => {
   journeyLog = []; updateJourneyPanel();
   firedChapters = new Set();
   chapterDisplay = null; chapterSlowMo = 0;
-  nextShapeY = 5000;
+  nextShapeY = 2500;
   nextChallengeY = 10000;
   particles = []; particleCount = 0;
   ragdolls = [new Ragdoll(W/2, 0, 'emy')];
@@ -2153,11 +2153,11 @@ function updateCamera(){
   }
   
   // ── Shape Density ──
-  // No shapes before 50m (5000px). Density ramps from 1 shape per 800px at 50m
+  // No shapes before 25m (2500px). Density ramps from 1 shape per 800px at 25m
   // down to 1 shape per 120px at 100m and beyond.
   const depthM = Math.max(0, cameraY / 100);
-  if(depthM >= 50 && aheadY > nextShapeY){
-    const ramp = Math.min((depthM - 50) / 50, 1.0);
+  if(depthM >= 25 && aheadY > nextShapeY){
+    const ramp = Math.min((depthM - 25) / 75, 1.0);
     const interval = 800 - ramp * 680; // 800px → 120px
     nextShapeY = aheadY + interval * (0.7 + Math.random() * 0.6);
     spawnSphereAtDepth(nextShapeY);
@@ -2170,9 +2170,9 @@ function recycleObjects(){
   // Keep spawning
   const aheadY = cameraY + H + 100;
   // Keep spawning — density increases with depth
-  const depthM = Math.max(0, cameraY / 100);
-  if(depthM >= 50 && aheadY > nextShapeY){
-    const ramp = Math.min((depthM - 50) / 50, 1.0);
+  const depthM2 = Math.max(0, cameraY / 100);
+  if(depthM2 >= 25 && aheadY > nextShapeY){
+    const ramp = Math.min((depthM2 - 25) / 75, 1.0);
     const interval = 800 - ramp * 680;
     nextShapeY = aheadY + interval * (0.7 + Math.random() * 0.6);
     spawnSphereAtDepth(nextShapeY);
