@@ -195,7 +195,79 @@ function collideParticleSphere(p, s, dt){
 }
 
 function collideRagdollSphere(ragdoll, sphere, dt){
-  for(const p of ragdoll.particles) collideParticleSphere(p, sphere, dt);
+  let hit = false;
+  for(const p of ragdoll.particles){
+    const dx = p.x-sphere.x, dy = p.y-sphere.y;
+    const d = Math.sqrt(dx*dx+dy*dy) || 0.001;
+    const minD = (p.radius||3) + sphere.r;
+    if(d < minD) hit = true;
+    collideParticleSphere(p, sphere, dt);
+  }
+  if(hit) spawnImpactParticles(sphere.x, sphere.y, sphere.hue);
+}
+
+// ── Impact particles ─────────────────────────────────────────────────────
+let particles = [];
+const MAX_PARTICLES = 200;
+
+function spawnImpactParticles(x, y, hue){
+  const count = 8 + Math.floor(Math.random()*8);
+  for(let i=0;i<count;i++){
+    if(particles.length >= MAX_PARTICLES) particles.shift();
+    const angle = Math.random() * TAU;
+    const speed = 30 + Math.random() * 120;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 20,
+      life: 1.0,
+      decay: 0.6 + Math.random() * 1.2,
+      size: 1 + Math.random() * 3,
+      hue: hue + Math.random() * 60 - 30,
+      sparkle: Math.random() > 0.6, // some get cross sparkle
+    });
+  }
+}
+
+function updateParticles(dt){
+  for(let i = particles.length-1; i >= 0; i--){
+    const p = particles[i];
+    p.vy += 80 * dt; // slight gravity
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vx *= 0.98;
+    p.vy *= 0.98;
+    p.life -= p.decay * dt;
+    if(p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function drawParticles(){
+  for(const p of particles){
+    const alpha = p.life * 0.8;
+    const twinkle = 0.5 + 0.5 * Math.sin(time * 8 + p.hue);
+    const s = p.size * (0.5 + 0.5 * twinkle) * p.life;
+
+    // Glow
+    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, s*3);
+    grad.addColorStop(0, `hsla(${p.hue},80%,70%,${alpha*0.4})`);
+    grad.addColorStop(1, `hsla(${p.hue},80%,50%,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(p.x, p.y, s*3, 0, TAU); ctx.fill();
+
+    // Core
+    ctx.fillStyle = `hsla(${p.hue},70%,85%,${alpha})`;
+    ctx.beginPath(); ctx.arc(p.x, p.y, s, 0, TAU); ctx.fill();
+
+    // Cross sparkle for sparkly ones
+    if(p.sparkle && p.life > 0.4){
+      const len = s * 4 * p.life;
+      ctx.strokeStyle = `hsla(${p.hue},60%,80%,${alpha*0.3})`;
+      ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.moveTo(p.x-len, p.y); ctx.lineTo(p.x+len, p.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(p.x, p.y-len); ctx.lineTo(p.x, p.y+len); ctx.stroke();
+    }
+  }
 }
 
 // ── State ────────────────────────────────────────────────────────────────
@@ -713,6 +785,9 @@ function frame(now){
     }
   }
 
+  // Update impact particles
+  updateParticles(dt * timeScale);
+
   // Clamp ragdoll to screen width
   for(const r of ragdolls){
     for(const p of r.particles){
@@ -731,6 +806,7 @@ function frame(now){
   drawBackground();
   for(const s of spheres) drawSphere(s);
   for(const r of ragdolls) drawRagdoll(r);
+  drawParticles();
 
   ctx.restore();
 
