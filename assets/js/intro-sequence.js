@@ -30,7 +30,7 @@
     canvas.width = W * dpr; canvas.height = H * dpr;
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    emy.targetY = H * 0.44;
+    emy.targetY = H * 0.35;
   }
 
   // ── Sacred Geometry Drawing ──────────────────────────────────────────
@@ -203,13 +203,13 @@
     promptArea.classList.remove('visible');
     setTimeout(() => {
       intro.style.opacity = '0';
-      intro.style.transition = 'opacity 1.8s ease';
+      intro.style.transition = 'opacity 2s ease';
       setTimeout(() => {
         intro.style.display = 'none'; intro.remove();
         phase = 'done'; cancelAnimationFrame(raf);
         window.dispatchEvent(new CustomEvent('intro-complete'));
-      }, 1800);
-    }, 600);
+      }, 2000);
+    }, 400);
   }
 
   // ── Events ───────────────────────────────────────────────────────────
@@ -234,9 +234,9 @@
     const px = (mouseX - 0.5), py = (mouseY - 0.5);
     const minDim = Math.min(W, H);
 
-    // ── Dark background ─────────────────────────────────────────────
+    // ── Dark background (semi-transparent so game bleeds through) ────
     ctx.globalAlpha = 1;
-    ctx.fillStyle = '#08060f';
+    ctx.fillStyle = 'rgba(8,6,15,0.88)';
     ctx.fillRect(0, 0, W, H);
 
     // Soft center glow

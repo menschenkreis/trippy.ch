@@ -1917,9 +1917,14 @@ function frame(now){
   const rawDt = Math.min((now - lastTime)/1000, 0.033);
   lastTime = now;
 
+  // Freeze physics during intro
+  const introEl = document.getElementById('intro-sequence');
+  const introActive = !!introEl;
+  const effectiveTimeScale = introActive ? 0 : targetTimeScale;
+
   // Smoothly interpolate time scale (much faster transition but still eased)
-  const ease = (targetTimeScale < timeScale) ? 0.45 : 0.15;
-  timeScale += (targetTimeScale - timeScale) * ease;
+  const ease = (effectiveTimeScale < timeScale) ? 0.45 : 0.15;
+  timeScale += (effectiveTimeScale - timeScale) * ease;
 
   time += rawDt;
   const dt = (rawDt * timeScale) / SUBSTEPS;
@@ -2501,16 +2506,13 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 
-// ── Gate: wait for intro sequence if present ─────────────────────────
+// ── Gate: hide UI during intro, game canvas visible underneath ─────
 const introEl = document.getElementById('intro-sequence');
 if(introEl){
-  canvas.style.opacity='0';
-  const ui=[document.querySelector('.top-controls'),document.querySelector('.bottom-left'),document.querySelector('.back-link')];
-  ui.forEach(e=>{if(e)e.style.opacity='0'});
+  const ui=[document.querySelector('.top-controls'),document.querySelector('.bottom-left'),document.querySelector('.back-link'),document.getElementById('sound-hint')];
+  ui.forEach(e=>{if(e)e.style.opacity='0'; e.style.transition='opacity 1.5s ease';});
   window.addEventListener('intro-complete',()=>{
-    canvas.style.transition='opacity 1.5s ease';
-    canvas.style.opacity='1';
-    ui.forEach(e=>{if(e){e.style.transition='opacity 1.5s ease';e.style.opacity='1'}});
+    ui.forEach(e=>{if(e)e.style.opacity='1'});
   });
 }
 
