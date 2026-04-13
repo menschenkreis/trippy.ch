@@ -18,14 +18,30 @@ window.addEventListener('resize', resize); resize();
 
 // ── Theme ────────────────────────────────────────────────────────────────
 const themes = [
-  { accent:[160,120,255], accent2:[255,140,200], bg:'#101018', name:'violet' },
-  { accent:[120,240,255], accent2:[255,200,140], bg:'#0d1418', name:'aqua' },
-  { accent:[255,160,80],  accent2:[255,100,140], bg:'#18100d', name:'ember' },
-  { accent:[100,255,180], accent2:[200,120,255], bg:'#0d1810', name:'jade' },
+  { accent:[180,100,255], accent2:[255,80,200], bg:'#08060f', name:'violet' },
+  { accent:[0,220,255],   accent2:[255,180,60],  bg:'#060d12', name:'aqua' },
+  { accent:[255,120,40],  accent2:[255,50,120],  bg:'#120806', name:'ember' },
+  { accent:[40,255,140],  accent2:[180,80,255],  bg:'#061208', name:'jade' },
+  { accent:[255,60,80],   accent2:[255,220,50],  bg:'#0f0608', name:'crimson' },
+  { accent:[255,200,255], accent2:[100,180,255], bg:'#0a0810', name:'frost' },
 ];
 let themeIdx = 0;
 let theme = themes[0];
-function setTheme(i){ themeIdx = i % themes.length; theme = themes[themeIdx]; }
+function setTheme(i){
+  themeIdx = i % themes.length;
+  theme = themes[themeIdx];
+  // Shift all ragdoll colors toward new theme
+  const newHue = themeIdx * (360 / themes.length);
+  for(const r of ragdolls){
+    r.hue = (newHue + Math.random() * 40 - 20) % 360;
+    r.accent = hslToRgbArr(r.hue, 0.95, 0.7);
+    r.accent2 = hslToRgbArr((r.hue + 40) % 360, 1.0, 0.8);
+  }
+  // Shift sphere hues toward new theme
+  for(const s of spheres){
+    s.hue = (newHue + Math.random() * 80 - 40) % 360;
+  }
+}
 
 // ── Physics constants ────────────────────────────────────────────────────
 const GRAVITY = 500;
