@@ -58,6 +58,7 @@ let dragParticle = null;
 
 // ── Collision Harmonics ──
 let harmonyIndex = 0;
+let harmonicCooldown = 0; // dynamic cooldown — increases when stuck
 const pentatonicScale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21]; // C D E G A c d e g a
 
 // ── Power-Up Effects ──
@@ -684,7 +685,14 @@ function collideRagdollSphere(ragdoll, sphere, dt){
 
     // ── Collision Harmonics ──
     harmonyIndex = (harmonyIndex + 1) % pentatonicScale.length;
-    if(comboCount > 1 && audioCtx && !isMuted && now - lastImpactTime > 0.08){
+    const timeSinceLast = now - lastHitTime;
+    // Adaptive cooldown: rapid hits increase the gap, slow hits reset it
+    if(timeSinceLast < 0.12){
+      harmonicCooldown = Math.min(harmonicCooldown + 0.04, 0.6);
+    } else {
+      harmonicCooldown = Math.max(harmonicCooldown - 0.02, 0);
+    }
+    if(comboCount > 1 && audioCtx && !isMuted && timeSinceLast > harmonicCooldown + 0.08){
       const hNow = audioCtx.currentTime;
       const hFreq = 220 * Math.pow(2, pentatonicScale[Math.min(comboCount-1, pentatonicScale.length-1)]/12);
       const hOsc = audioCtx.createOscillator();
@@ -692,16 +700,20 @@ function collideRagdollSphere(ragdoll, sphere, dt){
       const hFilter = audioCtx.createBiquadFilter();
       hOsc.type = 'triangle';
       hOsc.frequency.setValueAtTime(hFreq, hNow);
+      // Filter gets warmer (lower cutoff) the more stuck you are
+      const warmth = 1 + harmonicCooldown * 3; // 1.0 → 2.8
       hFilter.type = 'lowpass';
-      hFilter.frequency.setValueAtTime(hFreq * 3, hNow);
-      hFilter.frequency.exponentialRampToValueAtTime(hFreq * 1.5, hNow + 0.3);
-      hFilter.Q.value = 1;
+      hFilter.frequency.setValueAtTime(hFreq * 2 / warmth, hNow);
+      hFilter.frequency.exponentialRampToValueAtTime(hFreq / warmth, hNow + 0.3);
+      hFilter.Q.value = 0.7;
+      // Volume fades down when stuck
+      const stuckVol = 0.06 * Math.max(0.15, 1 - harmonicCooldown * 1.5);
       hGain.gain.setValueAtTime(0, hNow);
-      hGain.gain.linearRampToValueAtTime(0.06, hNow + 0.06);
-      hGain.gain.exponentialRampToValueAtTime(0.001, hNow + 0.8);
+      hGain.gain.linearRampToValueAtTime(stuckVol, hNow + 0.08);
+      hGain.gain.exponentialRampToValueAtTime(0.001, hNow + 1.0);
       hOsc.connect(hFilter); hFilter.connect(hGain); hGain.connect(masterGain);
       if(delayNode) hGain.connect(delayNode);
-      hOsc.start(hNow); hOsc.stop(hNow + 0.9);
+      hOsc.start(hNow); hOsc.stop(hNow + 1.1);
     }
 
     // ── Power-Up Activation ──
@@ -1068,7 +1080,7 @@ document.getElementById('reset-btn').onclick = () => {
   portal = null;
   score = 0; displayScore = 0; comboCount = 0; lastHitTime = 0;
   scorePopups = []; scoreFlies = [];
-  harmonyIndex = 0;
+  harmonyIndex = 0; harmonicCooldown = 0;
   activeEffects = { wave: 0, trail: 0, pulse: 0 };
   waveRings = [];
   lastMilestone = 0; milestoneText = null; milestoneSlowMo = 0;
