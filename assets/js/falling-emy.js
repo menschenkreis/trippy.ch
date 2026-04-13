@@ -89,7 +89,7 @@ function updateJourneyPanel(){
       // seed of life (sacred geometry)
       svg = `<svg width="${size}" height="${size}" viewBox="0 0 18 18"><circle cx="${cx}" cy="${cx}" r="3" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.5"/><circle cx="${cx}" cy="${cx-3}" r="3" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.4"/><circle cx="${cx+2.6}" cy="${cx-1.5}" r="3" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.4"/><circle cx="${cx+2.6}" cy="${cx+1.5}" r="3" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.4"/><circle cx="${cx}" cy="${cx+3}" r="3" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.4"/><circle cx="${cx-2.6}" cy="${cx+1.5}" r="3" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.4"/><circle cx="${cx-2.6}" cy="${cx-1.5}" r="3" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.4"/></svg>`;
     }
-    html += `<div class="journey-entry"><div class="journey-icon">${svg}</div><div class="journey-entry-text"><strong>${e.label}</strong> — ${e.text}</div></div>`;
+    html += `<div class="journey-entry"><div class="journey-icon">${svg}</div><div class="journey-entry-text"><strong>${e.label}</strong> - ${e.text}</div></div>`;
   }
   el.innerHTML = html;
 }
@@ -531,9 +531,9 @@ function playImpactSound(force, hue, xPos, type, sacredType){
   if(now - lastImpactTime < 0.04) return; // throttle overlapping sounds
   lastImpactTime = now;
 
-  // Pentatonic scale mapped to hue - crystalline/glass tuning
-  const baseFreq = 220; // A3 base
-  const pentatonic = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31, 33, 36];
+  // Pentatonic scale mapped to hue - warm, grounded tuning
+  const baseFreq = 165; // E3 base - warmer, less shrill than A3
+  const pentatonic = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
   const noteIdx = Math.floor((hue / 360) * pentatonic.length) % pentatonic.length;
   const freq = baseFreq * Math.pow(2, pentatonic[noteIdx]/12);
 
@@ -545,7 +545,7 @@ function playImpactSound(force, hue, xPos, type, sacredType){
   if(panner.pan) panner.pan.value = Math.max(-1, Math.min(1, (xPos / W) * 2 - 1));
 
   if (type === 'heart') {
-    // Warm, resonant major chord (root + fifth) with softer attack
+    // Warm, resonant major chord (root + fifth) with soft attack
     const osc1 = audioCtx.createOscillator();
     const osc2 = audioCtx.createOscillator();
     const gain1 = audioCtx.createGain();
@@ -553,11 +553,11 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     osc1.type = 'sine';
     osc2.type = 'sine';
     osc1.frequency.setValueAtTime(freq, now);
-    osc2.frequency.setValueAtTime(freq * 1.5, now); // perfect fifth
+    osc2.frequency.setValueAtTime(freq * 1.498, now); // near-perfect fifth (warm)
 
     gain1.gain.setValueAtTime(0, now);
-    gain1.gain.linearRampToValueAtTime(vol * 1.2, now + 0.05); // softer attack
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + duration * 1.5); // longer tail
+    gain1.gain.linearRampToValueAtTime(vol * 1.0, now + 0.08); // softer, slower attack
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + duration * 1.8); // longer tail
 
     osc1.connect(gain1);
     osc2.connect(gain1);
@@ -569,25 +569,25 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     osc2.start(now); osc2.stop(now + duration * 1.5 + 0.1);
 
   } else if (type === 'challenge') {
-    // Heavy, resonant crystalline "gong" - impactful yet harmonic
+    // Deep resonant gong - impactful but warm
     const osc1 = audioCtx.createOscillator();
     const osc2 = audioCtx.createOscillator();
     const sub = audioCtx.createOscillator();
     const gain1 = audioCtx.createGain();
 
     osc1.type = 'sine';
-    osc2.type = 'triangle';
+    osc2.type = 'sine'; // was triangle - sine is warmer
     sub.type = 'sine';
 
-    // Use harmonic base (note from current scale) but drop it 2 octaves
+    // Drop 2 octaves for deep body
     const baseNote = freq * 0.25;
     osc1.frequency.setValueAtTime(baseNote, now);
-    osc2.frequency.setValueAtTime(baseNote * 1.5, now); // perfect fifth
+    osc2.frequency.setValueAtTime(baseNote * 1.498, now); // warm fifth
     sub.frequency.setValueAtTime(baseNote * 0.5, now); // sub bass
 
     gain1.gain.setValueAtTime(0, now);
-    gain1.gain.linearRampToValueAtTime(vol * 1.5, now + 0.02); // quick but not instant attack
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + duration * 2.0); // long resonance
+    gain1.gain.linearRampToValueAtTime(vol * 1.3, now + 0.03); // slightly softer attack
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + duration * 2.2); // long resonance
 
     osc1.connect(gain1);
     osc2.connect(gain1);
@@ -612,8 +612,8 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     osc2.frequency.setValueAtTime(freq * 1.5, now);
 
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(vol * 0.7, now + 0.1);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + duration * 1.5);
+    gain.gain.linearRampToValueAtTime(vol * 0.6, now + 0.12);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration * 1.8);
 
     osc1.connect(gain);
     osc2.connect(gain);
@@ -645,9 +645,9 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     const osc1 = audioCtx.createOscillator();
     const osc2 = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    osc1.type = 'sine'; osc2.type = 'triangle';
-    osc1.frequency.setValueAtTime(freq * 3, now);
-    osc2.frequency.setValueAtTime(freq * 4.01, now);
+    osc1.type = 'sine'; osc2.type = 'sine';
+    osc1.frequency.setValueAtTime(freq * 2, now);
+    osc2.frequency.setValueAtTime(freq * 2.01, now); // gentle chorus, not octave doubling
     gain.gain.setValueAtTime(0, now);
     gain.gain.linearRampToValueAtTime(vol * 0.3, now + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.8);
@@ -664,7 +664,7 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     osc.frequency.setValueAtTime(freq * 0.5, now);
     osc.frequency.exponentialRampToValueAtTime(freq * 0.125, now + 0.15);
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(vol * 0.9, now + 0.005);
+    gain.gain.linearRampToValueAtTime(vol * 0.7, now + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
     osc.connect(gain); gain.connect(panner);
     panner.connect(masterGain);
@@ -675,11 +675,11 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     const osc1 = audioCtx.createOscillator();
     const osc2 = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    osc1.type = 'sawtooth'; osc2.type = 'square';
+    osc1.type = 'sine'; osc2.type = 'sine'; // was sawtooth+square — too harsh
     osc1.frequency.setValueAtTime(freq * 0.3, now);
-    osc2.frequency.setValueAtTime(freq * 0.3 + 2, now);
+    osc2.frequency.setValueAtTime(freq * 0.3 + 1.5, now); // tighter beat
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(vol * 0.4, now + 0.05);
+    gain.gain.linearRampToValueAtTime(vol * 0.35, now + 0.08);
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration * 1.2);
     osc1.connect(gain); osc2.connect(gain); gain.connect(panner);
     panner.connect(masterGain);
@@ -711,23 +711,23 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     osc2.start(now); osc2.stop(now + duration * 2.0 + 0.1);
 
   } else if (type === 'vesica') {
-    // Deep Choir Pad (Filtered sawtooth + sub oscillator)
+    // Warm Choir Pad (filtered sine pair)
     const osc1 = audioCtx.createOscillator();
     const osc2 = audioCtx.createOscillator();
     const gain1 = audioCtx.createGain();
     const filter = audioCtx.createBiquadFilter();
 
-    osc1.type = 'sawtooth';
+    osc1.type = 'sine'; // was sawtooth
     osc2.type = 'sine';
     osc1.frequency.setValueAtTime(freq * 0.5, now);
     osc2.frequency.setValueAtTime(freq * 0.25, now);
 
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(freq * 4, now);
-    filter.frequency.exponentialRampToValueAtTime(freq * 0.5, now + duration * 2);
+    filter.frequency.setValueAtTime(freq * 2, now); // lower cutoff
+    filter.frequency.exponentialRampToValueAtTime(freq * 0.4, now + duration * 2);
 
     gain1.gain.setValueAtTime(0, now);
-    gain1.gain.linearRampToValueAtTime(vol * 0.5, now + 0.1); // slow attack
+    gain1.gain.linearRampToValueAtTime(vol * 0.45, now + 0.12); // slower attack
     gain1.gain.exponentialRampToValueAtTime(0.001, now + duration * 2); // long fade
 
     osc1.connect(filter);
@@ -741,84 +741,83 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     osc2.start(now); osc2.stop(now + duration * 2 + 0.1);
 
   } else {
-    // Default sacred geometry — with random harmonic variation
+    // Default sacred geometry - with random harmonic variation
     const osc1 = audioCtx.createOscillator();
     const gain1 = audioCtx.createGain();
     const osc2 = audioCtx.createOscillator();
     const gain2 = audioCtx.createGain();
-    
+
     gain1.gain.setValueAtTime(0, now);
     gain2.gain.setValueAtTime(0, now);
 
-    // Random harmonic interval for variety: unison, min3, maj3, p4, p5, octave
-    const intervals = [1, 1.2, 1.25, 1.335, 1.5, 2];
+    // Random harmonic interval for variety: min3, maj3, p4, p5 (no octave)
+    const intervals = [1.2, 1.25, 1.335, 1.5];
     const interval = intervals[Math.floor(Math.random() * intervals.length)];
-    // Random wave character
-    const waves = ['sine', 'sine', 'sine', 'triangle']; // sine weighted 3:1
-    const wave = waves[Math.floor(Math.random() * waves.length)];
+    // All sine for warmth
+    const wave = 'sine';
 
     if (sacredType === 0) {
-      // Polygon: crystalline pluck with random harmony
+      // Polygon: warm crystalline pluck with random harmony
       osc1.type = 'sine';
       osc1.frequency.setValueAtTime(freq, now);
-      gain1.gain.linearRampToValueAtTime(vol * 0.8, now + 0.005);
+      gain1.gain.linearRampToValueAtTime(vol * 0.75, now + 0.012); // softer attack
       gain1.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
       osc2.type = wave;
       osc2.frequency.setValueAtTime(freq * interval, now);
-      gain2.gain.linearRampToValueAtTime(vol * 0.5, now + 0.002);
+      gain2.gain.linearRampToValueAtTime(vol * 0.45, now + 0.008);
       gain2.gain.exponentialRampToValueAtTime(0.001, now + duration * (interval > 1.5 ? 0.25 : 0.5));
-      
+
       osc1.connect(gain1);
       osc2.connect(gain2);
       gain1.connect(panner);
       gain2.connect(panner);
-      
+
     } else if (sacredType === 1) {
       // Seed of Life: warm chorus bell with random detune
       const detune = 1 + (Math.random() - 0.5) * 0.02;
       osc1.type = 'sine';
       osc1.frequency.setValueAtTime(freq, now);
-      gain1.gain.linearRampToValueAtTime(vol * 0.9, now + 0.01);
+      gain1.gain.linearRampToValueAtTime(vol * 0.85, now + 0.015);
       gain1.gain.exponentialRampToValueAtTime(0.001, now + duration * 1.2);
 
       osc2.type = 'sine';
       osc2.frequency.setValueAtTime(freq * interval * detune, now);
       gain2.gain.linearRampToValueAtTime(vol * 0.6, now + 0.015);
       gain2.gain.exponentialRampToValueAtTime(0.001, now + duration * 1.2);
-      
+
       osc1.connect(gain1);
       osc2.connect(gain2);
       gain1.connect(panner);
       gain2.connect(panner);
 
     } else if (sacredType === 2) {
-      // Metatron's Cube: metallic chime with random overtone
+      // Metatron's Cube: warm metallic chime
       osc1.type = 'sine';
       osc1.frequency.setValueAtTime(freq, now);
-      gain1.gain.linearRampToValueAtTime(vol * 0.7, now + 0.005);
+      gain1.gain.linearRampToValueAtTime(vol * 0.65, now + 0.012);
       gain1.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
-      osc2.type = interval >= 1.5 ? 'triangle' : 'square';
+      osc2.type = 'sine'; // was square — too harsh
       osc2.frequency.setValueAtTime(freq * interval, now);
-      gain2.gain.linearRampToValueAtTime(vol * 0.2, now + 0.002);
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.4);
+      gain2.gain.linearRampToValueAtTime(vol * 0.25, now + 0.008);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.5);
       
       const bq = audioCtx.createBiquadFilter();
       bq.type = 'lowpass';
-      bq.frequency.setValueAtTime(freq * 4, now);
-      bq.frequency.exponentialRampToValueAtTime(freq, now + duration * 0.4);
+      bq.frequency.setValueAtTime(freq * 3, now);
+      bq.frequency.exponentialRampToValueAtTime(freq * 0.8, now + duration * 0.5);
       osc2.connect(bq);
       bq.connect(gain2);
-      
+
       osc1.connect(gain1);
       gain1.connect(panner);
       gain2.connect(panner);
     }
-    
+
     panner.connect(masterGain);
     if(delayNode) panner.connect(delayNode);
-    
+
     osc1.start(now); osc1.stop(now + duration * 1.2 + 0.1);
     osc2.start(now); osc2.stop(now + duration * 1.2 + 0.1);
 
