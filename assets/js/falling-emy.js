@@ -979,13 +979,9 @@ let nextChallengeY = 10000;
 ragdolls.push(new Ragdoll(W/2, 0, 'emy'));
 for(let i=0;i<8;i++) spawnSphereAtDepth(i * 120 + Math.random()*80);
 
-function spawnSphereAtDepth(yWorld, forceType=null){
-  // Shape frequency ramps from 0 at 50m to full at 100m
-  const depthM = Math.max(0, yWorld / 100);
-  if(depthM < 50) return; // no shapes before 50m
-  const spawnChance = Math.min((depthM - 50) / 50, 1.0); // 0→1 between 50-100m
-  if(!forceType && Math.random() > spawnChance) return; // thin out shapes in ramp zone
+let nextShapeY = 5000; // first shape allowed at 50m
 
+function spawnSphereAtDepth(yWorld, forceType=null){
   let type = 'sphere';
   if (forceType) {
     type = forceType;
@@ -1116,6 +1112,8 @@ document.getElementById('reset-btn').onclick = () => {
   journeyLog = []; updateJourneyPanel();
   firedChapters = new Set();
   chapterDisplay = null; chapterSlowMo = 0;
+  nextShapeY = 5000;
+  nextChallengeY = 10000;
   ragdolls = [new Ragdoll(W/2, 0, 'emy')];
   spheres = [];
   for(let i=0;i<8;i++) spawnSphereAtDepth(i*120+Math.random()*80);
@@ -1882,9 +1880,15 @@ function updateCamera(){
     nextChallengeY += 10000;
   }
   
-  while(spheres.length < 12){
-    spawnSphereAtDepth(aheadY + Math.random()*300);
-    if(spheres.length < 1) break; // safety: avoid infinite loop at shallow depth
+  // ── Shape Density ──
+  // No shapes before 50m (5000px). Density ramps from 1 shape per 800px at 50m
+  // down to 1 shape per 120px at 100m and beyond.
+  const depthM = Math.max(0, cameraY / 100);
+  if(depthM >= 50 && aheadY > nextShapeY){
+    const ramp = Math.min((depthM - 50) / 50, 1.0);
+    const interval = 800 - ramp * 680; // 800px → 120px
+    nextShapeY = aheadY + interval * (0.7 + Math.random() * 0.6);
+    spawnSphereAtDepth(nextShapeY);
   }
 }
 
@@ -1893,9 +1897,13 @@ function recycleObjects(){
   spheres = spheres.filter(s => s.y > behindY);
   // Keep spawning
   const aheadY = cameraY + H + 100;
-  while(spheres.length < 10){
-    spawnSphereAtDepth(aheadY + Math.random()*400);
-    if(spheres.length < 1) break; // safety: avoid infinite loop at shallow depth
+  // Keep spawning — density increases with depth
+  const depthM = Math.max(0, cameraY / 100);
+  if(depthM >= 50 && aheadY > nextShapeY){
+    const ramp = Math.min((depthM - 50) / 50, 1.0);
+    const interval = 800 - ramp * 680;
+    nextShapeY = aheadY + interval * (0.7 + Math.random() * 0.6);
+    spawnSphereAtDepth(nextShapeY);
   }
 }
 
