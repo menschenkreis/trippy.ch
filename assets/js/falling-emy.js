@@ -2258,6 +2258,7 @@ function frame(now){
     }
   }
   drawScoreElements(); // popups in world space
+  drawParticles(); // collision effects in world space
 
   ctx.restore();
 
