@@ -499,8 +499,7 @@ function drawBackground(){
   drawKaleidoscope(W*0.15, H*0.6 - px3, 140, 5, time*0.05, 90, 0.045, px3);
   drawKaleidoscope(W*0.85, H*0.35 - px3*0.6, 170, 8, -time*0.045, 210, 0.04, px3*0.6);
 
-  // ── Endless twinkling stars — slow parallax (0.15×) ──────────────────
-  drawStarfield(0.15);
+  // Stars drawn outside camera transform — see frame()
 
   // Subtle grid — world space
   const a = theme.accent;
@@ -734,6 +733,9 @@ function frame(now){
   for(const r of ragdolls) drawRagdoll(r);
 
   ctx.restore();
+
+  // Stars in screen space with parallax
+  drawStarfield(0.15);
 
   // Draw UI elements in screen space (no camera transform)
   if(isDragging && dragParticle){
