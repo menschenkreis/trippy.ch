@@ -264,7 +264,7 @@ function initAudio(){
   if(!Ctx) return;
   audioCtx = new Ctx();
   masterGain = audioCtx.createGain();
-  masterGain.gain.value = 0.4;
+  masterGain.gain.value = 0.8;
   
   // Reverb/Delay for spatial void echo
   const delay = audioCtx.createDelay();
@@ -299,7 +299,7 @@ function playImpactSound(force, hue, xPos, type, sacredType){
   const noteIdx = Math.floor((hue / 360) * pentatonic.length) % pentatonic.length;
   const freq = baseFreq * Math.pow(2, pentatonic[noteIdx]/12);
   
-  const vol = Math.min(force * 0.015, 0.5);
+  const vol = Math.min(force * 0.025, 0.9);
   const duration = 0.3 + Math.min(force * 0.01, 1.5);
   
   // Stereo panning based on horizontal collision position
