@@ -58,7 +58,7 @@ function initAccel() {
       else if (angle === -90) tilt = -e.beta;
       
       let tiltX = Math.max(-45, Math.min(45, tilt)) / 45; // -1 to 1
-      gravityX = -tiltX * GRAVITY * 0.8; // Inverted to match expected feel
+      gravityX = tiltX * GRAVITY * 0.8; // Standard physical tilt (marble on a table)
     }, {passive: true});
     accelInited = true;
   };
