@@ -778,10 +778,10 @@ function collideParticleSphere(p, s, dt, impactData){
     const nx = dx/d, ny = dy/d;
     const overlap = minD - d;
     if(!p.pinned){
-      p.x += nx * overlap * 0.3;
-      p.y += ny * overlap * 0.3;
+      p.x += nx * overlap * 0.45;
+      p.y += ny * overlap * 0.45;
     }
-    const pushForce = overlap * 0.35;
+    const pushForce = overlap * 0.4;
     s.x -= nx * pushForce;
     s.y -= ny * pushForce;
     
@@ -791,8 +791,13 @@ function collideParticleSphere(p, s, dt, impactData){
     if(impactVel > impactData.maxForce) impactData.maxForce = impactVel;
     
     if(dot < 0){
-      p.ox = p.x - (vx - 2*dot*nx)*0.5;
-      p.oy = p.y - (vy - 2*dot*ny)*0.5;
+      // Reduced friction (0.95 vs 0.5) and increased bounce (0.65 vs 0.5)
+      const friction = 0.05; 
+      const bounce = 0.65;
+      const vnx = nx * dot, vny = ny * dot;
+      const vtx = vx - vnx, vty = vy - vny;
+      p.ox = p.x - (vtx * (1 - friction) - vnx * bounce);
+      p.oy = p.y - (vty * (1 - friction) - vny * bounce);
     }
   }
 }
