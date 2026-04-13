@@ -1766,6 +1766,16 @@ function drawSphere(s){
   ctx.restore();
 }
 
+function roundRect(c, x, y, w, h, r){
+  r = Math.min(r, h/2, w/2);
+  c.beginPath(); c.moveTo(x+r, y);
+  c.lineTo(x+w-r, y); c.quadraticCurveTo(x+w, y, x+w, y+r);
+  c.lineTo(x+w, y+h-r); c.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  c.lineTo(x+r, y+h); c.quadraticCurveTo(x, y+h, x, y+h-r);
+  c.lineTo(x, y+r); c.quadraticCurveTo(x, y, x+r, y);
+  c.closePath();
+}
+
 function drawRagdoll(ragdoll){
   const ps = ragdoll.particles;
   const a = ragdoll.accent;
