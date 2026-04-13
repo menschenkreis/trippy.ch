@@ -104,9 +104,16 @@ class Constraint {
 
 // ── Sphere ───────────────────────────────────────────────────────────────
 class Sphere {
-  constructor(x, y, r){
+  constructor(x, y, r, type='sphere'){
+    this.type = type;
     this.x = x; this.y = y;
-    this.r = r || (15 + Math.random()*35);
+    if(type === 'challenge'){
+      this.r = 35 + Math.random()*25;
+    } else if(type === 'heart'){
+      this.r = 25 + Math.random()*15;
+    } else {
+      this.r = r || (15 + Math.random()*35);
+    }
     this.vx = 0;
     this.vy = 0;
     this.rotation = Math.random()*TAU;
@@ -425,16 +432,22 @@ let spheres = [];
 let time = 0;
 let cameraY = 0; // camera offset — follows the ragdoll's descent
 let fallSpeed = 0; // how deep the ragdoll has fallen
+let nextChallengeY = 10000;
 
 // Spawn initial
 ragdolls.push(new Ragdoll(W/2, 0, 'emy'));
 for(let i=0;i<8;i++) spawnSphereAtDepth(i * 120 + Math.random()*80);
 
-function spawnSphereAtDepth(yWorld){
+function spawnSphereAtDepth(yWorld, forceType=null){
+  let type = 'sphere';
+  if (forceType) type = forceType;
+  else if (Math.random() < 0.05) type = 'heart';
+
   spheres.push(new Sphere(
     Math.random()*W,
     yWorld,
-    15 + Math.random()*40
+    null,
+    type
   ));
 }
 
@@ -762,63 +775,144 @@ function drawSphere(s){
   const pulse = 1 + 0.03*Math.sin(time*2 + s.hue);
   const r = s.r * pulse;
 
-  // Glow
-  const a2 = theme.accent2;
-  const grad = ctx.createRadialGradient(s.x,s.y,0, s.x,s.y,r*1.5);
-  grad.addColorStop(0, `rgba(${a2[0]},${a2[1]},${a2[2]},0.06)`);
-  grad.addColorStop(1, `rgba(${a2[0]},${a2[1]},${a2[2]},0)`);
-  ctx.fillStyle = grad;
-  ctx.beginPath(); ctx.arc(s.x,s.y,r*1.5,0,TAU); ctx.fill();
-
-  // Sacred geometry polygon fill
-  const hue = (s.hue + time*15) % 360;
   ctx.save();
   ctx.translate(s.x, s.y);
-  ctx.rotate(s.rotation);
 
-  // Outer polygon
-  ctx.strokeStyle = `hsla(${hue},60%,55%,0.25)`;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  for(let i=0;i<=s.segments;i++){
-    const angle = i*TAU/s.segments;
-    const px = Math.cos(angle)*r, py = Math.sin(angle)*r;
-    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
-  }
-  ctx.stroke();
+  if(s.type === 'heart'){
+    // Red/pink glowing heart
+    const hue = (330 + time*10 + s.hue) % 360; 
+    
+    // Glow
+    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+    grad.addColorStop(0, `hsla(${hue},80%,60%,0.2)`);
+    grad.addColorStop(1, `hsla(${hue},80%,60%,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
 
-  // Inner sacred geometry
-  ctx.strokeStyle = `hsla(${hue},50%,50%,0.12)`;
-  ctx.lineWidth = 0.5;
-  // Inner polygon (rotated)
-  ctx.beginPath();
-  for(let i=0;i<=s.segments;i++){
-    const angle = i*TAU/s.segments + PI/s.segments;
-    const px = Math.cos(angle)*r*0.5, py = Math.sin(angle)*r*0.5;
-    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
-  }
-  ctx.stroke();
-
-  // Connecting lines (star pattern)
-  if(s.segments >= 5){
-    ctx.strokeStyle = `hsla(${hue},40%,45%,0.08)`;
+    ctx.rotate(Math.sin(time + s.hue)*0.1);
+    ctx.strokeStyle = `hsla(${hue},80%,65%,0.9)`;
+    ctx.fillStyle = `hsla(${hue},70%,50%,0.25)`;
+    ctx.lineWidth = 1.5;
+    
     ctx.beginPath();
-    for(let i=0;i<s.segments;i++){
-      const a1 = i*TAU/s.segments;
-      const a2 = ((i+Math.floor(s.segments/2))%s.segments)*TAU/s.segments;
-      ctx.moveTo(Math.cos(a1)*r, Math.sin(a1)*r);
-      ctx.lineTo(Math.cos(a2)*r, Math.sin(a2)*r);
+    const scale = r / 16; 
+    for(let i=0; i<=TAU; i+=0.1){
+      const hx = 16*Math.pow(Math.sin(i), 3);
+      const hy = -(13*Math.cos(i) - 5*Math.cos(2*i) - 2*Math.cos(3*i) - Math.cos(4*i));
+      if(i===0) ctx.moveTo(hx*scale, hy*scale);
+      else ctx.lineTo(hx*scale, hy*scale);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    
+    // Inner pulse
+    ctx.strokeStyle = `hsla(${hue},80%,75%,0.5)`;
+    ctx.beginPath();
+    const s2 = scale * (0.6 + 0.1*Math.sin(time*5));
+    for(let i=0; i<=TAU; i+=0.1){
+      const hx = 16*Math.pow(Math.sin(i), 3);
+      const hy = -(13*Math.cos(i) - 5*Math.cos(2*i) - 2*Math.cos(3*i) - Math.cos(4*i));
+      if(i===0) ctx.moveTo(hx*s2, hy*s2);
+      else ctx.lineTo(hx*s2, hy*s2);
+    }
+    ctx.closePath();
+    ctx.stroke();
+
+  } else if(s.type === 'challenge'){
+    // Spiky abstract challenge shape
+    const hue = (s.hue + time*40) % 360;
+    ctx.rotate(s.rotation * 2);
+    
+    // Danger glow
+    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.5);
+    grad.addColorStop(0, `hsla(${hue},80%,40%,0.2)`);
+    grad.addColorStop(1, `hsla(${hue},80%,40%,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0,0,r*1.5,0,TAU); ctx.fill();
+
+    ctx.strokeStyle = `hsla(${hue},80%,60%,0.9)`;
+    ctx.fillStyle = `rgba(10,10,15,0.85)`;
+    ctx.lineWidth = 1.5;
+    
+    // Sharp, irregular star
+    ctx.beginPath();
+    const spikes = 9;
+    for(let i=0; i<=spikes*2; i++){
+      const angle = i * TAU / (spikes*2);
+      const dist = (i%2 === 0) ? r : r * (0.3 + 0.2*Math.sin(time*10 + i));
+      if(i===0) ctx.moveTo(Math.cos(angle)*dist, Math.sin(angle)*dist);
+      else ctx.lineTo(Math.cos(angle)*dist, Math.sin(angle)*dist);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    
+    // Inner frantic pattern
+    ctx.strokeStyle = `hsla(${(hue+180)%360},80%,60%,0.5)`;
+    ctx.beginPath();
+    for(let i=0; i<spikes; i++){
+      const angle = i * TAU / spikes + time;
+      ctx.moveTo(0,0);
+      ctx.lineTo(Math.cos(angle)*r*0.6, Math.sin(angle)*r*0.6);
     }
     ctx.stroke();
+
+  } else {
+    // Normal sacred geometry sphere
+    const a2 = theme.accent2;
+    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.5);
+    grad.addColorStop(0, `rgba(${a2[0]},${a2[1]},${a2[2]},0.06)`);
+    grad.addColorStop(1, `rgba(${a2[0]},${a2[1]},${a2[2]},0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0,0,r*1.5,0,TAU); ctx.fill();
+
+    const hue = (s.hue + time*15) % 360;
+    ctx.rotate(s.rotation);
+
+    // Outer polygon
+    ctx.strokeStyle = `hsla(${hue},60%,55%,0.25)`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for(let i=0;i<=s.segments;i++){
+      const angle = i*TAU/s.segments;
+      const px = Math.cos(angle)*r, py = Math.sin(angle)*r;
+      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+
+    // Inner sacred geometry
+    ctx.strokeStyle = `hsla(${hue},50%,50%,0.12)`;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    for(let i=0;i<=s.segments;i++){
+      const angle = i*TAU/s.segments + PI/s.segments;
+      const px = Math.cos(angle)*r*0.5, py = Math.sin(angle)*r*0.5;
+      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+
+    // Connecting lines
+    if(s.segments >= 5){
+      ctx.strokeStyle = `hsla(${hue},40%,45%,0.08)`;
+      ctx.beginPath();
+      for(let i=0;i<s.segments;i++){
+        const a1 = i*TAU/s.segments;
+        const a2 = ((i+Math.floor(s.segments/2))%s.segments)*TAU/s.segments;
+        ctx.moveTo(Math.cos(a1)*r, Math.sin(a1)*r);
+        ctx.lineTo(Math.cos(a2)*r, Math.sin(a2)*r);
+      }
+      ctx.stroke();
+    }
+
+    // Inner circle
+    ctx.strokeStyle = `hsla(${hue},45%,50%,0.15)`;
+    ctx.beginPath(); ctx.arc(0,0,r*0.35,0,TAU); ctx.stroke();
+
+    // Center dot
+    ctx.fillStyle = `hsla(${hue},60%,60%,0.3)`;
+    ctx.beginPath(); ctx.arc(0,0,2,0,TAU); ctx.fill();
   }
-
-  // Inner circle
-  ctx.strokeStyle = `hsla(${hue},45%,50%,0.15)`;
-  ctx.beginPath(); ctx.arc(0,0,r*0.35,0,TAU); ctx.stroke();
-
-  // Center dot
-  ctx.fillStyle = `hsla(${hue},60%,60%,0.3)`;
-  ctx.beginPath(); ctx.arc(0,0,2,0,TAU); ctx.fill();
 
   ctx.restore();
 }
@@ -916,7 +1010,14 @@ function updateCamera(){
   }
   // Spawn new spheres ahead of the camera
   const aheadY = cameraY + H + 200;
- while(spheres.length < 12){
+  
+  // Every 100m (10000px), spawn a challenge
+  if(aheadY > nextChallengeY){
+    spawnSphereAtDepth(nextChallengeY, 'challenge');
+    nextChallengeY += 10000;
+  }
+  
+  while(spheres.length < 12){
     spawnSphereAtDepth(aheadY + Math.random()*300);
   }
 }
