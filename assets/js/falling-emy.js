@@ -40,6 +40,16 @@ let isDragging = false;
 // ── Portal System ──
 let portal = null;
 
+// ── Score System ──
+let score = 0;
+let displayScore = 0; // smoothly animated
+let scorePopups = []; // {x, y, text, life, vy, hue}
+let scoreFlies = []; // sparks that fly to the counter
+let comboCount = 0;
+let comboTimer = 0;
+const COMBO_WINDOW = 1.5; // seconds to chain combos
+let lastHitTime = 0;
+
 let isSlowed = false;
 let timeScale = 1.0;
 let targetTimeScale = 1.0;
@@ -551,6 +561,43 @@ function collideRagdollSphere(ragdoll, sphere, dt){
     spawnImpactParticles(sphere.x, sphere.y, sphere.hue);
     playImpactSound(impactData.maxForce, sphere.hue, sphere.x, sphere.type, sphere.sacredType);
     sphere.impactFlash = 1.0;
+
+    // ── Score ──
+    const now = time;
+    if(now - lastHitTime < COMBO_WINDOW){ comboCount++; } else { comboCount = 1; }
+    lastHitTime = now;
+    const basePoints = sphere.type === 'challenge' ? 50 : (sphere.type === 'heart' ? 25 : 15);
+    const multiplier = Math.min(comboCount, 10);
+    const pts = basePoints * multiplier;
+    score += pts;
+
+    // Score popup at collision (world space → screen space later)
+    scorePopups.push({
+      x: sphere.x, y: sphere.y,
+      text: multiplier > 1 ? `+${pts} ×${multiplier}` : `+${pts}`,
+      life: 1.0,
+      vy: -80,
+      hue: sphere.hue,
+    });
+
+    // Spawn 5-8 fly-to-counter sparks
+    const flyCount = 5 + Math.floor(Math.random() * 4);
+    for(let i = 0; i < flyCount; i++){
+      scoreFlies.push({
+        x: sphere.x + (Math.random()-0.5) * sphere.r * 1.5,
+        y: sphere.y + (Math.random()-0.5) * sphere.r * 1.5,
+        vx: (Math.random()-0.5) * 120,
+        vy: -60 - Math.random() * 80,
+        size: 1.5 + Math.random() * 2,
+        hue: (sphere.hue + Math.random() * 40 - 20) % 360,
+        life: 1.0,
+        delay: i * 0.04, // staggered departure
+        phase: 'burst', // burst → arc → home
+        arcTime: 0,
+      });
+    }
+
+    // Portal trigger
     if(sphere.type === 'challenge' && !portal){
       const h = (sphere.hue + time * 40) % 360;
       portal = {
@@ -605,6 +652,150 @@ function updateParticles(dt){
     p.life -= p.decay * dt;
     if(p.life <= 0) particles.splice(i, 1);
   }
+}
+
+function updateScoreElements(dt){
+  // Animate display score toward actual score
+  if(displayScore < score){
+    displayScore += Math.ceil((score - displayScore) * 0.15);
+    if(displayScore > score) displayScore = score;
+  }
+
+  // Combo decay
+  if(time - lastHitTime > COMBO_WINDOW) comboCount = 0;
+
+  // Score popups (world space)
+  for(let i = scorePopups.length-1; i >= 0; i--){
+    const p = scorePopups[i];
+    p.y += p.vy * dt;
+    p.vy *= 0.97;
+    p.life -= dt * 1.2;
+    if(p.life <= 0) scorePopups.splice(i, 1);
+  }
+
+  // Score flies (world space → screen space transition)
+  const counterX = W - 20;
+  const counterY = 20;
+  for(let i = scoreFlies.length-1; i >= 0; i--){
+    const f = scoreFlies[i];
+    f.life -= dt * 0.8;
+    if(f.life <= 0){ scoreFlies.splice(i, 1); continue; }
+
+    if(f.delay > 0){ f.delay -= dt; continue; }
+
+    if(f.phase === 'burst'){
+      // Initial burst outward
+      f.x += f.vx * dt;
+      f.y += f.vy * dt;
+      f.vx *= 0.94;
+      f.vy *= 0.94;
+      f.arcTime += dt;
+      if(f.arcTime > 0.2) f.phase = 'arc';
+    } else if(f.phase === 'arc'){
+      // Curve toward counter (screen space target, but we're in world space during update)
+      // Convert counter to world space
+      const targetWX = counterX;
+      const targetWY = counterY + cameraY;
+      const dx = targetWX - f.x;
+      const dy = targetWY - f.y;
+      const d = Math.sqrt(dx*dx + dy*dy) || 1;
+      const accel = 800 + f.arcTime * 2000; // accelerating homing
+      f.vx += (dx / d) * accel * dt;
+      f.vy += (dy / d) * accel * dt;
+      f.vx *= 0.96;
+      f.vy *= 0.96;
+      f.x += f.vx * dt;
+      f.y += f.vy * dt;
+      f.arcTime += dt;
+      if(d < 30) f.phase = 'arrived';
+    }
+    // 'arrived' fades out via life
+  }
+}
+
+function drawScoreElements(){
+  const a = theme.accent2;
+
+  // ── Score Counter (screen space) ──
+  const counterX = W - 20;
+  const counterY = 20;
+  const isAnimating = displayScore < score;
+
+  // Glow when receiving
+  if(isAnimating){
+    ctx.shadowColor = `rgba(${a[0]},${a[1]},${a[2]},0.6)`;
+    ctx.shadowBlur = 15 + Math.sin(time * 12) * 5;
+  }
+  ctx.fillStyle = `rgba(${a[0]},${a[1]},${a[2]},${isAnimating ? 0.95 : 0.5})`;
+  ctx.font = `${isAnimating ? '300' : '200'} 1.1rem monospace`;
+  ctx.textAlign = 'right';
+  ctx.fillText(displayScore.toLocaleString(), counterX, counterY + 14);
+  ctx.shadowBlur = 0;
+
+  // Combo indicator
+  if(comboCount > 1){
+    const comboAlpha = Math.max(0, 1 - (time - lastHitTime) / COMBO_WINDOW);
+    const comboScale = 1 + Math.sin(time * 8) * 0.05;
+    ctx.save();
+    ctx.translate(counterX, counterY + 32);
+    ctx.scale(comboScale, comboScale);
+    ctx.fillStyle = `rgba(${a[0]},${a[1]},${a[2]},${comboAlpha * 0.7})`;
+    ctx.font = '600 0.7rem monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(`×${Math.min(comboCount, 10)} COMBO`, 0, 0);
+    ctx.restore();
+  }
+
+  // ── Score Popups (world space, drawn in camera transform) ──
+  for(const p of scorePopups){
+    const alpha = p.life * (p.life > 0.5 ? 1 : p.life * 2);
+    const scale = 0.8 + (1 - p.life) * 0.3;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.scale(scale, scale);
+    ctx.fillStyle = `hsla(${p.hue},80%,75%,${alpha})`;
+    ctx.font = '600 0.75rem monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = `hsla(${p.hue},90%,60%,${alpha * 0.5})`;
+    ctx.shadowBlur = 8;
+    ctx.fillText(p.text, 0, 0);
+    ctx.restore();
+  }
+
+  // ── Score Flies (screen space overlay) ──
+  for(const f of scoreFlies){
+    if(f.delay > 0 || f.life <= 0) continue;
+    const sx = f.x;
+    const sy = f.y - cameraY;
+    let alpha, size;
+    if(f.phase === 'arrived'){
+      alpha = f.life * 0.8;
+      size = f.size * (1 + (1 - f.life) * 2);
+    } else {
+      alpha = f.life * 0.9;
+      size = f.size;
+    }
+    ctx.fillStyle = `hsla(${f.hue},90%,70%,${alpha})`;
+    ctx.shadowColor = `hsla(${f.hue},90%,60%,${alpha * 0.7})`;
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.arc(sx, sy, size, 0, TAU);
+    ctx.fill();
+    // Trail
+    if(f.phase === 'arc'){
+      const trailLen = 3;
+      for(let t = 1; t <= trailLen; t++){
+        const ta = alpha * (1 - t / (trailLen + 1)) * 0.5;
+        const tx = sx - f.vx * 0.008 * t;
+        const ty = sy - f.vy * 0.008 * t;
+        ctx.fillStyle = `hsla(${f.hue},90%,70%,${ta})`;
+        ctx.beginPath();
+        ctx.arc(tx, ty, size * (1 - t * 0.2), 0, TAU);
+        ctx.fill();
+      }
+    }
+  }
+  ctx.shadowBlur = 0;
 }
 
 function drawParticles(){
@@ -759,6 +950,8 @@ document.getElementById('reset-btn').onclick = () => {
   isDragging = false; dragRagdoll = null; dragParticle = null;
   cameraY = 0; fallSpeed = 0;
   portal = null;
+  score = 0; displayScore = 0; comboCount = 0; lastHitTime = 0;
+  scorePopups = []; scoreFlies = [];
   ragdolls = [new Ragdoll(W/2, 0, 'emy')];
   spheres = [];
   for(let i=0;i<8;i++) spawnSphereAtDepth(i*120+Math.random()*80);
@@ -1473,6 +1666,7 @@ function frame(now){
 
   // Update impact particles
   updateParticles(dt * timeScale);
+  updateScoreElements(rawDt);
 
   // Clamp ragdoll to screen width
   for(const r of ragdolls){
@@ -1521,6 +1715,7 @@ function frame(now){
   for(const s of spheres) drawSphere(s);
   for(const r of ragdolls) drawRagdoll(r);
   drawParticles();
+  drawScoreElements(); // popups in world space
 
   ctx.restore();
 
@@ -1757,6 +1952,9 @@ function frame(now){
 
   // Stars in screen space with parallax
   drawStarfield(0.15);
+
+  // Score flies & counter in screen space
+  // (flies already drawn in drawScoreElements, counter drawn there too)
 
   // Draw UI elements in screen space (no camera transform)
   if(isDragging && dragParticle){
