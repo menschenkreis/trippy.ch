@@ -2845,7 +2845,7 @@ if(introEl){
 
 function updateSoundHint() {
   const hint = document.getElementById('sound-hint');
-  if(!hint) return;
+  if(!hint || hint.style.display === 'none') return;
   const depthM = Math.max(0, cameraY / 100);
   
   // Show hint after intro is complete
@@ -2862,7 +2862,11 @@ function updateSoundHint() {
       hint.style.opacity = '0';
       hint.style.transform = 'scale(1)';
       // Completely remove from layout after fade
-      setTimeout(() => { if(hint.style.opacity === '0') hint.style.display = 'none'; }, 2000);
+      setTimeout(() => { 
+        if(hint.style.opacity === '0') {
+          hint.style.display = 'none';
+        }
+      }, 2000);
     }
   }
 }
