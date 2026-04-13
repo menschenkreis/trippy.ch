@@ -181,91 +181,102 @@
     ctx.fillStyle = 'rgba(8,6,15,0.35)';
     ctx.fillRect(0, 0, W, H);
 
-    // Soft center glow
+    // Soft iridescent center glow
+    const glowHue = (time * 12) % 360;
     const bg = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, minDim * 0.6);
-    bg.addColorStop(0, `rgba(60, 40, 90, ${0.15 + Math.sin(s * 0.3) * 0.05})`);
+    bg.addColorStop(0, `hsla(${glowHue}, 60%, 40%, 0.12)`);
+    bg.addColorStop(0.5, `hsla(${(glowHue + 60) % 360}, 50%, 30%, 0.06)`);
     bg.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
-    // ── Sacred Geometry (parallax) ──────────────────────────────────
-    ctx.lineWidth = 0.8;
+    // ── Iridescent Sacred Geometry (parallax) ─────────────────────────
+    ctx.lineWidth = 1.0;
+    // Each layer shifts through the full spectrum at its own speed
+    const hue = (layer, offset, speed) => ((time * speed * 20 + offset) % 360 + 360) % 360;
 
     // Layer 0: Giant Flower of Life — far back
-    ctx.strokeStyle = `hsl(${265 + Math.sin(s * 0.12) * 15}, 35%, 45%)`;
+    const h0 = hue(0, 0, 0.08);
+    ctx.strokeStyle = `hsl(${h0}, 85%, 62%)`;
     ctx.save();
     ctx.translate(W/2 + px * 12, H/2 + py * 8);
     ctx.rotate(s * 0.015);
-    drawFlower(0, 0, minDim * 0.22, 0.28);
+    drawFlower(0, 0, minDim * 0.22, 0.32);
     ctx.restore();
 
     // Layer 1: Mandala of Life — center, medium depth
-    ctx.strokeStyle = `hsl(${240 + Math.sin(s * 0.2) * 20}, 30%, 50%)`;
-    ctx.fillStyle = `hsl(${240 + Math.sin(s * 0.2) * 20}, 30%, 50%)`;
+    const h1 = hue(1, 120, 0.06);
+    ctx.strokeStyle = `hsl(${h1}, 90%, 60%)`;
+    ctx.fillStyle = `hsl(${h1}, 90%, 60%)`;
     ctx.save();
     ctx.translate(W/2 + px * 25, H/2 + py * 18);
-    drawMandala(0, 0, minDim * 0.3, 0.35, s);
+    drawMandala(0, 0, minDim * 0.3, 0.4, s);
     ctx.restore();
 
     // Layer 2: Flower of Life — center-right
-    ctx.strokeStyle = `hsl(${280 + Math.sin(s * 0.25) * 20}, 30%, 42%)`;
+    const h2 = hue(2, 60, 0.1);
+    ctx.strokeStyle = `hsl(${h2}, 80%, 58%)`;
     ctx.save();
     ctx.translate(W * 0.68 + px * 40, H * 0.38 + py * 28);
     ctx.rotate(-s * 0.03);
-    drawFlower(0, 0, minDim * 0.11, 0.25);
+    drawFlower(0, 0, minDim * 0.11, 0.3);
     ctx.restore();
 
     // Layer 3: Metatron's Cube — center-left
-    ctx.strokeStyle = `hsl(${210 + Math.sin(s * 0.18) * 25}, 28%, 45%)`;
-    ctx.fillStyle = `hsl(${210 + Math.sin(s * 0.18) * 25}, 28%, 45%)`;
+    const h3 = hue(3, 200, 0.07);
+    ctx.strokeStyle = `hsl(${h3}, 85%, 60%)`;
+    ctx.fillStyle = `hsl(${h3}, 85%, 60%)`;
     ctx.save();
     ctx.translate(W * 0.32 + px * 50, H * 0.62 + py * 35);
     ctx.rotate(s * 0.02);
-    drawMetatron(0, 0, minDim * 0.08, 0.28);
+    drawMetatron(0, 0, minDim * 0.08, 0.32);
     ctx.restore();
 
     // Layer 4: Sri Yantra — offset
-    ctx.strokeStyle = `hsl(${35 + Math.sin(s * 0.15) * 15}, 30%, 48%)`;
+    const h4 = hue(4, 300, 0.09);
+    ctx.strokeStyle = `hsl(${h4}, 80%, 62%)`;
     ctx.save();
     ctx.translate(W * 0.72 + px * 60, H * 0.7 + py * 42);
     ctx.rotate(-s * 0.04);
-    drawYantra(0, 0, minDim * 0.12, 0.22);
+    drawYantra(0, 0, minDim * 0.12, 0.28);
     ctx.restore();
 
     // Layer 5: Small mandala top-left
-    ctx.strokeStyle = `hsl(${200 + Math.sin(s * 0.22) * 20}, 25%, 43%)`;
-    ctx.fillStyle = `hsl(${200 + Math.sin(s * 0.22) * 20}, 25%, 43%)`;
+    const h5 = hue(5, 180, 0.11);
+    ctx.strokeStyle = `hsl(${h5}, 85%, 58%)`;
+    ctx.fillStyle = `hsl(${h5}, 85%, 58%)`;
     ctx.save();
     ctx.translate(W * 0.25 + px * 35, H * 0.3 + py * 24);
-    drawMandala(0, 0, minDim * 0.12, 0.22, s * 1.3);
+    drawMandala(0, 0, minDim * 0.12, 0.28, s * 1.3);
     ctx.restore();
 
     // Layer 6: Metatron bottom-right
-    ctx.strokeStyle = `hsl(${300 + Math.sin(s * 0.16) * 15}, 25%, 40%)`;
-    ctx.fillStyle = `hsl(${300 + Math.sin(s * 0.16) * 15}, 25%, 40%)`;
+    const h6 = hue(6, 240, 0.08);
+    ctx.strokeStyle = `hsl(${h6}, 80%, 56%)`;
+    ctx.fillStyle = `hsl(${h6}, 80%, 56%)`;
     ctx.save();
     ctx.translate(W * 0.75 + px * 45, H * 0.68 + py * 32);
     ctx.rotate(s * 0.035);
-    drawMetatron(0, 0, minDim * 0.06, 0.25);
+    drawMetatron(0, 0, minDim * 0.06, 0.3);
     ctx.restore();
 
-    // ── Light motes ─────────────────────────────────────────────────
+    // ── Light motes (iridescent) ────────────────────────────────────
     for (const m of motes) {
       m.x += m.vx + px * 0.0001 * m.depth;
       m.y += m.vy + py * 0.0001 * m.depth;
       if (m.x > 1.3) m.x = -1.3; if (m.x < -1.3) m.x = 1.3;
       if (m.y > 1.3) m.y = -1.3; if (m.y < -1.3) m.y = 1.3;
       const tw = Math.sin(time * m.speed + m.phase) * 0.5 + 0.5;
-      ctx.globalAlpha = 0.06 + tw * 0.14;
-      const mH = (240 + Math.sin(time * 0.3 + m.phase) * 40) % 360;
-      ctx.fillStyle = `hsl(${mH}, 30%, 70%)`;
+      ctx.globalAlpha = 0.08 + tw * 0.18;
+      const mH = (time * 15 + m.phase * 57.3) % 360;
+      ctx.fillStyle = `hsl(${mH}, 80%, 70%)`;
       ctx.beginPath(); ctx.arc(W/2 + m.x * W/2, H/2 + m.y * H/2, m.size * (0.6 + tw * 0.5), 0, TAU); ctx.fill();
     }
 
 
-    // ── Vignette ────────────────────────────────────────────────────
+    // ── Soft vignette ──────────────────────────────────────────────
     const vig = ctx.createRadialGradient(W/2, H/2, minDim * 0.15, W/2, H/2, Math.max(W, H) * 0.7);
     vig.addColorStop(0, 'rgba(0,0,0,0)');
-    vig.addColorStop(1, 'rgba(0,0,0,0.45)');
+    vig.addColorStop(1, 'rgba(0,0,0,0.3)');
     ctx.globalAlpha = 1; ctx.fillStyle = vig; ctx.fillRect(0, 0, W, H);
 
     ctx.globalAlpha = 1;
