@@ -1644,7 +1644,7 @@ function drawBackground(){
   // Stars (screen space — must reset transform since we're inside camera transform)
   ctx.save();
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  drawStarfield(0.05); // distant tiny stars — very slow parallax
+  drawStarfield(0.08); // distant tiny stars — slow parallax
   drawStarfield(0.15); // closer stars
   ctx.restore();
 
