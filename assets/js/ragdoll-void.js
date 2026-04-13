@@ -349,7 +349,10 @@ document.getElementById('add-btn').onclick = () => {
   const headY = ragdolls[0] ? ragdolls[0].particles[0].y : 0;
   ragdolls.push(new Ragdoll(W/2, headY - 50));
 };
-document.getElementById('theme-btn').onclick = () => setTheme(themeIdx+1);
+document.getElementById('theme-btn').onclick = () => {
+  window.manualThemeSet = true;
+  setTheme(themeIdx+1);
+};
 document.getElementById('reset-btn').onclick = () => {
   isDragging = false; dragRagdoll = null; dragParticle = null;
   cameraY = 0; fallSpeed = 0;
@@ -809,6 +812,31 @@ function frame(now){
   drawParticles();
 
   ctx.restore();
+
+  // ── Depth Meter & Sunrise Overlay ──
+  const depthMeters = Math.max(0, cameraY / 100);
+  
+  // Auto-change theme every 500m
+  const autoTheme = Math.floor(depthMeters / 500) % themes.length;
+  if(themeIdx !== autoTheme && !window.manualThemeSet){
+    setTheme(autoTheme);
+  }
+
+  // Sunrise effect (brightens over 10 minutes)
+  const sunrise = Math.min(time / 600, 1.0);
+  if(sunrise > 0){
+    const sunGrad = ctx.createLinearGradient(0, H, 0, 0);
+    sunGrad.addColorStop(0, `rgba(255, 200, 150, ${sunrise * 0.4})`);
+    sunGrad.addColorStop(1, `rgba(150, 200, 255, ${sunrise * 0.1})`);
+    ctx.fillStyle = sunGrad;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Depth HUD
+  ctx.fillStyle = `rgba(255,255,255,${0.3 + sunrise * 0.5})`;
+  ctx.font = '200 1rem monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText(`${depthMeters.toFixed(1)} m`, W - 20, H - 20);
 
   // Stars in screen space with parallax
   drawStarfield(0.15);
