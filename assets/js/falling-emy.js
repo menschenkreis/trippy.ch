@@ -673,10 +673,10 @@ function collideParticleSphere(p, s, dt, impactData){
     const nx = dx/d, ny = dy/d;
     const overlap = minD - d;
     if(!p.pinned){
-      p.x += nx * overlap * 0.4;
-      p.y += ny * overlap * 0.4;
+      p.x += nx * overlap * 0.3;
+      p.y += ny * overlap * 0.3;
     }
-    const pushForce = overlap * 0.6;
+    const pushForce = overlap * 0.35;
     s.x -= nx * pushForce;
     s.y -= ny * pushForce;
     
@@ -686,8 +686,8 @@ function collideParticleSphere(p, s, dt, impactData){
     if(impactVel > impactData.maxForce) impactData.maxForce = impactVel;
     
     if(dot < 0){
-      p.ox = p.x - (vx - 2*dot*nx)*0.8;
-      p.oy = p.y - (vy - 2*dot*ny)*0.8;
+      p.ox = p.x - (vx - 2*dot*nx)*0.5;
+      p.oy = p.y - (vy - 2*dot*ny)*0.5;
     }
   }
 }
@@ -808,18 +808,18 @@ let particles = [];
 const MAX_PARTICLES = 150;
 
 function spawnImpactParticles(x, y, hue){
-  const count = 6 + Math.floor(Math.random()*6);
+  const count = 4 + Math.floor(Math.random()*4);
   for(let i=0;i<count;i++){
     if(particles.length >= MAX_PARTICLES) particles.shift();
     const angle = Math.random() * TAU;
-    const speed = 50 + Math.random() * 200; // fast initial burst
+    const speed = 20 + Math.random() * 80; // gentle puff
     particles.push({
       x, y,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 30, // slight upward bias
+      vy: Math.sin(angle) * speed - 15, // slight upward bias
       life: 1.0,
-      decay: 0.5 + Math.random() * 1.5,
-      size: 0.5 + Math.random() * 1.5,
+      decay: 0.8 + Math.random() * 1.2,
+      size: 0.5 + Math.random() * 1.2,
       hue: hue + Math.random() * 40 - 20,
       sparkle: Math.random() > 0.8,
     });
@@ -829,11 +829,11 @@ function spawnImpactParticles(x, y, hue){
 function updateParticles(dt){
   for(let i = particles.length-1; i >= 0; i--){
     const p = particles[i];
-    p.vy += 150 * dt; // gravity
+    p.vy += 80 * dt; // gentle gravity
     p.x += p.vx * dt;
     p.y += p.vy * dt;
-    p.vx *= 0.92; // heavy friction (firework style)
-    p.vy *= 0.92;
+    p.vx *= 0.95; // softer friction
+    p.vy *= 0.95;
     p.life -= p.decay * dt;
     if(p.life <= 0) particles.splice(i, 1);
   }
@@ -1376,7 +1376,7 @@ function drawSphere(s){
     grad.addColorStop(1, `hsla(${s.hue},100%,100%,0)`);
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(0,0,r*(1.1 + f*0.4),0,TAU); ctx.fill();
-    s.impactFlash -= 0.05; // decay faster
+    s.impactFlash -= 0.035; // smoother decay
     if(s.impactFlash < 0) s.impactFlash = 0;
   }
 
