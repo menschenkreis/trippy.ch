@@ -760,9 +760,12 @@ function collideParticleSphere(p, s, dt, impactData){
     const nx = dx/d, ny = dy/d;
     const overlap = minD - d;
     if(!p.pinned){
-      p.x += nx * overlap;
-      p.y += ny * overlap;
+      p.x += nx * overlap * 0.3;
+      p.y += ny * overlap * 0.3;
     }
+    const pushForce = overlap * 0.35;
+    s.x -= nx * pushForce;
+    s.y -= ny * pushForce;
     
     const vx = p.x - p.ox, vy = p.y - p.oy;
     const dot = vx*nx + vy*ny;
@@ -971,6 +974,7 @@ function spawnImpactParticles(x, y, hue, force){
 }
 
 function updateParticles(dt){
+  const burstQueue = [];
   let writeIdx = 0;
   for(let i = 0; i < particleCount; i++){
     const p = particles[i];
@@ -986,15 +990,13 @@ function updateParticles(dt){
     if(p.type === 'firework' && !p.didBurst){
       p.burstTimer -= dt;
       if(p.burstTimer <= 0){
-        p.didBurst = true;
-        p.life = 0; // kill the rocket
+        p.life = 0; // kill rocket
         const bHue = p.burstHue;
         const bCount = 6 + Math.floor(Math.random() * 4);
         for(let b = 0; b < bCount; b++){
-          if(writeIdx >= MAX_PARTICLES) break;
           const ba = (b / bCount) * TAU + Math.random() * 0.3;
           const bs = 30 + Math.random() * 50;
-          const bp = {
+          burstQueue.push({
             x: p.x, y: p.y,
             vx: Math.cos(ba) * bs,
             vy: Math.sin(ba) * bs,
@@ -1003,11 +1005,8 @@ function updateParticles(dt){
             size: 0.4 + Math.random() * 0.5,
             hue: (bHue + b * 15) % 360,
             type: 'glitter',
-          };
-          particles[writeIdx] = bp;
-          writeIdx++;
+          });
         }
-        continue;
       }
     }
 
@@ -1017,6 +1016,12 @@ function updateParticles(dt){
     }
   }
   particleCount = writeIdx;
+
+  // Append burst particles
+  for(const bp of burstQueue){
+    if(particleCount >= MAX_PARTICLES) break;
+    particles[particleCount++] = bp;
+  }
 }
 
 function updateScoreElements(dt){
