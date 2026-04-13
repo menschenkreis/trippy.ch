@@ -33,6 +33,7 @@ const DAMPING = 0.998;
 const ITERATIONS = 8;
 const SUBSTEPS = 2;
 
+let tiltEnabled = false;
 let gravityX = 0, gravityY = GRAVITY;
 let isDragging = false;
 let isSlowed = false;
@@ -58,7 +59,8 @@ function initAccel() {
       else if (angle === -90) tilt = -e.beta;
       
       let tiltX = Math.max(-45, Math.min(45, tilt)) / 45; // -1 to 1
-      gravityX = tiltX * GRAVITY * 0.8; // Standard physical tilt (marble on a table)
+      if(tiltEnabled) gravityX = tiltX * GRAVITY * 0.8;
+      else gravityX = 0;
     }, {passive: true});
     accelInited = true;
   };
@@ -624,6 +626,14 @@ muteBtn.onclick = () => {
   muteBtn.textContent = isMuted ? '🔇' : '🔊';
   muteBtn.classList.toggle('is-on', !isMuted);
   if(!isMuted) initAudio();
+};
+
+const tiltBtn = document.getElementById('tilt-btn');
+tiltBtn.onclick = () => {
+  tiltEnabled = !tiltEnabled;
+  tiltBtn.classList.toggle('is-on', tiltEnabled);
+  if(!tiltEnabled) gravityX = 0;
+  else initAccel(); // Ensure permission is requested if turned on explicitly
 };
 document.getElementById('reset-btn').onclick = () => {
   isDragging = false; dragRagdoll = null; dragParticle = null;
