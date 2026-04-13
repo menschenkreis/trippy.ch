@@ -36,6 +36,12 @@ const SUBSTEPS = 2;
 let tiltEnabled = false;
 let gravityX = 0, gravityY = GRAVITY;
 let isDragging = false;
+
+// ── Growth / Age System ──
+let growthPoints = 0;
+const GROWTH_PER_YEAR = 1000; // 1000 points = 1 year; target: ~1 year per 1km
+const COLLISION_GROWTH = 55; // points per regular collision
+const CHALLENGE_DEDUCT = 80; // points deducted by challenge hits
 let isSlowed = false;
 let timeScale = 1.0;
 let targetTimeScale = 1.0;
@@ -547,6 +553,12 @@ function collideRagdollSphere(ragdoll, sphere, dt){
     spawnImpactParticles(sphere.x, sphere.y, sphere.hue);
     playImpactSound(impactData.maxForce, sphere.hue, sphere.x, sphere.type, sphere.sacredType);
     sphere.impactFlash = 1.0;
+    // Growth system
+    if(sphere.type === 'challenge'){
+      growthPoints = Math.max(0, growthPoints - CHALLENGE_DEDUCT);
+    } else {
+      growthPoints += COLLISION_GROWTH;
+    }
   }
 }
 
@@ -739,6 +751,7 @@ document.getElementById('reset-btn').onclick = () => {
   cameraY = 0; fallSpeed = 0;
   ragdolls = [new Ragdoll(W/2, 0, 'emy')];
   spheres = [];
+  growthPoints = 0;
   for(let i=0;i<8;i++) spawnSphereAtDepth(i*120+Math.random()*80);
 };
 
@@ -1391,6 +1404,21 @@ function drawRagdoll(ragdoll){
   ctx.fillText(ragdoll.name, head.x, head.y - 25);
 }
 
+function roundRect(c, x, y, w, h, r){
+  r = Math.min(r, h/2, w/2);
+  c.beginPath();
+  c.moveTo(x+r, y);
+  c.lineTo(x+w-r, y);
+  c.quadraticCurveTo(x+w, y, x+w, y+r);
+  c.lineTo(x+w, y+h-r);
+  c.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  c.lineTo(x+r, y+h);
+  c.quadraticCurveTo(x, y+h, x, y+h-r);
+  c.lineTo(x, y+r);
+  c.quadraticCurveTo(x, y, x+r, y);
+  c.closePath();
+}
+
 // ── Camera follows ragdoll + spawn spheres ahead ──────────────────────
 function updateCamera(){
   if(ragdolls.length > 0){
@@ -1493,6 +1521,29 @@ function frame(now){
     ctx.fillRect(0, 0, W, H);
   }
 
+  // ── Age / Growth HUD ──
+  const ageYears = growthPoints / GROWTH_PER_YEAR;
+  const displayAge = Math.min(Math.floor(ageYears), 122);
+  const progressInYear = ageYears - displayAge;
+  const barW = 120, barH = 4, barX = 20, barY = H - 50;
+  const a3 = theme.accent2;
+  // Background bar
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  roundRect(ctx, barX, barY, barW, barH, 2); ctx.fill();
+  // Filled portion with glow
+  const fillW = barW * Math.min(progressInYear, 1);
+  if(fillW > 0){
+    ctx.shadowColor = `rgba(${a3[0]},${a3[1]},${a3[2]},0.5)`;
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = `rgba(${a3[0]},${a3[1]},${a3[2]},0.7)`;
+    roundRect(ctx, barX, barY, fillW, barH, 2); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+  // Age label
+  ctx.fillStyle = `rgba(${a3[0]},${a3[1]},${a3[2]},0.6)`;
+  ctx.font = '200 0.65rem monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(`age ${displayAge}`, barX, barY - 6);
   // Depth HUD
   ctx.fillStyle = `rgba(255,255,255,${0.3 + sunrise * 0.5})`;
   ctx.font = '200 1rem monospace';
