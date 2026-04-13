@@ -62,7 +62,7 @@ let harmonicCooldown = 0; // dynamic cooldown — increases when stuck
 const pentatonicScale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21]; // C D E G A c d e g a
 
 // ── Power-Up Effects ──
-let activeEffects = { wave: 0, trail: 0, pulse: 0 };
+let activeEffects = { wave: 0, trail: 0, pulse: 0, magnet: 0 };
 let waveRings = []; // {x, y, radius, life}
 
 // ── Milestones ──
@@ -489,6 +489,22 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     panner.connect(masterGain);
     if(delayNode) panner.connect(delayNode);
     osc.start(now); osc.stop(now + 0.4);
+  } else if (type === 'magnet') {
+    // Deep electromagnetic hum
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc1.type = 'sawtooth'; osc2.type = 'square';
+    osc1.frequency.setValueAtTime(freq * 0.3, now);
+    osc2.frequency.setValueAtTime(freq * 0.3 + 2, now);
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(vol * 0.4, now + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration * 1.2);
+    osc1.connect(gain); osc2.connect(gain); gain.connect(panner);
+    panner.connect(masterGain);
+    if(delayNode) panner.connect(delayNode);
+    osc1.start(now); osc1.stop(now + duration * 1.2 + 0.1);
+    osc2.start(now); osc2.stop(now + duration * 1.2 + 0.1);
   } else if (type === 'chakra') {
     // Singing bowl resonance
     const osc1 = audioCtx.createOscillator();
@@ -721,8 +737,9 @@ function collideRagdollSphere(ragdoll, sphere, dt){
     if(sphere.type === 'wave') activeEffects.wave = 4;
     else if(sphere.type === 'trail') activeEffects.trail = 5;
     else if(sphere.type === 'pulse') activeEffects.pulse = 3;
+    else if(sphere.type === 'magnet') activeEffects.magnet = 5;
 
-    const basePoints = sphere.type === 'challenge' ? 50 : (sphere.type === 'heart' ? 25 : (['wave','trail','pulse'].includes(sphere.type) ? 30 : 15));
+    const basePoints = sphere.type === 'challenge' ? 50 : (sphere.type === 'heart' ? 25 : (['wave','trail','pulse','magnet'].includes(sphere.type) ? 30 : 15));
     const multiplier = Math.min(comboCount, 10);
     const pts = basePoints * multiplier;
     score += pts;
@@ -964,6 +981,7 @@ function spawnSphereAtDepth(yWorld, forceType=null){
     else if (r < 0.080) type = 'wave';
     else if (r < 0.100) type = 'trail';
     else if (r < 0.120) type = 'pulse';
+    else if (r < 0.140) type = 'magnet';
   }
 
   spheres.push(new Sphere(
@@ -1075,7 +1093,7 @@ document.getElementById('reset-btn').onclick = () => {
   score = 0; displayScore = 0; comboCount = 0; lastHitTime = 0;
   scorePopups = []; scoreFlies = [];
   harmonyIndex = 0; harmonicCooldown = 0;
-  activeEffects = { wave: 0, trail: 0, pulse: 0 };
+  activeEffects = { wave: 0, trail: 0, pulse: 0, magnet: 0 };
   waveRings = [];
   lastMilestone = 0; milestoneText = null; milestoneSlowMo = 0;
   lastChapter = 0; chapterDisplay = null; chapterSlowMo = 0;
@@ -1565,6 +1583,36 @@ function drawSphere(s){
       else ctx.lineTo(Math.cos(a)*d, Math.sin(a)*d);
     }
     ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else if(s.type === 'magnet'){
+    // Electric blue horseshoe magnet shape
+    ctx.rotate(s.rotation);
+    const hue = (220 + time * 20) % 360;
+    // Glow
+    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+    grad.addColorStop(0, `hsla(${hue},90%,65%,0.2)`);
+    grad.addColorStop(1, `hsla(${hue},90%,65%,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
+    // U-shape
+    ctx.strokeStyle = `hsla(${hue},90%,65%,0.9)`;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.7, 0, PI);
+    ctx.stroke();
+    // Pole lines
+    ctx.beginPath(); ctx.moveTo(-r*0.7, 0); ctx.lineTo(-r*0.7, -r*0.6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(r*0.7, 0); ctx.lineTo(r*0.7, -r*0.6); ctx.stroke();
+    // Field lines
+    ctx.lineWidth = 0.8;
+    ctx.strokeStyle = `hsla(${hue},80%,70%,0.4)`;
+    for(let i = -1; i <= 1; i++){
+      const offset = i * r * 0.25;
+      ctx.beginPath();
+      ctx.moveTo(-r*0.7, -r*0.3 + offset);
+      ctx.quadraticCurveTo(0, -r*1.1 + offset, r*0.7, -r*0.3 + offset);
+      ctx.stroke();
+    }
   } else if(s.type === 'challenge'){
     // Spiky abstract challenge shape
     const hue = (s.hue + time*40) % 360;
@@ -1837,6 +1885,23 @@ function frame(now){
   // Physics substeps
   for(let s=0;s<SUBSTEPS;s++){
     for(const r of ragdolls) r.update(dt);
+    // Magnet repulsion — push spheres away from ragdoll
+    if(activeEffects.magnet > 0 && ragdolls.length > 0){
+      const head = ragdolls[0].particles[0];
+      const repelRadius = 200;
+      const repelForce = 3000;
+      for(const sp of spheres){
+        const dx = sp.x - head.x;
+        const dy = sp.y - head.y;
+        const d = Math.sqrt(dx*dx + dy*dy) || 1;
+        if(d < repelRadius){
+          const strength = repelForce * (1 - d / repelRadius);
+          sp.x += (dx / d) * strength * dt * dt;
+          sp.y += (dy / d) * strength * dt * dt;
+        }
+      }
+      activeEffects.magnet -= dt;
+    }
     // No sphere physics — they're static obstacles
     for(const r of ragdolls){
       for(const sp of spheres) collideRagdollSphere(r, sp);
@@ -1950,7 +2015,31 @@ function frame(now){
     ctx.shadowBlur = 0;
   }
 
-  drawParticles();
+  // Magnet effect: repulsion field visualization
+  if(activeEffects.magnet > 0){
+    const mAlpha = Math.min(activeEffects.magnet / 0.5, 1.0) * 0.5;
+    const repelR = 200;
+    const mHue = (220 + time * 30) % 360;
+    // Field ring
+    ctx.strokeStyle = `hsla(${mHue},80%,65%,${mAlpha * 0.3})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(headX, headY, repelR, 0, TAU); ctx.stroke();
+    // Inner pulsing ring
+    const pulseR = 50 + 30 * Math.sin(time * 6);
+    ctx.strokeStyle = `hsla(${mHue},90%,70%,${mAlpha * 0.5})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(headX, headY, pulseR, 0, TAU); ctx.stroke();
+    // Field lines radiating outward
+    ctx.lineWidth = 0.6;
+    for(let i = 0; i < 8; i++){
+      const a = (i / 8) * TAU + time * 1.5;
+      ctx.strokeStyle = `hsla(${mHue},80%,65%,${mAlpha * 0.2})`;
+      ctx.beginPath();
+      ctx.moveTo(headX + Math.cos(a) * 30, headY + Math.sin(a) * 30);
+      ctx.lineTo(headX + Math.cos(a) * repelR, headY + Math.sin(a) * repelR);
+      ctx.stroke();
+    }
+  }
   drawScoreElements(); // popups in world space
 
   ctx.restore();
