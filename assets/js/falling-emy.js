@@ -687,12 +687,14 @@ canvas.addEventListener('pointermove', e => {
     const targetX = e.clientX + dragOffsetX;
     const targetY = e.clientY + dragOffsetY + cameraY;
     
-    // Smoothly move the particle towards the target without pinning others
-    // This allows the rest of the body to react physics-wise
-    dragParticle.x = targetX;
-    dragParticle.y = targetY;
+    // Smoothly interpolate position to make dragging slower and more physical
+    // (Prevents fast "flicking")
+    dragParticle.x += (targetX - dragParticle.x) * 0.15;
+    dragParticle.y += (targetY - dragParticle.y) * 0.15;
     
-    // We don't adjust cameraY here anymore to prevent scrolling while dragging
+    // Update velocity tracking for when released
+    dragParticle.ox = dragParticle.x;
+    dragParticle.oy = dragParticle.y;
   }
 });
 function releaseDrag(){
