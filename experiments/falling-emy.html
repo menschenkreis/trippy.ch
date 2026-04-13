@@ -49,6 +49,7 @@
     .journey-icon{width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.75rem;border-radius:50%;background:rgba(140,100,255,0.08);border:1px solid rgba(140,100,255,0.12)}
     .journey-entry-text{font-size:0.8rem;line-height:1.5;color:rgba(255,255,255,0.4)}
     .journey-entry-text strong{color:rgba(255,255,255,0.6);font-weight:400}
+    @keyframes pulse-glow{0%,100%{box-shadow:0 0 0 0 rgba(140,100,255,0.3)}50%{box-shadow:0 0 12px 4px rgba(140,100,255,0.15)}}
   </style>
 </head>
 <body class="experiment-view">
@@ -59,7 +60,7 @@
     <button id="add-btn" class="ctrl-btn" title="Add ragdoll">+</button>
     <button id="theme-btn" class="ctrl-btn" title="Theme">✦</button>
     <button id="tilt-btn" class="ctrl-btn" title="Toggle tilt">📱</button>
-    <button id="mute-btn" class="ctrl-btn" title="Toggle sound">🔇</button>
+    <button id="mute-btn" class="ctrl-btn" title="Toggle sound" style="animation:pulse-glow 2s ease-in-out infinite">🔇</button>
     <div id="sound-hint" style="position:fixed;top:3.5rem;right:1rem;z-index:200;pointer-events:none;text-align:right;opacity:1;transition:opacity 1.5s ease"><span style="font-size:0.6rem;color:rgba(255,255,255,0.3);letter-spacing:0.08em;display:block;line-height:1.4">tap 🔇 for<br>sound & music</span></div>
     <button id="reset-btn" class="ctrl-btn" title="Reset">⟳</button>
     <button id="info-btn" class="ctrl-btn" title="Info">i</button>

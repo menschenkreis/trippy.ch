@@ -1080,6 +1080,7 @@ muteBtn.onclick = () => {
   isMuted = !isMuted;
   muteBtn.textContent = isMuted ? '🔇' : '🔊';
   muteBtn.classList.toggle('is-on', !isMuted);
+  muteBtn.style.animation = 'none';
   if(!isMuted) initAudio();
   // Hide hint on first unmute
   const hint = document.getElementById('sound-hint');
@@ -1090,6 +1091,8 @@ muteBtn.onclick = () => {
   setTimeout(()=>{
     const hint = document.getElementById('sound-hint');
     if(hint && isMuted) hint.style.opacity = '0';
+    const mb = document.getElementById('mute-btn');
+    if(mb && isMuted) mb.style.animation = 'none';
     setTimeout(()=>{ if(hint) hint.style.display = 'none'; }, 1500);
   }, 8000);
 
