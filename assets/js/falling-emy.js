@@ -2629,7 +2629,7 @@ function frame(now){
         firedChapters.add(ci);
         const isMilestone = ch.label.endsWith('km') || ch.label.endsWith('m') || ch.depth !== undefined;
         chapterSlowMo = isMilestone ? 0.8 : 1.2;
-        chapterDisplay = {text: ch.text, life: isMilestone ? 3.5 : 6.0, phase: 'fadein'};
+        chapterDisplay = {text: ch.text, life: isMilestone ? 5.5 : 9.0, phase: 'fadein'};
         journeyLog.push({label: ch.label, text: ch.text});
         updateJourneyPanel();
         playMilestoneChord();
@@ -2669,18 +2669,18 @@ function frame(now){
   if(chapterDisplay){
     const maxLife = chapterDisplay.life > 3 ? 6.0 : 2.5;
     chapterDisplay.life -= rawDt;
-    if(chapterDisplay.life > maxLife - 1) chapterDisplay.phase = 'fadein';
-    else if(chapterDisplay.life > 2.0) chapterDisplay.phase = 'hold';
+    if(chapterDisplay.life > maxLife - 1.8) chapterDisplay.phase = 'fadein';
+    else if(chapterDisplay.life > 1.8) chapterDisplay.phase = 'hold';
     else chapterDisplay.phase = 'fadeout';
     if(chapterDisplay.life <= 0) chapterDisplay = null;
   }
 
   // ── Draw Chapter Text (screen space) — speech bubble ──
   if(chapterDisplay){
-    const maxLife = chapterDisplay.life > 4 ? 6.0 : 3.5;
-    const isShort = maxLife < 4;
+    const maxLife = chapterDisplay.life > 4 ? 9.0 : 5.5;
+    const isShort = maxLife < 6;
     let cAlpha;
-    const fadeDur = 1.0;
+    const fadeDur = 1.8;
     if(chapterDisplay.phase === 'fadein') cAlpha = Math.min((maxLife - chapterDisplay.life) / fadeDur, 1);
     else if(chapterDisplay.phase === 'hold') cAlpha = 1.0;
     else cAlpha = Math.max(0, chapterDisplay.life / fadeDur);
