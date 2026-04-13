@@ -197,6 +197,7 @@ class Ragdoll {
 let audioCtx;
 let masterGain;
 let lastImpactTime = 0;
+let isMuted = true;
 
 function initAudio(){
   if(audioCtx) return;
@@ -206,49 +207,76 @@ function initAudio(){
   masterGain = audioCtx.createGain();
   masterGain.gain.value = 0.4;
   
-  // Reverb/Delay if possible to make it spatial
+  // Reverb/Delay for spatial void echo
   const delay = audioCtx.createDelay();
-  delay.delayTime.value = 0.3;
+  delay.delayTime.value = 0.4;
   const feedback = audioCtx.createGain();
-  feedback.gain.value = 0.4;
-  delay.connect(feedback);
+  feedback.gain.value = 0.45;
+  
+  // Lowpass filter on the echo to make it fade into the distance
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 1200;
+
+  delay.connect(filter);
+  filter.connect(feedback);
   feedback.connect(delay);
   delay.connect(masterGain);
   
-  masterGain.connect(delay); // send everything to delay too
+  masterGain.connect(delay);
   masterGain.connect(audioCtx.destination);
 }
 
-function playImpactSound(force, hue){
-  if(!audioCtx) return;
-  if(force < 2.0) return; // ignore tiny grazes
+function playImpactSound(force, hue, xPos){
+  if(isMuted || !audioCtx) return;
+  if(force < 1.5) return; // ignore tiny grazes
   const now = audioCtx.currentTime;
-  if(now - lastImpactTime < 0.05) return; // throttle
+  if(now - lastImpactTime < 0.04) return; // throttle overlapping sounds
   lastImpactTime = now;
   
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  
-  // Pentatonic scale mapped to hue
-  const baseFreq = 110; // A2
+  // Pentatonic scale mapped to hue — crystalline/glass tuning
+  const baseFreq = 220; // A3 base
   const pentatonic = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31, 33, 36];
   const noteIdx = Math.floor((hue / 360) * pentatonic.length) % pentatonic.length;
   const freq = baseFreq * Math.pow(2, pentatonic[noteIdx]/12);
   
-  osc.type = 'triangle';
-  osc.frequency.setValueAtTime(freq, now);
+  const vol = Math.min(force * 0.015, 0.5);
+  const duration = 0.3 + Math.min(force * 0.01, 1.5);
   
-  // Pluck envelope mapped to force
-  const vol = Math.min(force * 0.02, 0.5);
-  gain.gain.setValueAtTime(0, now);
-  gain.gain.linearRampToValueAtTime(vol, now + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4 + Math.random()*0.3);
+  // Stereo panning based on horizontal collision position
+  const panner = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : audioCtx.createGain();
+  if(panner.pan) panner.pan.value = Math.max(-1, Math.min(1, (xPos / W) * 2 - 1));
+
+  // Osc 1: Sine (round body)
+  const osc1 = audioCtx.createOscillator();
+  const gain1 = audioCtx.createGain();
+  osc1.type = 'sine';
+  osc1.frequency.setValueAtTime(freq, now);
   
-  osc.connect(gain);
-  gain.connect(masterGain);
+  gain1.gain.setValueAtTime(0, now);
+  gain1.gain.linearRampToValueAtTime(vol * 0.8, now + 0.005);
+  gain1.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+  // Osc 2: Triangle (bright, plucky attack)
+  const osc2 = audioCtx.createOscillator();
+  const gain2 = audioCtx.createGain();
+  osc2.type = 'triangle';
+  osc2.frequency.setValueAtTime(freq * 2, now); // an octave up
   
-  osc.start(now);
-  osc.stop(now + 1.0);
+  gain2.gain.setValueAtTime(0, now);
+  gain2.gain.linearRampToValueAtTime(vol * 0.5, now + 0.002);
+  gain2.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.25); // decays much faster
+
+  osc1.connect(gain1);
+  osc2.connect(gain2);
+  gain1.connect(panner);
+  gain2.connect(panner);
+  panner.connect(masterGain);
+
+  osc1.start(now);
+  osc1.stop(now + duration + 0.1);
+  osc2.start(now);
+  osc2.stop(now + duration + 0.1);
 }
 
 function collideParticleSphere(p, s, dt, impactData){
@@ -290,7 +318,7 @@ function collideRagdollSphere(ragdoll, sphere, dt){
   }
   if(hit){
     spawnImpactParticles(sphere.x, sphere.y, sphere.hue);
-    playImpactSound(impactData.maxForce, sphere.hue);
+    playImpactSound(impactData.maxForce, sphere.hue, sphere.x);
   }
 }
 
@@ -441,6 +469,13 @@ document.getElementById('add-btn').onclick = () => {
 document.getElementById('theme-btn').onclick = () => {
   window.manualThemeSet = true;
   setTheme(themeIdx+1);
+};
+const muteBtn = document.getElementById('mute-btn');
+muteBtn.onclick = () => {
+  isMuted = !isMuted;
+  muteBtn.textContent = isMuted ? '🔇' : '🔊';
+  muteBtn.classList.toggle('is-on', !isMuted);
+  if(!isMuted) initAudio();
 };
 document.getElementById('reset-btn').onclick = () => {
   isDragging = false; dragRagdoll = null; dragParticle = null;

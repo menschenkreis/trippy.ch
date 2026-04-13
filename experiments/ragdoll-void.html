@@ -12,7 +12,7 @@
     .ctrl-btn{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.4);color:rgba(255,255,255,0.5);font-size:0.75rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color 0.3s,color 0.3s,box-shadow 0.3s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-family:inherit;user-select:none}
     .ctrl-btn:hover{border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.8)}
     .ctrl-btn.is-on{color:rgba(180,140,255,0.9);border-color:rgba(180,140,255,0.4);box-shadow:0 0 15px rgba(140,100,255,0.2)}
-    #theme-btn,#add-btn,#reset-btn,#info-btn{position:static!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;width:36px!important;height:36px!important;border-radius:50%!important;font-size:0.75rem!important;animation:none!important}
+    #theme-btn,#add-btn,#mute-btn,#reset-btn,#info-btn{position:static!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;width:36px!important;height:36px!important;border-radius:50%!important;font-size:0.75rem!important;animation:none!important}
     .back-link{position:fixed;top:1rem;left:1rem;z-index:200;font-size:0.85rem;color:rgba(255,255,255,0.3);text-decoration:none;letter-spacing:0.05em;transition:color 0.25s;backdrop-filter:blur(6px);background:rgba(0,0,0,0.3);padding:0.4rem 0.8rem;border-radius:20px;border:1px solid rgba(255,255,255,0.06)}
     .back-link:hover{color:rgba(180,140,255,0.8)}
     .bottom-left{position:fixed;bottom:1.5rem;left:1.5rem;z-index:200;pointer-events:none}
@@ -44,6 +44,7 @@
   <div class="top-controls">
     <button id="add-btn" class="ctrl-btn" title="Add ragdoll">+</button>
     <button id="theme-btn" class="ctrl-btn" title="Theme">✦</button>
+    <button id="mute-btn" class="ctrl-btn" title="Toggle sound">🔇</button>
     <button id="reset-btn" class="ctrl-btn" title="Reset">⟳</button>
     <button id="info-btn" class="ctrl-btn" title="Info">i</button>
   </div>
