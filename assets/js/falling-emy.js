@@ -255,6 +255,7 @@ class Ragdoll {
 // ── Audio ────────────────────────────────────────────────────────────────
 let audioCtx;
 let masterGain;
+let delayNode;
 let lastImpactTime = 0;
 let isMuted = true;
 
@@ -265,10 +266,11 @@ function initAudio(){
   audioCtx = new Ctx();
   masterGain = audioCtx.createGain();
   masterGain.gain.value = 0.8;
+  masterGain.connect(audioCtx.destination);
   
   // Reverb/Delay for spatial void echo
-  const delay = audioCtx.createDelay();
-  delay.delayTime.value = 0.4;
+  delayNode = audioCtx.createDelay();
+  delayNode.delayTime.value = 0.4;
   const feedback = audioCtx.createGain();
   feedback.gain.value = 0.45;
   
@@ -277,13 +279,12 @@ function initAudio(){
   filter.type = 'lowpass';
   filter.frequency.value = 1200;
 
-  delay.connect(filter);
+  delayNode.connect(filter);
   filter.connect(feedback);
-  feedback.connect(delay);
-  delay.connect(masterGain);
+  feedback.connect(delayNode);
   
-  masterGain.connect(delay);
-  masterGain.connect(audioCtx.destination);
+  // Send echo output to master
+  delayNode.connect(masterGain);
 }
 
 function playImpactSound(force, hue, xPos, type, sacredType){
@@ -325,6 +326,7 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     osc2.connect(gain1);
     gain1.connect(panner);
     panner.connect(masterGain);
+    if(delayNode) panner.connect(delayNode);
     
     osc1.start(now); osc1.stop(now + duration * 1.5 + 0.1);
     osc2.start(now); osc2.stop(now + duration * 1.5 + 0.1);
@@ -344,6 +346,7 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     osc1.connect(gain1);
     gain1.connect(panner);
     panner.connect(masterGain);
+    if(delayNode) panner.connect(delayNode);
     
     osc1.start(now); osc1.stop(now + duration * 0.5 + 0.1);
 
@@ -364,6 +367,7 @@ function playImpactSound(force, hue, xPos, type, sacredType){
       osc.connect(gain);
       gain.connect(panner);
       panner.connect(masterGain);
+      if(delayNode) panner.connect(delayNode);
       
       osc.start(tStart);
       osc.stop(tStart + duration + 0.1);
@@ -394,6 +398,7 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     filter.connect(gain1);
     gain1.connect(panner);
     panner.connect(masterGain);
+    if(delayNode) panner.connect(delayNode);
     
     osc1.start(now); osc1.stop(now + duration * 2 + 0.1);
     osc2.start(now); osc2.stop(now + duration * 2 + 0.1);
@@ -466,6 +471,7 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     }
     
     panner.connect(masterGain);
+    if(delayNode) panner.connect(delayNode);
 
     osc1.start(now); osc1.stop(now + duration * 1.2 + 0.1);
     osc2.start(now); osc2.stop(now + duration * 1.2 + 0.1);
