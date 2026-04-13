@@ -2855,7 +2855,9 @@ function checkResume(){
         restartBtn.onclick = (e) => {
           e.preventDefault(); e.stopPropagation();
           window._fe.clearSave();
-          location.reload(); 
+          // Silently start the birth sequence immediately
+          if(window._startBirth) window._startBirth();
+          else if(typeof setPhase === 'function') setPhase('born');
         };
         promptArea.appendChild(restartBtn);
       }
