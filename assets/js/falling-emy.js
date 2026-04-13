@@ -843,14 +843,25 @@ function collideRagdollSphere(ragdoll, sphere, dt){
     const pts = basePoints * multiplier;
     score += pts;
 
-    // Score popup at collision (world space → screen space later)
-    scorePopups.push({
-      x: sphere.x, y: sphere.y,
-      text: multiplier > 1 ? `+${pts} ×${multiplier}` : `+${pts}`,
-      life: 1.0,
-      vy: -80,
-      hue: sphere.hue,
-    });
+    // Glitter burst instead of text popup
+    const glitterIntensity = Math.min(impactData.maxForce || 3, 10);
+    const glitterCount = Math.min(6 + Math.floor(glitterIntensity * 1.5), 12);
+    for(let gi = 0; gi < glitterCount; gi++){
+      if(particleCount >= MAX_PARTICLES) break;
+      const ga = Math.random() * TAU;
+      const gs = 20 + Math.random() * 50;
+      particles.push({
+        x: sphere.x, y: sphere.y,
+        vx: Math.cos(ga) * gs,
+        vy: Math.sin(ga) * gs - 30,
+        life: 1.0,
+        decay: 1.2 + Math.random() * 0.6,
+        size: 0.4 + Math.random() * 0.6,
+        hue: (sphere.hue + Math.random() * 80 - 40 + 360) % 360,
+        type: 'glitter',
+      });
+      particleCount++;
+    }
 
     // Spawn 5-8 fly-to-counter sparks
     const flyCount = 5 + Math.floor(Math.random() * 4);
@@ -903,13 +914,7 @@ function spawnImpactParticles(x, y, hue, force){
   const hue2 = (hue + 120) % 360;
   const hue3 = (hue + 240) % 360;
 
-  if(shockwaves.length < MAX_SHOCKWAVES){
-    shockwaves.push({
-      x, y, radius: 5, maxRadius: 20 + intensity * 6,
-      life: 1.0, decay: 2.5,
-      hue, lineWidth: 1.2,
-    });
-  }
+  // No shockwave rings — too expensive
 
   for(let i=0;i<burstCount;i++){
     if(particleCount >= MAX_PARTICLES) break;
@@ -962,18 +967,6 @@ function updateParticles(dt){
     }
   }
   particleCount = writeIdx;
-
-  let swWrite = 0;
-  for(let i = 0; i < shockwaves.length; i++){
-    const sw = shockwaves[i];
-    sw.radius += (sw.maxRadius - sw.radius) * 4 * dt;
-    sw.life -= sw.decay * dt;
-    if(sw.life > 0){
-      if(swWrite !== i) shockwaves[swWrite] = sw;
-      swWrite++;
-    }
-  }
-  shockwaves.length = swWrite;
 }
 
 function updateScoreElements(dt){
@@ -1038,22 +1031,6 @@ function updateScoreElements(dt){
 function drawScoreElements(){
   const a = theme.accent2;
 
-  // ── Score Popups (world space, drawn in camera transform) ──
-  for(const p of scorePopups){
-    const alpha = p.life * (p.life > 0.5 ? 1 : p.life * 2);
-    const scale = 0.8 + (1 - p.life) * 0.3;
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.scale(scale, scale);
-    ctx.fillStyle = `hsla(${p.hue},80%,75%,${alpha})`;
-    ctx.font = '600 0.75rem monospace';
-    ctx.textAlign = 'center';
-    ctx.shadowColor = `hsla(${p.hue},90%,60%,${alpha * 0.5})`;
-    ctx.shadowBlur = 8;
-    ctx.fillText(p.text, 0, 0);
-    ctx.restore();
-  }
-
   // ── Score Flies (screen space overlay) ──
   for(const f of scoreFlies){
     if(f.delay > 0 || f.life <= 0) continue;
@@ -1092,17 +1069,6 @@ function drawParticles(){
   ctx.save();
   ctx.globalCompositeOperation = 'screen';
 
-  // ── Draw shockwave rings ──
-  for(const sw of shockwaves){
-    const alpha = sw.life * 0.7;
-    ctx.strokeStyle = `hsla(${sw.hue},90%,65%,${alpha})`;
-    ctx.lineWidth = sw.lineWidth * sw.life;
-    ctx.shadowColor = `hsla(${sw.hue},100%,60%,${alpha * 0.5})`;
-    ctx.shadowBlur = 12;
-    ctx.beginPath(); ctx.arc(sw.x, sw.y, sw.radius, 0, TAU); ctx.stroke();
-  }
-  ctx.shadowBlur = 0;
-
   // ── Draw particles ──
   for(let pi = 0; pi < particleCount; pi++){
     const p = particles[pi];
@@ -1117,14 +1083,16 @@ function drawParticles(){
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill();
 
     } else if(p.type === 'ember'){
-      // Soft glow (no radialGradient — cheaper)
       ctx.fillStyle = `hsla(${p.hue},80%,55%,${alpha * 0.15})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 3, 0, TAU); ctx.fill();
       ctx.fillStyle = `hsla(${p.hue},80%,65%,${alpha * 0.3})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 1.5, 0, TAU); ctx.fill();
-      // Core
       ctx.fillStyle = `hsla(${p.hue},60%,90%,${alpha * 0.9})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 0.4, 0, TAU); ctx.fill();
+    } else if(p.type === 'glitter'){
+      const twinkle = Math.sin(time * 15 + p.hue * 0.1) * 0.5 + 0.5;
+      ctx.fillStyle = `hsla(${p.hue},100%,85%,${alpha * (0.3 + twinkle * 0.7)})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.6 + twinkle * 0.4), 0, TAU); ctx.fill();
     }
   }
   ctx.restore();
