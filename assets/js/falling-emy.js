@@ -59,9 +59,9 @@ function formatTimeAgo(ts){
 
 function autoSave(now){
   const depthM = Math.max(0, cameraY / 100);
-  // Auto-save every 50m of progress
-  const lastSavedDepth = hasSaveData ? (loadProgress()?.depthMeters || 0) : 0;
-  if(depthM >= lastSavedDepth + 50){
+  // Auto-save every 50m of progress OR every 10s if we've moved at all
+  const lastSavedDepth = loadProgress()?.depthMeters || 0;
+  if(depthM >= lastSavedDepth + 50 || (now - lastSaveTime > 10000 && depthM > lastSavedDepth + 1)){
     saveProgress();
     lastSaveTime = now;
     hasSaveData = true;
