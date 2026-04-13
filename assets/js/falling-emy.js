@@ -2882,8 +2882,11 @@ function updateSoundHint() {
   if(!hint || hint.style.display === 'none') return;
   const depthM = Math.max(0, cameraY / 100);
   
-  // Show hint after intro is complete
-  if(hint.dataset.introComplete === 'true') {
+  // Show hint after intro is complete OR if we resumed deep into the journey
+  const isIntroComplete = hint.dataset.introComplete === 'true';
+  const isDeepResumed = cameraY > 500; // if we resumed, cameraY will be high immediately
+
+  if(isIntroComplete || isDeepResumed) {
     if(depthM < 50) {
       hint.style.opacity = '1';
       // Gentle pulsation
