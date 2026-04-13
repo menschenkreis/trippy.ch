@@ -2878,10 +2878,17 @@ function checkResume(){
       }
       const promptArea = document.getElementById('intro-prompt');
       if(promptArea && !document.getElementById('intro-restart')) {
+        const embarkEl = document.getElementById('intro-embark');
         const restartBtn = document.createElement('button');
         restartBtn.id = 'intro-restart';
         restartBtn.textContent = "Embark again";
-        restartBtn.style.cssText = '';
+        // Copy all CSS properties from embark button to ensure visual match
+        if(embarkEl){
+          const cs = getComputedStyle(embarkEl);
+          for(const prop of cs){
+            try { restartBtn.style.setProperty(prop, cs.getPropertyValue(prop)); } catch(e){}
+          }
+        }
         restartBtn.onclick = (e) => {
           e.preventDefault(); e.stopPropagation();
           window._fe.clearSave();
