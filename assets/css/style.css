@@ -625,6 +625,7 @@ footer a:hover { color: var(--pink); }
   align-items: center;
   justify-content: center;
   flex-direction: column;
+  padding-top: 18vh;
 }
 
 #intro-canvas {
@@ -639,6 +640,7 @@ footer a:hover { color: var(--pink); }
   z-index: 1;
   text-align: center;
   opacity: 0;
+  transform: translateY(12px) scale(0.97);
   transform: translateY(12px) scale(0.97);
   transition: opacity 1.8s ease, transform 1.8s ease;
   pointer-events: none;
@@ -670,7 +672,8 @@ footer a:hover { color: var(--pink); }
   position: relative;
   z-index: 1;
   text-align: center;
-  margin-top: 2.5rem;
+  margin-top: auto;
+  margin-bottom: 15vh;
   opacity: 0;
   transform: translateY(10px);
   transition: opacity 1.5s ease 0.3s, transform 1.5s ease 0.3s;
