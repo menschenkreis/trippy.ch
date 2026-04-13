@@ -675,7 +675,7 @@ function updateScoreElements(dt){
 
   // Score flies (world space → screen space transition)
   const counterX = W - 20;
-  const counterY = 20;
+  const counterY = H - 38;
   for(let i = scoreFlies.length-1; i >= 0; i--){
     const f = scoreFlies[i];
     f.life -= dt * 0.8;
@@ -715,36 +715,6 @@ function updateScoreElements(dt){
 
 function drawScoreElements(){
   const a = theme.accent2;
-
-  // ── Score Counter (screen space) ──
-  const counterX = W - 20;
-  const counterY = 20;
-  const isAnimating = displayScore < score;
-
-  // Glow when receiving
-  if(isAnimating){
-    ctx.shadowColor = `rgba(${a[0]},${a[1]},${a[2]},0.6)`;
-    ctx.shadowBlur = 15 + Math.sin(time * 12) * 5;
-  }
-  ctx.fillStyle = `rgba(${a[0]},${a[1]},${a[2]},${isAnimating ? 0.95 : 0.5})`;
-  ctx.font = `${isAnimating ? '300' : '200'} 1.1rem monospace`;
-  ctx.textAlign = 'right';
-  ctx.fillText(displayScore.toLocaleString(), counterX, counterY + 14);
-  ctx.shadowBlur = 0;
-
-  // Combo indicator
-  if(comboCount > 1){
-    const comboAlpha = Math.max(0, 1 - (time - lastHitTime) / COMBO_WINDOW);
-    const comboScale = 1 + Math.sin(time * 8) * 0.05;
-    ctx.save();
-    ctx.translate(counterX, counterY + 32);
-    ctx.scale(comboScale, comboScale);
-    ctx.fillStyle = `rgba(${a[0]},${a[1]},${a[2]},${comboAlpha * 0.7})`;
-    ctx.font = '600 0.7rem monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText(`×${Math.min(comboCount, 10)} COMBO`, 0, 0);
-    ctx.restore();
-  }
 
   // ── Score Popups (world space, drawn in camera transform) ──
   for(const p of scorePopups){
@@ -1949,6 +1919,27 @@ function frame(now){
   ctx.font = '200 1rem monospace';
   ctx.textAlign = 'right';
   ctx.fillText(`${depthMeters.toFixed(1)} m`, W - 20, H - 20);
+
+  // Score HUD (below depth meter)
+  const a3 = theme.accent2;
+  const isAnim = displayScore < score;
+  ctx.fillStyle = `rgba(${a3[0]},${a3[1]},${a3[2]},${isAnim ? 0.8 : 0.35})`;
+  ctx.font = `${isAnim ? '300' : '200'} 0.8rem monospace`;
+  ctx.textAlign = 'right';
+  if(isAnim){
+    ctx.shadowColor = `rgba(${a3[0]},${a3[1]},${a3[2]},0.5)`;
+    ctx.shadowBlur = 10 + Math.sin(time * 12) * 4;
+  }
+  ctx.fillText(displayScore.toLocaleString(), W - 20, H - 38);
+  ctx.shadowBlur = 0;
+
+  // Combo next to score
+  if(comboCount > 1){
+    const ca = Math.max(0, 1 - (time - lastHitTime) / COMBO_WINDOW);
+    ctx.fillStyle = `rgba(${a3[0]},${a3[1]},${a3[2]},${ca * 0.5})`;
+    ctx.font = '600 0.55rem monospace';
+    ctx.fillText(`×${Math.min(comboCount, 10)}`, W - 20, H - 52);
+  }
 
   // Stars in screen space with parallax
   drawStarfield(0.15);
