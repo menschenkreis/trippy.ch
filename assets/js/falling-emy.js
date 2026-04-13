@@ -850,7 +850,7 @@ function collideRagdollSphere(ragdoll, sphere, dt){
       if(particleCount >= MAX_PARTICLES) break;
       const ga = Math.random() * TAU;
       const gs = 20 + Math.random() * 50;
-      particles.push({
+      particles[particleCount++] = {
         x: sphere.x, y: sphere.y,
         vx: Math.cos(ga) * gs,
         vy: Math.sin(ga) * gs - 30,
@@ -859,8 +859,7 @@ function collideRagdollSphere(ragdoll, sphere, dt){
         size: 0.4 + Math.random() * 0.6,
         hue: (sphere.hue + Math.random() * 80 - 40 + 360) % 360,
         type: 'glitter',
-      });
-      particleCount++;
+      };
     }
 
     // Spawn 5-8 fly-to-counter sparks
@@ -920,7 +919,7 @@ function spawnImpactParticles(x, y, hue, force){
     if(particleCount >= MAX_PARTICLES) break;
     const angle = (i / burstCount) * TAU + (Math.random()-0.5)*0.5;
     const speed = 30 + Math.random() * 60 * (intensity / 5);
-    particles.push({
+    particles[particleCount++] = {
       x, y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed - 10,
@@ -929,14 +928,13 @@ function spawnImpactParticles(x, y, hue, force){
       size: 0.6 + Math.random() * 1.5 * (intensity / 5),
       hue: [hue, hue2, hue3][i % 3] + Math.random() * 30 - 15,
       type: 'spark',
-    });
-    particleCount++;
+    };
   }
 
   if(particleCount < MAX_PARTICLES - 2){
     const angle = Math.random() * TAU;
     const speed = 8 + Math.random() * 20;
-    particles.push({
+    particles[particleCount++] = {
       x, y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed - 20,
@@ -945,8 +943,7 @@ function spawnImpactParticles(x, y, hue, force){
       size: 2 + Math.random() * 2,
       hue: hue + Math.random() * 60 - 30,
       type: 'ember',
-    });
-    particleCount++;
+    };
   }
 
   // ── Firework rockets (small, rise then burst) ──
@@ -955,7 +952,7 @@ function spawnImpactParticles(x, y, hue, force){
     if(particleCount >= MAX_PARTICLES) break;
     const angle = -PI/2 + (Math.random()-0.5) * PI * 0.8;
     const speed = 80 + Math.random() * 60;
-    particles.push({
+    particles[particleCount++] = {
       x: x + (Math.random()-0.5) * 10,
       y,
       vx: Math.cos(angle) * speed * 0.4,
@@ -968,8 +965,7 @@ function spawnImpactParticles(x, y, hue, force){
       burstTimer: 0.15 + Math.random() * 0.15,
       burstHue: (hue + Math.random() * 180) % 360,
       didBurst: false,
-    });
-    particleCount++;
+    };
   }
 }
 
@@ -1310,6 +1306,7 @@ document.getElementById('reset-btn').onclick = () => {
   chapterDisplay = null; chapterSlowMo = 0;
   nextShapeY = 5000;
   nextChallengeY = 10000;
+  particles = []; particleCount = 0;
   ragdolls = [new Ragdoll(W/2, 0, 'emy')];
   spheres = [];
   for(let i=0;i<8;i++) spawnSphereAtDepth(i*120+Math.random()*80);
