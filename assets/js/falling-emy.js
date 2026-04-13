@@ -1394,6 +1394,9 @@ function drawRagdoll(ragdoll){
 // ── Camera follows ragdoll + spawn spheres ahead ──────────────────────
 function updateCamera(){
   if(ragdolls.length > 0){
+    // DISABLE camera follow while dragging to fix the canvas position
+    if(isDragging) return;
+
     const head = ragdolls[0].particles[0];
     // Smoothly follow the ragdoll's head, keeping it at ~35% from top
     const targetCam = head.y - H * 0.35;
