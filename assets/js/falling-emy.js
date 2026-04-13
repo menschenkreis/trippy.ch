@@ -131,7 +131,7 @@ function setTheme(i){
 }
 
 // ── Physics constants ────────────────────────────────────────────────────
-const GRAVITY = 500;
+const GRAVITY = 360;
 const DAMPING = 0.998;
 const ITERATIONS = 8;
 const SUBSTEPS = 2;
@@ -903,66 +903,67 @@ function collideRagdollSphere(ragdoll, sphere, dt){
 // ── Impact particles ─────────────────────────────────────────────────────
 let particles = [];
 let shockwaves = [];
-const MAX_PARTICLES = 120;
+const MAX_PARTICLES = 200;
 const MAX_SHOCKWAVES = 6;
 let particleCount = 0;
 
 function spawnImpactParticles(x, y, hue, force){
   const intensity = Math.min(force || 3, 10);
-  const burstCount = Math.min(3 + Math.floor(intensity * 0.8), 8);
+  const burstCount = Math.min(6 + Math.floor(intensity * 1.2), 14);
   const hue2 = (hue + 120) % 360;
   const hue3 = (hue + 240) % 360;
-
-  // No shockwave rings — too expensive
 
   for(let i=0;i<burstCount;i++){
     if(particleCount >= MAX_PARTICLES) break;
     const angle = (i / burstCount) * TAU + (Math.random()-0.5)*0.5;
-    const speed = 30 + Math.random() * 60 * (intensity / 5);
-    particles[particleCount++] = {
-      x, y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 10,
-      life: 1.0,
-      decay: 1.0 + Math.random() * 0.8,
-      size: 0.6 + Math.random() * 1.5 * (intensity / 5),
-      hue: [hue, hue2, hue3][i % 3] + Math.random() * 30 - 15,
-      type: 'spark',
-    };
-  }
-
-  if(particleCount < MAX_PARTICLES - 2){
-    const angle = Math.random() * TAU;
-    const speed = 8 + Math.random() * 20;
+    const speed = 60 + Math.random() * 110 * (intensity / 5);
     particles[particleCount++] = {
       x, y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed - 20,
       life: 1.0,
-      decay: 0.4 + Math.random() * 0.3,
-      size: 2 + Math.random() * 2,
+      decay: 0.7 + Math.random() * 0.6,
+      size: 1.2 + Math.random() * 2.5 * (intensity / 5),
+      hue: [hue, hue2, hue3][i % 3] + Math.random() * 40 - 20,
+      type: 'spark',
+    };
+  }
+
+  // 2–3 embers for warmth
+  const emberCount = 2 + Math.floor(intensity * 0.2);
+  for(let e = 0; e < emberCount; e++){
+    if(particleCount >= MAX_PARTICLES) break;
+    const angle = Math.random() * TAU;
+    const speed = 15 + Math.random() * 35;
+    particles[particleCount++] = {
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 30,
+      life: 1.0,
+      decay: 0.3 + Math.random() * 0.25,
+      size: 2.5 + Math.random() * 2.5,
       hue: hue + Math.random() * 60 - 30,
       type: 'ember',
     };
   }
 
-  // ── Firework rockets (small, rise then burst) ──
-  const fwCount = 2 + Math.floor(intensity * 0.3);
+  // ── Firework rockets (rise then burst) ──
+  const fwCount = 3 + Math.floor(intensity * 0.5);
   for(let i = 0; i < fwCount; i++){
     if(particleCount >= MAX_PARTICLES) break;
-    const angle = -PI/2 + (Math.random()-0.5) * PI * 0.8;
-    const speed = 80 + Math.random() * 60;
+    const angle = -PI/2 + (Math.random()-0.5) * PI * 0.9;
+    const speed = 100 + Math.random() * 80;
     particles[particleCount++] = {
-      x: x + (Math.random()-0.5) * 10,
+      x: x + (Math.random()-0.5) * 14,
       y,
-      vx: Math.cos(angle) * speed * 0.4,
+      vx: Math.cos(angle) * speed * 0.45,
       vy: Math.sin(angle) * speed,
       life: 1.0,
-      decay: 0.6 + Math.random() * 0.3,
-      size: 1.2,
+      decay: 0.5 + Math.random() * 0.25,
+      size: 1.6,
       hue: (hue + Math.random() * 120) % 360,
       type: 'firework',
-      burstTimer: 0.15 + Math.random() * 0.15,
+      burstTimer: 0.12 + Math.random() * 0.14,
       burstHue: (hue + Math.random() * 180) % 360,
       didBurst: false,
     };
@@ -988,17 +989,17 @@ function updateParticles(dt){
       if(p.burstTimer <= 0){
         p.life = 0; // kill rocket
         const bHue = p.burstHue;
-        const bCount = 6 + Math.floor(Math.random() * 4);
+        const bCount = 9 + Math.floor(Math.random() * 5);
         for(let b = 0; b < bCount; b++){
           const ba = (b / bCount) * TAU + Math.random() * 0.3;
-          const bs = 30 + Math.random() * 50;
+          const bs = 50 + Math.random() * 80;
           burstQueue.push({
             x: p.x, y: p.y,
             vx: Math.cos(ba) * bs,
             vy: Math.sin(ba) * bs,
             life: 1.0,
-            decay: 1.0 + Math.random() * 0.8,
-            size: 0.4 + Math.random() * 0.5,
+            decay: 0.8 + Math.random() * 0.7,
+            size: 0.6 + Math.random() * 0.8,
             hue: (bHue + b * 15) % 360,
             type: 'glitter',
           });
@@ -1126,20 +1127,23 @@ function drawParticles(){
     const alpha = p.life * (p.life > 0.5 ? 1.0 : p.life * 2.0);
 
     if(p.type === 'spark'){
-      // Glow
-      ctx.fillStyle = `hsla(${p.hue},85%,60%,${alpha * 0.2})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 3, 0, TAU); ctx.fill();
+      // Outer glow
+      ctx.fillStyle = `hsla(${p.hue},100%,65%,${alpha * 0.3})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 4.5, 0, TAU); ctx.fill();
+      // Mid glow
+      ctx.fillStyle = `hsla(${p.hue},100%,75%,${alpha * 0.55})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 2, 0, TAU); ctx.fill();
       // Core
-      ctx.fillStyle = `hsla(${p.hue},100%,85%,${alpha})`;
+      ctx.fillStyle = `hsla(${p.hue},100%,95%,${alpha})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill();
 
     } else if(p.type === 'ember'){
-      ctx.fillStyle = `hsla(${p.hue},80%,55%,${alpha * 0.15})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 3, 0, TAU); ctx.fill();
-      ctx.fillStyle = `hsla(${p.hue},80%,65%,${alpha * 0.3})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 1.5, 0, TAU); ctx.fill();
-      ctx.fillStyle = `hsla(${p.hue},60%,90%,${alpha * 0.9})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 0.4, 0, TAU); ctx.fill();
+      ctx.fillStyle = `hsla(${p.hue},95%,60%,${alpha * 0.25})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 4, 0, TAU); ctx.fill();
+      ctx.fillStyle = `hsla(${p.hue},90%,70%,${alpha * 0.5})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 2, 0, TAU); ctx.fill();
+      ctx.fillStyle = `hsla(${p.hue},80%,95%,${alpha})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 0.5, 0, TAU); ctx.fill();
     } else if(p.type === 'glitter'){
       const twinkle = Math.sin(time * 15 + p.hue * 0.1) * 0.5 + 0.5;
       ctx.fillStyle = `hsla(${p.hue},100%,85%,${alpha * (0.3 + twinkle * 0.7)})`;

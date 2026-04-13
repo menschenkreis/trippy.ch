@@ -8,9 +8,11 @@
   <link rel="stylesheet" href="../assets/css/style.css">
   <style>
     html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#0a0a0f;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+    *{-webkit-tap-highlight-color:transparent;tap-highlight-color:transparent}
+    button,a{outline:none}
     #c{position:fixed;inset:0;width:100%;height:100%;display:block}
     .top-controls{position:fixed;top:1rem;right:1rem;z-index:200;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:0.5rem;align-items:center;max-width:calc(100vw - 2rem)}
-    .ctrl-btn{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.4);color:rgba(255,255,255,0.5);font-size:0.75rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color 0.3s,color 0.3s,box-shadow 0.3s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-family:inherit;user-select:none}
+    .ctrl-btn{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.4);color:rgba(255,255,255,0.5);font-size:0.75rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color 0.3s,color 0.3s,box-shadow 0.3s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-family:inherit;user-select:none;outline:none;-webkit-tap-highlight-color:transparent}
     .ctrl-btn:hover{border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.8)}
     .ctrl-btn.is-on{color:rgba(180,140,255,0.9);border-color:rgba(180,140,255,0.4);box-shadow:0 0 15px rgba(140,100,255,0.2)}
     #theme-btn,#add-btn,#tilt-btn,#mute-btn,#reset-btn,#info-btn{position:static!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;width:36px!important;height:36px!important;border-radius:50%!important;font-size:0.75rem!important;animation:none!important}
@@ -71,8 +73,8 @@
       <h2 id="resume-depth" style="font-size:2.2rem;font-weight:200;letter-spacing:0.08em;color:rgba(255,255,255,0.85);margin:0 0 0.3rem"></h2>
       <p id="resume-meta" style="font-size:0.78rem;color:rgba(255,255,255,0.3);margin:0 0 2rem;line-height:1.6"></p>
       <div style="display:flex;flex-direction:column;gap:0.7rem;align-items:center">
-        <button id="resume-btn" style="width:200px;padding:0.7rem 0;border:1px solid rgba(140,100,255,0.35);border-radius:28px;background:rgba(140,100,255,0.08);color:rgba(255,255,255,0.8);font-size:0.85rem;font-weight:300;letter-spacing:0.06em;cursor:pointer;transition:all 0.25s;font-family:inherit">Continue Journey</button>
-        <button id="new-journey-btn" style="width:200px;padding:0.7rem 0;border:1px solid rgba(255,255,255,0.08);border-radius:28px;background:transparent;color:rgba(255,255,255,0.35);font-size:0.78rem;font-weight:300;letter-spacing:0.06em;cursor:pointer;transition:all 0.25s;font-family:inherit">New Journey</button>
+        <button id="resume-btn" style="width:200px;padding:0.7rem 0;border:1px solid rgba(140,100,255,0.35);border-radius:28px;background:rgba(140,100,255,0.08);color:rgba(255,255,255,0.8);font-size:0.85rem;font-weight:300;letter-spacing:0.06em;cursor:pointer;transition:all 0.25s;font-family:inherit;outline:none;-webkit-tap-highlight-color:transparent">Continue Journey</button>
+        <button id="new-journey-btn" style="width:200px;padding:0.7rem 0;border:1px solid rgba(255,255,255,0.08);border-radius:28px;background:transparent;color:rgba(255,255,255,0.35);font-size:0.78rem;font-weight:300;letter-spacing:0.06em;cursor:pointer;transition:all 0.25s;font-family:inherit;outline:none;-webkit-tap-highlight-color:transparent">New Journey</button>
       </div>
     </div>
   </div>
