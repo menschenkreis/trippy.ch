@@ -2316,8 +2316,17 @@ function frame(now){
     if(depthMeters >= m && lastMilestone < m){
       lastMilestone = m;
       milestoneSlowMo = 0.5;
-      const mLabel = m >= 1000 ? (m/1000) + ' km' : m + ' m';
-      milestoneText = {text: mLabel, life: 2.0};
+      const quips = {
+        500: '500 m — the descent begins',
+        1000: '1 km — still falling',
+        2000: '2 km — gaining momentum',
+        5000: '5 km — no turning back',
+        10000: '10 km — the void stretches on',
+        25000: '25 km — gravity feels different now',
+        50000: '50 km — halfway to somewhere',
+        100000: '100 km — dawn breaks',
+      };
+      milestoneText = {text: quips[m] || mLabel, life: 2.5};
       playMilestoneChord();
       // Spawn celebration particles (screen space) — reduced
       for(let i = 0; i < 20; i++){
@@ -2367,53 +2376,110 @@ function frame(now){
     if(chapterDisplay.life <= 0) chapterDisplay = null;
   }
 
-  // ── Draw Milestone Text (screen space) ──
+  // ── Draw Milestone Text (screen space) — speech bubble ──
   if(milestoneText){
-    const mAlpha = milestoneText.life / 2.0;
-    ctx.fillStyle = `rgba(255,255,255,${mAlpha * 0.9})`;
-    ctx.font = '600 2rem monospace';
+    const mAlpha = Math.min(milestoneText.life / 0.5, 1) * Math.min(milestoneText.life, 1);
+    const words = milestoneText.text.split(' ');
+    const elapsed = 2.0 - milestoneText.life;
+    ctx.save();
     ctx.textAlign = 'center';
-    ctx.shadowColor = `rgba(255,255,255,${mAlpha * 0.5})`;
-    ctx.shadowBlur = 20;
-    ctx.fillText(milestoneText.text, W/2, H/2);
-    ctx.shadowBlur = 0;
+    ctx.font = '300 1rem sans-serif';
+    // Measure full text for bubble
+    let fullWidth = ctx.measureText(milestoneText.text).width;
+    const padX = 28, padY = 16;
+    const bx = W/2, by = H * 0.38;
+    const bw = fullWidth + padX * 2;
+    const bh = 40 + padY;
+    // Bubble body
+    ctx.fillStyle = `rgba(${theme.accent[0]},${theme.accent[1]},${theme.accent[2]},${mAlpha * 0.15})`;
+    ctx.strokeStyle = `rgba(${theme.accent[0]},${theme.accent[1]},${theme.accent[2]},${mAlpha * 0.4})`;
+    ctx.lineWidth = 1;
+    roundRect(ctx, bx - bw/2, by - bh/2, bw, bh, 16);
+    ctx.fill(); ctx.stroke();
+    // Bubble tail
+    ctx.fillStyle = `rgba(${theme.accent[0]},${theme.accent[1]},${theme.accent[2]},${mAlpha * 0.15})`;
+    ctx.beginPath();
+    ctx.moveTo(bx - 10, by + bh/2);
+    ctx.lineTo(bx, by + bh/2 + 14);
+    ctx.lineTo(bx + 10, by + bh/2);
+    ctx.fill();
+    // Words appearing one by one
+    let xOff = -fullWidth / 2;
+    ctx.textAlign = 'left';
+    for(let i = 0; i < words.length; i++){
+      const wordStart = i * 0.15;
+      const wordElapsed = Math.max(0, elapsed - wordStart);
+      const wAlpha = Math.min(wordElapsed / 0.25, 1) * mAlpha;
+      const bounce = wordElapsed < 0.3 ? Math.sin(wordElapsed / 0.3 * PI) * 4 : 0;
+      const ww = ctx.measureText(words[i] + ' ').width;
+      ctx.fillStyle = `rgba(255,255,255,${wAlpha * 0.9})`;
+      ctx.fillText(words[i], bx + xOff, by + 4 - bounce);
+      xOff += ww;
+    }
+    ctx.restore();
   }
 
-  // ── Draw Chapter Text (screen space) ──
+  // ── Draw Chapter Text (screen space) — speech bubble with word reveal ──
   if(chapterDisplay){
     let cAlpha;
-    if(chapterDisplay.phase === 'fadein') cAlpha = (6.0 - chapterDisplay.life); // 0→1 over 1s
+    if(chapterDisplay.phase === 'fadein') cAlpha = Math.min((6.0 - chapterDisplay.life) / 0.8, 1);
     else if(chapterDisplay.phase === 'hold') cAlpha = 1.0;
-    else cAlpha = chapterDisplay.life / 2.0; // 1→0 over 2s
+    else cAlpha = chapterDisplay.life / 2.0;
     cAlpha = Math.max(0, Math.min(1, cAlpha));
-
-    // Semi-transparent backdrop
-    ctx.fillStyle = `rgba(0,0,0,${cAlpha * 0.5})`;
-    const boxW = Math.min(W * 0.85, 500);
-    const boxH = 80;
-    ctx.fillRect((W - boxW)/2, H/2 - boxH/2, boxW, boxH);
-
-    // Text
-    ctx.fillStyle = `rgba(255,255,255,${cAlpha * 0.9})`;
-    ctx.font = '300 0.9rem sans-serif';
-    ctx.textAlign = 'center';
-    ctx.shadowColor = `rgba(200,200,255,${cAlpha * 0.4})`;
-    ctx.shadowBlur = 12;
-    // Word wrap
+    const elapsed = 6.0 - chapterDisplay.life;
     const words = chapterDisplay.text.split(' ');
+    const a = theme.accent2;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = '300 0.9rem sans-serif';
+    // Measure for bubble sizing
     const lines = []; let line = '';
     for(const w of words){
       const test = line + w + ' ';
-      if(ctx.measureText(test).width > boxW - 40){ lines.push(line); line = w + ' '; }
+      if(ctx.measureText(test).width > Math.min(W * 0.75, 420) - 40){ lines.push(line); line = w + ' '; }
       else line = test;
     }
     lines.push(line);
-    const lineH = 22;
-    const startY = H/2 - (lines.length * lineH) / 2 + lineH / 2;
-    for(let i = 0; i < lines.length; i++){
-      ctx.fillText(lines[i].trim(), W/2, startY + i * lineH);
+    const lineH = 24;
+    const padX = 24, padY = 18;
+    let maxW = 0;
+    for(const l of lines) maxW = Math.max(maxW, ctx.measureText(l.trim()).width);
+    const bw = maxW + padX * 2;
+    const bh = lines.length * lineH + padY * 2;
+    const bx = W/2, by = H * 0.42;
+    // Bubble body
+    ctx.fillStyle = `rgba(${a[0]},${a[1]},${a[2]},${cAlpha * 0.1})`;
+    ctx.strokeStyle = `rgba(${a[0]},${a[1]},${a[2]},${cAlpha * 0.3})`;
+    ctx.lineWidth = 1;
+    roundRect(ctx, bx - bw/2, by - bh/2, bw, bh, 14);
+    ctx.fill(); ctx.stroke();
+    // Bubble tail
+    ctx.fillStyle = `rgba(${a[0]},${a[1]},${a[2]},${cAlpha * 0.1})`;
+    ctx.beginPath();
+    ctx.moveTo(bx - 12, by + bh/2);
+    ctx.lineTo(bx, by + bh/2 + 16);
+    ctx.lineTo(bx + 12, by + bh/2);
+    ctx.fill();
+    // Words reveal one by one with stagger
+    let wordIdx = 0;
+    ctx.textAlign = 'left';
+    const startY = by - bh/2 + padY + lineH / 2;
+    for(let li = 0; li < lines.length; li++){
+      const lineWords = lines[li].trim().split(' ');
+      let lx = bx - maxW / 2;
+      for(let wi = 0; wi < lineWords.length; wi++){
+        const wordStart = wordIdx * 0.12;
+        const wordElapsed = Math.max(0, elapsed - wordStart);
+        const wAlpha = Math.min(wordElapsed / 0.3, 1) * cAlpha;
+        const bounce = wordElapsed < 0.35 ? Math.sin(wordElapsed / 0.35 * PI) * 3 : 0;
+        const ww = ctx.measureText(lineWords[wi] + ' ').width;
+        ctx.fillStyle = `rgba(255,255,255,${wAlpha * 0.85})`;
+        ctx.fillText(lineWords[wi], lx, startY + li * lineH - bounce);
+        lx += ww;
+        wordIdx++;
+      }
     }
-    ctx.shadowBlur = 0;
+    ctx.restore();
   }
 
   // Stars in screen space with parallax
