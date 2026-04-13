@@ -20,12 +20,18 @@ function saveProgress(){
       depthMeters: Math.max(0, cameraY / 100),
       savedAt: Date.now(),
     };
-    document.cookie = `${SAVE_KEY}=${encodeURIComponent(JSON.stringify(data))};path=/;max-age=${365*24*3600};SameSite=Lax`;
+    const json = JSON.stringify(data);
+    localStorage.setItem(SAVE_KEY, json);
+    document.cookie = `${SAVE_KEY}=${encodeURIComponent(json)};path=/;max-age=${365*24*3600};SameSite=Lax`;
   } catch(e){}
 }
 
 function loadProgress(){
   try {
+    // Try localStorage first (more reliable)
+    const local = localStorage.getItem(SAVE_KEY);
+    if(local) return JSON.parse(local);
+    // Fallback to cookie
     const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${SAVE_KEY}=([^;]*)`));
     if(!match) return null;
     return JSON.parse(decodeURIComponent(match[1]));
@@ -33,6 +39,7 @@ function loadProgress(){
 }
 
 function clearSave(){
+  localStorage.removeItem(SAVE_KEY);
   document.cookie = `${SAVE_KEY}=;path=/;max-age=0`;
   hasSaveData = false;
 }
@@ -2812,12 +2819,10 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 
-window.addEventListener('load', () => {
+function checkResume(){
   if(window._fe){
     const saved = window._fe.loadProgress();
-    // Use a slightly lower threshold for resume button to be safe
     if(saved && saved.depthMeters >= 5){
-      // Update intro text and buttons inside the existing sequence
       const thoughtText = document.getElementById('intro-thought-text');
       if(thoughtText) thoughtText.textContent = "Your journey already began.";
       
@@ -2825,31 +2830,20 @@ window.addEventListener('load', () => {
       if(embarkBtn) {
         embarkBtn.textContent = "Resume journey";
         embarkBtn.dataset.resume = "true";
-        // Explicitly bind the resume action to the button here as well
-        // to ensure it's not lost or overridden
         embarkBtn.onclick = (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          // Restore game state
+          e.preventDefault(); e.stopPropagation();
           window._fe.restoreFromSave(saved);
-          // Trigger the birth sequence (this is globally available from intro-sequence.js)
           if(window._startBirth) window._startBirth();
-          else if(typeof setPhase === 'function') setPhase('born');
         };
       }
-
-      // Add "Embark again" button
       const promptArea = document.getElementById('intro-prompt');
       if(promptArea && !document.getElementById('intro-restart')) {
         const restartBtn = document.createElement('button');
         restartBtn.id = 'intro-restart';
         restartBtn.textContent = "Embark again";
         restartBtn.style.cssText = "margin-top:1rem;font-size:0.75rem;opacity:0.5;background:transparent;border:1px solid rgba(255,255,255,0.1);color:white;padding:0.4rem 1.2rem;border-radius:20px;cursor:pointer;font-family:inherit;transition:opacity 0.3s";
-        restartBtn.onmouseover = () => restartBtn.style.opacity = "0.8";
-        restartBtn.onmouseout = () => restartBtn.style.opacity = "0.5";
         restartBtn.onclick = (e) => {
-          e.preventDefault();
-          e.stopPropagation();
+          e.preventDefault(); e.stopPropagation();
           window._fe.clearSave();
           location.reload(); 
         };
@@ -2857,7 +2851,11 @@ window.addEventListener('load', () => {
       }
     }
   }
-});
+}
+
+window.addEventListener('load', checkResume);
+// Also run immediately in case load already fired
+checkResume();
 
 // ── Gate: hide UI during intro, game canvas visible underneath ─────
 const introEl = document.getElementById('intro-sequence');
