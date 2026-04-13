@@ -2815,7 +2815,8 @@ requestAnimationFrame(frame);
 window.addEventListener('load', () => {
   if(window._fe){
     const saved = window._fe.loadProgress();
-    if(saved && saved.depthMeters >= 10){
+    // Use a slightly lower threshold for resume button to be safe
+    if(saved && saved.depthMeters >= 5){
       // Update intro text and buttons inside the existing sequence
       const thoughtText = document.getElementById('intro-thought-text');
       if(thoughtText) thoughtText.textContent = "Your journey already began.";
@@ -2824,6 +2825,17 @@ window.addEventListener('load', () => {
       if(embarkBtn) {
         embarkBtn.textContent = "Resume journey";
         embarkBtn.dataset.resume = "true";
+        // Explicitly bind the resume action to the button here as well
+        // to ensure it's not lost or overridden
+        embarkBtn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          // Restore game state
+          window._fe.restoreFromSave(saved);
+          // Trigger the birth sequence (this is globally available from intro-sequence.js)
+          if(window._startBirth) window._startBirth();
+          else if(typeof setPhase === 'function') setPhase('born');
+        };
       }
 
       // Add "Embark again" button
@@ -2856,15 +2868,16 @@ if(introEl){
   // Custom click handler for embark to support resume
   const embarkBtn = document.getElementById('intro-embark');
   if(embarkBtn) {
-    embarkBtn.onclick = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if(embarkBtn.dataset.resume === "true" && window._fe) {
-        const saved = window._fe.loadProgress();
-        if(saved) window._fe.restoreFromSave(saved);
-      }
-      if(typeof setPhase === 'function') setPhase('born');
-    };
+    // Note: onclick is already set in the window.load handler if resuming
+    // This is the fallback for new journeys
+    if(!embarkBtn.onclick) {
+      embarkBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if(typeof setPhase === 'function') setPhase('born');
+        else if(window._startBirth) window._startBirth();
+      };
+    }
   }
 
   window.addEventListener('intro-complete',()=>{

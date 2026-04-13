@@ -138,6 +138,8 @@
     else if (p === 'born') startBirth();
   }
 
+  window._startBirth = startBirth;
+
   function startBirth() {
     if (birthStarted) return;
     birthStarted = true;
