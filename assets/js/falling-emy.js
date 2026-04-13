@@ -2850,7 +2850,7 @@ window.addEventListener('load', () => {
 // ── Gate: hide UI during intro, game canvas visible underneath ─────
 const introEl = document.getElementById('intro-sequence');
 if(introEl){
-  const ui=[document.querySelector('.top-controls'),document.querySelector('.bottom-left'),document.querySelector('.back-link'),document.getElementById('sound-hint')];
+  const ui=[document.querySelector('.top-controls'),document.querySelector('.bottom-left'),document.querySelector('.back-link')];
   ui.forEach(e=>{if(e)e.style.opacity='0'; e.style.transition='opacity 1.5s ease';});
   
   // Custom click handler for embark to support resume
@@ -2868,12 +2868,7 @@ if(introEl){
   }
 
   window.addEventListener('intro-complete',()=>{
-    ui.forEach(e=>{
-      if(e) {
-        if(e.id === 'sound-hint') e.dataset.introComplete = 'true';
-        else e.style.opacity='1';
-      }
-    });
+    ui.forEach(e=>{ if(e) e.style.opacity='1'; });
   });
 }
 
@@ -2885,11 +2880,13 @@ function updateSoundHint() {
   // Show hint regardless of intro state once we are in the main loop
   if(depthM < 50) {
     hint.style.opacity = '1';
+    hint.style.display = 'block'; // Ensure it's not hidden
     // Gentle pulsation
     const pulse = 0.8 + Math.sin(time * 3) * 0.2;
     hint.style.transform = `scale(${pulse})`;
   } else if(depthM < 100) {
     hint.style.opacity = '1';
+    hint.style.display = 'block';
     hint.style.transform = 'scale(1)';
   } else {
     // Start fading at 100m
