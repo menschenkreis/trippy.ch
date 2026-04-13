@@ -883,62 +883,52 @@ function collideRagdollSphere(ragdoll, sphere, dt){
 // ── Impact particles ─────────────────────────────────────────────────────
 let particles = [];
 let shockwaves = [];
-const MAX_PARTICLES = 200;
+const MAX_PARTICLES = 150;
 const MAX_SHOCKWAVES = 6;
 let particleCount = 0;
 
 function spawnImpactParticles(sphere, force){
   const x = sphere.x, y = sphere.y, hue = sphere.hue, type = sphere.type;
-  // Scale intensity by sphere radius (bigger spheres = bigger burst)
-  const sizeScale = sphere.r / 25; 
-  const intensity = Math.min(force || 3, 10) * sizeScale;
+  // Scale intensity by sphere radius, but keep it subtle
+  const sizeScale = 0.5 + (sphere.r / 50); 
+  const intensity = Math.min(force || 3, 8) * sizeScale;
   
-  const burstCount = Math.min(3 + Math.floor(intensity * 1.5), 20);
+  const burstCount = Math.min(3 + Math.floor(intensity * 1.0), 12);
   const hue2 = (hue + 120) % 360;
   const hue3 = (hue + 240) % 360;
 
   for(let i=0; i<burstCount; i++){
     if(particleCount >= MAX_PARTICLES) break;
-    const angle = (i / burstCount) * TAU + (Math.random()-0.5)*0.3;
-    const speed = (40 + Math.random() * 80) * (intensity / 5);
+    const angle = (i / burstCount) * TAU + (Math.random()-0.5)*0.2;
+    const speed = (30 + Math.random() * 50) * (intensity / 5);
     
     let pHue = [hue, hue2, hue3][i % 3] + Math.random() * 20 - 10;
     let pType = 'spark';
-    let pSize = (0.8 + Math.random() * 2.0) * sizeScale * (intensity / 5);
-    let pDecay = 0.8 + Math.random() * 1.0;
-    let pVyBias = -15;
+    let pSize = (0.5 + Math.random() * 1.2) * sizeScale;
+    let pDecay = 1.2 + Math.random() * 1.5; // fade faster
+    let pVyBias = -10;
 
     // ── Type variations ──
     if (type === 'heart') {
-      pHue = (340 + Math.random() * 50 + 360) % 360; // Pink/Red/Crimson
+      pHue = (340 + Math.random() * 40 + 360) % 360;
       pType = 'glitter';
-      pVyBias = -50; // rise like bubbles
-      pSize *= 0.8;
+      pVyBias = -30;
+      pSize *= 0.7;
     } else if (type === 'yinyang') {
-      pHue = i % 2 === 0 ? 60 : 250; // Golden-white vs Indigo-black
+      pHue = i % 2 === 0 ? 60 : 250;
       pType = 'spark';
-      pSize *= 1.2;
-    } else if (type === 'chakra') {
-      pHue = (i * (360 / Math.min(burstCount, 7))) % 360; // Rainbow sequence
-      pType = 'glitter';
       pSize *= 1.1;
+    } else if (type === 'chakra') {
+      pHue = (i * 45) % 360;
+      pType = 'glitter';
+      pSize *= 0.9;
     } else if (type === 'challenge') {
       pType = 'ember';
-      pSize *= 1.4;
-      pDecay *= 0.6; // last longer
-      pHue = (hue + Math.random() * 40 - 20 + 360) % 360;
-    } else if (type === 'wave') {
-      pHue = (180 + Math.random() * 40 - 20 + 360) % 360; // Cyan/Aqua
-      pType = 'spark';
-    } else if (type === 'trail') {
-      pHue = (300 + Math.random() * 40 - 20 + 360) % 360; // Magenta/Pink
-      pType = 'spark';
-    } else if (type === 'pulse') {
-      pHue = (45 + Math.random() * 30 - 15 + 360) % 360; // Gold/Orange
-      pType = 'ember';
-    } else if (type === 'magnet') {
-      pHue = (220 + Math.random() * 40 - 20 + 360) % 360; // Electric Blue
-      pType = 'spark';
+      pSize *= 1.2;
+      pDecay = 0.8 + Math.random();
+    } else if (['wave', 'trail', 'pulse', 'magnet'].includes(type)) {
+      pSize *= 0.8;
+      pDecay *= 1.2;
     }
 
     particles[particleCount++] = {
@@ -953,46 +943,43 @@ function spawnImpactParticles(sphere, force){
     };
   }
 
-  // ── Aggressive embers for high-force or challenges ──
-  if(type === 'challenge' || intensity > 8){
-    const extraCount = Math.floor(intensity * 0.7);
+  // ── Aggressive embers ONLY for challenges ──
+  if(type === 'challenge'){
+    const extraCount = 3 + Math.floor(intensity * 0.3);
     for(let i=0; i<extraCount; i++){
       if(particleCount >= MAX_PARTICLES) break;
       const angle = Math.random() * TAU;
-      const speed = 15 + Math.random() * 40;
+      const speed = 10 + Math.random() * 30;
       particles[particleCount++] = {
-        x: x + (Math.random()-0.5) * 20,
-        y: y + (Math.random()-0.5) * 20,
+        x: x + (Math.random()-0.5) * 15,
+        y: y + (Math.random()-0.5) * 15,
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 25,
+        vy: Math.sin(angle) * speed - 15,
         life: 1.0,
-        decay: 0.2 + Math.random() * 0.3,
-        size: (3 + Math.random() * 4) * sizeScale,
-        hue: hue + Math.random() * 40 - 20,
+        decay: 0.5 + Math.random() * 0.5,
+        size: (2 + Math.random() * 2.5) * sizeScale,
+        hue: hue + Math.random() * 30 - 15,
         type: 'ember',
       };
     }
   }
 
-  // ── Firework rockets for special shapes ──
-  if(['heart', 'chakra', 'wave', 'trail', 'pulse', 'magnet'].includes(type)){
-    const fwCount = 1 + Math.floor(intensity * 0.2);
-    for(let i = 0; i < fwCount; i++){
-      if(particleCount >= MAX_PARTICLES) break;
-      const angle = -PI/2 + (Math.random()-0.5) * PI * 0.6;
-      const speed = 70 + Math.random() * 50;
+  // ── Firework rockets (very rare now) ──
+  if(['heart', 'chakra'].includes(type) && Math.random() > 0.6){
+    if(particleCount < MAX_PARTICLES){
+      const angle = -PI/2 + (Math.random()-0.5) * PI * 0.4;
+      const speed = 60 + Math.random() * 40;
       particles[particleCount++] = {
-        x: x + (Math.random()-0.5) * 15,
-        y,
-        vx: Math.cos(angle) * speed * 0.4,
+        x, y,
+        vx: Math.cos(angle) * speed * 0.3,
         vy: Math.sin(angle) * speed,
         life: 1.0,
-        decay: 0.5 + Math.random() * 0.3,
-        size: 1.2 * sizeScale,
-        hue: (hue + Math.random() * 60) % 360,
+        decay: 0.6 + Math.random() * 0.3,
+        size: 1.0,
+        hue: (hue + Math.random() * 40) % 360,
         type: 'firework',
-        burstTimer: 0.2 + Math.random() * 0.2,
-        burstHue: (hue + 180 + Math.random() * 60) % 360,
+        burstTimer: 0.15 + Math.random() * 0.15,
+        burstHue: (hue + 180) % 360,
         didBurst: false,
       };
     }
