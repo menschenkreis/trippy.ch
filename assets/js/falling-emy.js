@@ -75,7 +75,7 @@ function restoreFromSave(data){
   waveRings = [];
   portal = null;
   chapterDisplay = null; chapterSlowMo = 0;
-  particles = []; shockwaves = [];
+  particles = []; shockwaves = []; particleCount = 0;
   firedChapters = new Set();
   // Re-create ragdoll at saved depth
   ragdolls = [new Ragdoll(W/2, cameraY, 'emy')];
@@ -893,60 +893,61 @@ function collideRagdollSphere(ragdoll, sphere, dt){
 // ── Impact particles ─────────────────────────────────────────────────────
 let particles = [];
 let shockwaves = [];
-const MAX_PARTICLES = 150;
+const MAX_PARTICLES = 80;
+const MAX_SHOCKWAVES = 6;
+let particleCount = 0;
 
 function spawnImpactParticles(x, y, hue, force){
   const intensity = Math.min(force || 3, 10);
-  const burstCount = 4 + Math.floor(intensity * 1.2);
+  const burstCount = Math.min(3 + Math.floor(intensity * 0.8), 8);
   const hue2 = (hue + 120) % 360;
   const hue3 = (hue + 240) % 360;
 
-  // ── Shockwave ring ──
-  shockwaves.push({
-    x, y, radius: 5, maxRadius: 25 + intensity * 8,
-    life: 1.0, decay: 2.0,
-    hue, lineWidth: 1.5 + intensity * 0.3,
-  });
-
-  // ── Primary burst sparks ──
-  for(let i=0;i<burstCount;i++){
-    if(particles.length >= MAX_PARTICLES) particles.shift();
-    const angle = (i / burstCount) * TAU + (Math.random()-0.5)*0.5;
-    const speed = 40 + Math.random() * 80 * (intensity / 5);
-    const sparkHue = [hue, hue2, hue3][i % 3] + Math.random() * 30 - 15;
-    particles.push({
-      x, y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 15,
-      life: 1.0,
-      decay: 0.8 + Math.random() * 0.8,
-      size: 0.8 + Math.random() * 2 * (intensity / 5),
-      hue: sparkHue,
-      type: 'spark',
+  if(shockwaves.length < MAX_SHOCKWAVES){
+    shockwaves.push({
+      x, y, radius: 5, maxRadius: 20 + intensity * 6,
+      life: 1.0, decay: 2.5,
+      hue, lineWidth: 1.2,
     });
   }
 
-  // ── A couple embers ──
-  const emberCount = 1 + Math.floor(intensity * 0.4);
-  for(let i=0;i<emberCount;i++){
-    if(particles.length >= MAX_PARTICLES) particles.shift();
-    const angle = Math.random() * TAU;
-    const speed = 10 + Math.random() * 30;
+  for(let i=0;i<burstCount;i++){
+    if(particleCount >= MAX_PARTICLES) break;
+    const angle = (i / burstCount) * TAU + (Math.random()-0.5)*0.5;
+    const speed = 30 + Math.random() * 60 * (intensity / 5);
     particles.push({
       x, y,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 30,
+      vy: Math.sin(angle) * speed - 10,
       life: 1.0,
-      decay: 0.3 + Math.random() * 0.3,
-      size: 2.5 + Math.random() * 2.5,
+      decay: 1.0 + Math.random() * 0.8,
+      size: 0.6 + Math.random() * 1.5 * (intensity / 5),
+      hue: [hue, hue2, hue3][i % 3] + Math.random() * 30 - 15,
+      type: 'spark',
+    });
+    particleCount++;
+  }
+
+  if(particleCount < MAX_PARTICLES - 2){
+    const angle = Math.random() * TAU;
+    const speed = 8 + Math.random() * 20;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 20,
+      life: 1.0,
+      decay: 0.4 + Math.random() * 0.3,
+      size: 2 + Math.random() * 2,
       hue: hue + Math.random() * 60 - 30,
       type: 'ember',
     });
+    particleCount++;
   }
 }
 
 function updateParticles(dt){
-  for(let i = particles.length-1; i >= 0; i--){
+  let writeIdx = 0;
+  for(let i = 0; i < particleCount; i++){
     const p = particles[i];
     const grav = p.type === 'ember' ? 25 : 55;
     p.vy += grav * dt;
@@ -955,14 +956,24 @@ function updateParticles(dt){
     p.vx *= 0.96;
     p.vy *= 0.96;
     p.life -= p.decay * dt;
-    if(p.life <= 0) particles.splice(i, 1);
+    if(p.life > 0){
+      if(writeIdx !== i) particles[writeIdx] = p;
+      writeIdx++;
+    }
   }
-  for(let i = shockwaves.length-1; i >= 0; i--){
+  particleCount = writeIdx;
+
+  let swWrite = 0;
+  for(let i = 0; i < shockwaves.length; i++){
     const sw = shockwaves[i];
     sw.radius += (sw.maxRadius - sw.radius) * 4 * dt;
     sw.life -= sw.decay * dt;
-    if(sw.life <= 0) shockwaves.splice(i, 1);
+    if(sw.life > 0){
+      if(swWrite !== i) shockwaves[swWrite] = sw;
+      swWrite++;
+    }
   }
+  shockwaves.length = swWrite;
 }
 
 function updateScoreElements(dt){
@@ -1093,7 +1104,8 @@ function drawParticles(){
   ctx.shadowBlur = 0;
 
   // ── Draw particles ──
-  for(const p of particles){
+  for(let pi = 0; pi < particleCount; pi++){
+    const p = particles[pi];
     const alpha = p.life * (p.life > 0.5 ? 1.0 : p.life * 2.0);
 
     if(p.type === 'spark'){
