@@ -2877,28 +2877,26 @@ function updateSoundHint() {
   if(!hint) return;
   const depthM = Math.max(0, cameraY / 100);
   
-  if(depthM < 100) {
-    // FORCE visibility - override any other script
+  if(depthM < 50) {
+    // FORCE visibility until 50m
     hint.style.setProperty('display', 'block', 'important');
     hint.style.setProperty('opacity', '1', 'important');
     
-    if(depthM < 50) {
-      const pulse = 0.8 + Math.sin(time * 3) * 0.2;
-      hint.style.transform = `scale(${pulse})`;
-    } else {
-      hint.style.transform = 'scale(1)';
-    }
+    // Very subtle pulsation
+    const pulse = 0.95 + Math.sin(time * 2.5) * 0.05;
+    hint.style.transform = `scale(${pulse})`;
   } else {
-    // Only here do we allow it to fade
+    // Start fading at 50m
     hint.style.removeProperty('opacity');
-    hint.style.transition = 'opacity 2.5s ease, transform 2.5s ease';
+    hint.style.removeProperty('display');
+    hint.style.transition = 'opacity 3.0s ease, transform 3.0s ease';
     hint.style.opacity = '0';
-    hint.style.transform = 'scale(0.8)';
+    hint.style.transform = 'scale(0.85)';
     setTimeout(() => { 
       if(hint.style.opacity === '0') {
         hint.style.display = 'none';
       }
-    }, 3000);
+    }, 3500);
   }
 }
 
