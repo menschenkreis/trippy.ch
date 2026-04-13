@@ -118,9 +118,19 @@ function hslToRgbArr(h, s, l) {
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
+// ── Random Names ────────────────────────────────────────────────────────
+function generateName(){
+  const p = ['l','n','r','s','m','k','z','v','t','x'];
+  const m = ['a','e','i','o','u','y','ae','io','ea'];
+  const s = ['x','n','m','l','r','s','th','z','k'];
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+  return pick(p) + pick(m) + pick(s);
+}
+
 // ── Ragdoll ──────────────────────────────────────────────────────────────
 class Ragdoll {
-  constructor(x, y){
+  constructor(x, y, name){
+    this.name = name || generateName();
     this.hue = Math.random() * 360;
     this.accent = hslToRgbArr(this.hue, 0.85, 0.6);
     this.accent2 = hslToRgbArr((this.hue + 40)%360, 0.9, 0.75);
@@ -394,7 +404,7 @@ let cameraY = 0; // camera offset — follows the ragdoll's descent
 let fallSpeed = 0; // how deep the ragdoll has fallen
 
 // Spawn initial
-ragdolls.push(new Ragdoll(W/2, 0));
+ragdolls.push(new Ragdoll(W/2, 0, 'emy'));
 for(let i=0;i<8;i++) spawnSphereAtDepth(i * 120 + Math.random()*80);
 
 function spawnSphereAtDepth(yWorld){
@@ -480,7 +490,7 @@ muteBtn.onclick = () => {
 document.getElementById('reset-btn').onclick = () => {
   isDragging = false; dragRagdoll = null; dragParticle = null;
   cameraY = 0; fallSpeed = 0;
-  ragdolls = [new Ragdoll(W/2, 0)];
+  ragdolls = [new Ragdoll(W/2, 0, 'emy')];
   spheres = [];
   for(let i=0;i<8;i++) spawnSphereAtDepth(i*120+Math.random()*80);
 };
@@ -863,6 +873,13 @@ function drawRagdoll(ragdoll){
       }
     }
   }
+
+  // Name tag
+  const head = ps[0];
+  ctx.fillStyle = `rgba(${a2[0]},${a2[1]},${a2[2]},0.4)`;
+  ctx.font = '200 0.5rem monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(ragdoll.name, head.x, head.y - 25);
 }
 
 // ── Camera follows ragdoll + spawn spheres ahead ──────────────────────
