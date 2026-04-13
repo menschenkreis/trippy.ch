@@ -54,6 +54,15 @@
 </head>
 <body class="experiment-view">
   <div id="page-transition" class="page-transition"></div>
+  <div id="intro-sequence">
+    <canvas id="intro-canvas"></canvas>
+    <div id="intro-thought">
+      <p id="intro-thought-text">Your journey has not been written yet.</p>
+    </div>
+    <div id="intro-prompt">
+      <button id="intro-embark">Embark into life</button>
+    </div>
+  </div>
   <canvas id="c"></canvas>
   <a href="../experiments.html" class="back-link">↞</a>
   <div class="top-controls">
@@ -164,6 +173,7 @@
     <hr class="panel-divider">
     <a href="https://github.com/menschenkreis/trippy.ch" class="source-link" target="_blank" rel="noopener">view source on GitHub ↗</a>
   </div>
+  <script src="../assets/js/intro-sequence.js"></script>
   <script src="../assets/js/falling-emy.js"></script>
   <script src="../assets/js/main.js"></script>
   <script>

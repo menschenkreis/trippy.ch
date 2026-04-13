@@ -9,15 +9,6 @@
 </head>
 <body>
   <div id="page-transition" class="page-transition"></div>
-  <div id="intro-sequence">
-    <canvas id="intro-canvas"></canvas>
-    <div id="intro-thought">
-      <p id="intro-thought-text">Your journey has not been written yet.</p>
-    </div>
-    <div id="intro-prompt">
-      <button id="intro-embark">Embark into life</button>
-    </div>
-  </div>
   <button id="contrast-btn" title="Toggle high contrast">LC</button>
   <button id="theme-btn" title="Randomize theme">✦</button>
   <section class="hero">
@@ -51,7 +42,6 @@
     <p>trippy.ch — a creative experiment</p>
   </footer>
 
-  <script src="assets/js/intro-sequence.js"></script>
   <script src="assets/js/hero-morph.js"></script>
   <script src="assets/js/main.js"></script>
   <script>document.getElementById('page-transition').classList.add('is-active');requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('page-transition').classList.remove('is-active')));</script>

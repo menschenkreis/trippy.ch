@@ -2501,4 +2501,17 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 
+// ── Gate: wait for intro sequence if present ─────────────────────────
+const introEl = document.getElementById('intro-sequence');
+if(introEl){
+  canvas.style.opacity='0';
+  const ui=[document.querySelector('.top-controls'),document.querySelector('.bottom-left'),document.querySelector('.back-link')];
+  ui.forEach(e=>{if(e)e.style.opacity='0'});
+  window.addEventListener('intro-complete',()=>{
+    canvas.style.transition='opacity 1.5s ease';
+    canvas.style.opacity='1';
+    ui.forEach(e=>{if(e){e.style.transition='opacity 1.5s ease';e.style.opacity='1'}});
+  });
+}
+
 })();
