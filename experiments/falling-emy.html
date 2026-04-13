@@ -64,6 +64,18 @@
     </div>
   </div>
   <canvas id="c"></canvas>
+  <!-- Resume Modal -->
+  <div id="resume-modal" style="position:fixed;inset:0;z-index:600;background:rgba(5,5,12,0.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center;flex-direction:column">
+    <div style="text-align:center;max-width:360px;padding:2rem">
+      <p style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.18em;color:rgba(140,100,255,0.6);margin:0 0 0.8rem">saved journey</p>
+      <h2 id="resume-depth" style="font-size:2.2rem;font-weight:200;letter-spacing:0.08em;color:rgba(255,255,255,0.85);margin:0 0 0.3rem"></h2>
+      <p id="resume-meta" style="font-size:0.78rem;color:rgba(255,255,255,0.3);margin:0 0 2rem;line-height:1.6"></p>
+      <div style="display:flex;flex-direction:column;gap:0.7rem;align-items:center">
+        <button id="resume-btn" style="width:200px;padding:0.7rem 0;border:1px solid rgba(140,100,255,0.35);border-radius:28px;background:rgba(140,100,255,0.08);color:rgba(255,255,255,0.8);font-size:0.85rem;font-weight:300;letter-spacing:0.06em;cursor:pointer;transition:all 0.25s;font-family:inherit">Continue Journey</button>
+        <button id="new-journey-btn" style="width:200px;padding:0.7rem 0;border:1px solid rgba(255,255,255,0.08);border-radius:28px;background:transparent;color:rgba(255,255,255,0.35);font-size:0.78rem;font-weight:300;letter-spacing:0.06em;cursor:pointer;transition:all 0.25s;font-family:inherit">New Journey</button>
+      </div>
+    </div>
+  </div>
   <a href="../experiments.html" class="back-link">↞</a>
   <div class="top-controls">
     <button id="add-btn" class="ctrl-btn" title="Add ragdoll">+</button>

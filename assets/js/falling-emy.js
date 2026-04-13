@@ -5,6 +5,93 @@ const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 const PI = Math.PI, TAU = PI*2;
 
+// ── Cookie Save/Resume ──────────────────────────────────────────────────
+const SAVE_KEY = 'falling-emy-save';
+const SAVE_INTERVAL = 3000; // auto-save every 3s
+let lastSaveTime = 0;
+let hasSaveData = false;
+let resumeCallback = null; // set by modal
+
+function saveProgress(){
+  try {
+    const data = {
+      cameraY, score, fallSpeed, time,
+      nextChallengeY, nextShapeY, themeIdx,
+      depthMeters: Math.max(0, cameraY / 100),
+      savedAt: Date.now(),
+    };
+    document.cookie = `${SAVE_KEY}=${encodeURIComponent(JSON.stringify(data))};path=/;max-age=${365*24*3600};SameSite=Lax`;
+  } catch(e){}
+}
+
+function loadProgress(){
+  try {
+    const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${SAVE_KEY}=([^;]*)`));
+    if(!match) return null;
+    return JSON.parse(decodeURIComponent(match[1]));
+  } catch(e){ return null; }
+}
+
+function clearSave(){
+  document.cookie = `${SAVE_KEY}=;path=/;max-age=0`;
+  hasSaveData = false;
+}
+
+function formatDepth(m){
+  if(m >= 1000) return (m/1000).toFixed(1) + ' km';
+  return m.toFixed(0) + ' m';
+}
+
+function formatTimeAgo(ts){
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if(s < 60) return 'just now';
+  if(s < 3600) return Math.floor(s/60) + ' min ago';
+  if(s < 86400) return Math.floor(s/3600) + 'h ago';
+  return Math.floor(s/86400) + 'd ago';
+}
+
+function autoSave(now){
+  if(now - lastSaveTime > SAVE_INTERVAL && cameraY > 500){
+    saveProgress();
+    lastSaveTime = now;
+  }
+}
+
+function restoreFromSave(data){
+  cameraY = data.cameraY;
+  score = data.score;
+  displayScore = data.score;
+  fallSpeed = data.fallSpeed || 0;
+  time = data.time || 0;
+  nextChallengeY = data.nextChallengeY || cameraY + 10000;
+  nextShapeY = data.nextShapeY || cameraY + 2000;
+  themeIdx = data.themeIdx || 0;
+  theme = themes[themeIdx];
+  // Reset transient state
+  comboCount = 0; lastHitTime = 0;
+  scorePopups = []; scoreFlies = [];
+  harmonyIndex = 0; harmonicCooldown = 0;
+  activeEffects = { wave: 0, trail: 0, pulse: 0, magnet: 0 };
+  waveRings = [];
+  portal = null;
+  chapterDisplay = null; chapterSlowMo = 0;
+  particles = []; shockwaves = [];
+  firedChapters = new Set();
+  // Re-create ragdoll at saved depth
+  ragdolls = [new Ragdoll(W/2, cameraY, 'emy')];
+  spheres = [];
+  // Pre-spawn spheres in the visible range around saved position
+  const behindY = cameraY - H;
+  const aheadY = cameraY + H;
+  for(let y = behindY; y < aheadY; y += 400 + Math.random()*400){
+    if(y > 5000) spawnSphereAtDepth(y);
+  }
+  lastSaveTime = time;
+}
+
+// Expose to global scope for resume modal
+window._fe = { loadProgress, restoreFromSave, clearSave, formatDepth, formatTimeAgo };
+
 // ── Resize ───────────────────────────────────────────────────────────────
 let W, H, dpr;
 function resize(){
@@ -1168,6 +1255,7 @@ tiltBtn.onclick = () => {
   else initAccel(); // Ensure permission is requested if turned on explicitly
 };
 document.getElementById('reset-btn').onclick = () => {
+  clearSave();
   isDragging = false; dragRagdoll = null; dragParticle = null;
   cameraY = 0; fallSpeed = 0;
   portal = null;
@@ -1991,6 +2079,7 @@ function frame(now){
   timeScale += (effectiveTimeScale - timeScale) * ease;
 
   time += rawDt;
+  autoSave(time);
   const dt = (rawDt * timeScale) / SUBSTEPS;
 
   // Physics substeps
@@ -2578,6 +2667,25 @@ if(introEl){
   ui.forEach(e=>{if(e)e.style.opacity='0'; e.style.transition='opacity 1.5s ease';});
   window.addEventListener('intro-complete',()=>{
     ui.forEach(e=>{if(e)e.style.opacity='1'});
+    // Show resume modal after intro
+    if(window._fe){
+      const saved = window._fe.loadProgress();
+      if(saved && saved.depthMeters >= 10){
+        const modal = document.getElementById('resume-modal');
+        modal.style.display='flex';
+        document.getElementById('resume-depth').textContent = window._fe.formatDepth(saved.depthMeters);
+        document.getElementById('resume-meta').innerHTML =
+          `${saved.score.toLocaleString()} points<br>${window._fe.formatTimeAgo(saved.savedAt)}`;
+        document.getElementById('resume-btn').onclick = () => {
+          window._fe.restoreFromSave(saved);
+          modal.style.display='none';
+        };
+        document.getElementById('new-journey-btn').onclick = () => {
+          window._fe.clearSave();
+          modal.style.display='none';
+        };
+      }
+    }
   });
 }
 
