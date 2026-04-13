@@ -410,6 +410,66 @@ function drawKaleidoscope(cx, cy, radius, folds, rotation, hueOffset, alpha, par
   ctx.beginPath(); ctx.arc(cx,cy,radius*0.2,0,TAU); ctx.fill();
 }
 
+function drawStarfield(parallax){
+  // Deterministic star positions based on grid cells
+  const starSpacing = 80;
+  const scrollY = cameraY * parallax;
+  const startCellY = Math.floor(scrollY / starSpacing) - 1;
+  const endCellY = startCellY + Math.ceil(H / starSpacing) + 2;
+  const startCellX = -1;
+  const endCellX = Math.ceil(W / starSpacing) + 1;
+
+  for(let cy = startCellY; cy <= endCellY; cy++){
+    for(let cx = startCellX; cx <= endCellX; cx++){
+      // Deterministic hash for this cell
+      const seed = cx * 73856093 ^ cy * 19349663;
+      const h1 = ((seed >>> 0) % 1000) / 1000;
+      const h2 = (((seed * 83492791) >>> 0) % 1000) / 1000;
+      const h3 = (((seed * 49297347) >>> 0) % 1000) / 1000;
+
+      // Only ~40% of cells have a star
+      if(h1 > 0.4) continue;
+
+      const sx = cx * starSpacing + h2 * starSpacing;
+      const sy = cy * starSpacing + h3 * starSpacing - scrollY;
+
+      // Skip if off screen
+      if(sx < -5 || sx > W+5 || sy < -5 || sy > H+5) continue;
+
+      // Star properties from hash
+      const brightness = 0.15 + h1 * 0.6; // 0.15 - 0.39
+      const size = 0.5 + h3 * 1.5;
+      const twinkleSpeed = 1.0 + h2 * 4.0;
+      const twinklePhase = h1 * TAU * 10;
+
+      // Twinkle
+      const twinkle = 0.5 + 0.5 * Math.sin(time * twinkleSpeed + twinklePhase);
+      const alpha = brightness * (0.4 + 0.6 * twinkle);
+
+      // Colour — slight variation
+      const hue = (h2 * 360 + h3 * 60 + time * 5) % 360;
+      const sat = 20 + h1 * 40; // mostly white-ish
+      const light = 70 + twinkle * 25;
+
+      // Draw star
+      ctx.fillStyle = `hsla(${hue},${sat}%,${light}%,${alpha})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, size * (0.6 + 0.4 * twinkle), 0, TAU);
+      ctx.fill();
+
+      // Bright stars get a subtle cross sparkle
+      if(brightness > 0.3 && twinkle > 0.7){
+        const sparkle = (twinkle - 0.7) / 0.3 * 0.15;
+        ctx.strokeStyle = `hsla(${hue},${sat}%,${light}%,${sparkle})`;
+        ctx.lineWidth = 0.5;
+        const len = size * 3;
+        ctx.beginPath(); ctx.moveTo(sx-len, sy); ctx.lineTo(sx+len, sy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(sx, sy-len); ctx.lineTo(sx, sy+len); ctx.stroke();
+      }
+    }
+  }
+}
+
 function drawBackground(){
   // Gradient background — screen-space
   const grad = ctx.createRadialGradient(W/2,H/2,0, W/2,H/2,Math.max(W,H)*0.7);
@@ -438,6 +498,9 @@ function drawBackground(){
   const px3 = cameraY * 0.5;
   drawKaleidoscope(W*0.15, H*0.6 - px3, 140, 5, time*0.05, 90, 0.045, px3);
   drawKaleidoscope(W*0.85, H*0.35 - px3*0.6, 170, 8, -time*0.045, 210, 0.04, px3*0.6);
+
+  // ── Endless twinkling stars — slow parallax (0.15×) ──────────────────
+  drawStarfield(0.15);
 
   // Subtle grid — world space
   const a = theme.accent;
