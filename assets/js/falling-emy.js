@@ -81,49 +81,43 @@ const pentatonicScale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21]; // C D E G A c d e 
 let activeEffects = { wave: 0, trail: 0, pulse: 0, magnet: 0 };
 let waveRings = []; // {x, y, radius, life}
 
-// ── Milestones ──
-const milestones = [500, 10000, 25000, 50000, 100000];
-let lastMilestone = 0;
-let journeyLog = []; // {type:'chapter'|'milestone', label, text}
-let milestoneText = null; // {text, life}
-let milestoneSlowMo = 0;
-
-// ── Life Chapters ──
-const lifeChapters = [
-  { age: 0.1, text: "The first breath. Pure awareness. No past, no future." },
-  { age: 1, text: "Year one. Every sensation is brand new." },
-  { age: 2, text: "Learning to walk. Every fall is a discovery." },
-  { age: 3, text: "Why? Why? Why? The universe is infinite questions." },
-  { age: 4, text: "Imagination runs wild. Everything is alive." },
-  { age: 5, text: "The first day of something bigger." },
-  { age: 6, text: "Friendships form. The world gets wider." },
-  { age: 7, text: "Losing teeth. Growing. Things fall away to make room." },
-  { age: 8, text: "Reading opens doors to a thousand worlds." },
-  { age: 9, text: "Almost double digits. Time starts to feel real." },
-  { age: 10, text: "A whole decade. You have no idea how fast this goes." },
-  { age: 11, text: "The in-between years. Neither child nor teenager." },
-  { age: 12, text: "A turning point. Everything begins to change." },
-  { age: 13, text: "Teenage years. The void gets deeper." },
-  { age: 14, text: "Rebellion. Questioning everything you were told." },
-  { age: 15, text: "First love, first heartbreak. The obstacles get sharper." },
-  { age: 16, text: "Finding your people. Or learning to be alone." },
-  { age: 17, text: "The edge of something vast." },
-  { age: 18, text: "Adulthood arrives. Nobody feels ready." },
-  { age: 20, text: "The twenties. A blur of motion and mistakes." },
-  { age: 25, text: "A quarter century. Who am I now?" },
-  { age: 30, text: "Thirty. The fall feels different from here." },
-  { age: 35, text: "The gravity of choices becomes undeniable." },
-  { age: 40, text: "Midlife. Not a crisis — a clearing." },
-  { age: 50, text: "Half a century of falling. Grace finds its rhythm." },
-  { age: 60, text: "Wisdom isn't knowing more. It's carrying less." },
-  { age: 70, text: "The obstacles soften. The geometry becomes beautiful." },
-  { age: 80, text: "A long fall. A good fall. Still falling." },
-  { age: 90, text: "Nearly a century. The void and you are old friends." },
-  { age: 100, text: "A hundred years of descent. What a journey." },
-];
-let lastChapter = 0;
+// ── Life Chapters (includes milestones) ──
+let journeyLog = []; // {label, text}
 let chapterDisplay = null; // {text, life, phase}
 let chapterSlowMo = 0;
+let lastChapter = -1;
+
+const lifeChapters = [
+  { age: 0.1, label: 'Birth', text: 'No past. But so much future ahead.' },
+  { age: 1, label: 'Year 1', text: 'Every sensation is brand new. The world is pure wonder.' },
+  { age: 2, label: 'Year 2', text: 'Learning to walk. Every fall is a discovery.' },
+  { age: 3, label: 'Year 3', text: 'Why? Why? Why? The universe is infinite questions.' },
+  { age: 4, label: 'Year 4', text: 'Imagination runs wild. Everything is alive.' },
+  { age: 5, label: 'Year 5', text: 'The first day of something bigger.' },
+  { age: 6, label: 'Year 6', text: 'Friendships form. The world gets wider.' },
+  { age: 7, label: 'Year 7', text: 'Things fall away. But they make room for what comes next.' },
+  { age: 8, label: 'Year 8', text: 'Reading opens doors to a thousand worlds.' },
+  { age: 9, label: 'Year 9', text: 'Almost double digits. Time starts to feel real.' },
+  { age: 10, label: 'Year 10', text: 'A whole decade. You have no idea how fast this goes.' },
+  { age: 12, label: 'Year 12', text: 'A turning point. Everything begins to change.' },
+  { age: 13, label: 'Year 13', text: 'The void gets deeper.' },
+  { age: 15, label: 'Year 15', text: 'First love. First heartbreak. The obstacles get sharper.' },
+  { age: 18, label: 'Year 18', text: 'Adulthood arrives. Nobody feels ready.' },
+  { age: 0.5, label: '500 m', text: 'The descent begins.' },
+  { age: 10, label: '10 km', text: 'The void stretches on.' },
+  { age: 25, label: 'Year 25', text: 'A quarter century. Who am I now?' },
+  { age: 25, label: '25 km', text: 'Gravity feels different now.' },
+  { age: 30, label: 'Year 30', text: 'The fall feels different from here.' },
+  { age: 40, label: 'Year 40', text: 'Not a crisis — a clearing.' },
+  { age: 50, label: 'Year 50', text: 'Half a century. Grace finds its rhythm.' },
+  { age: 50, label: '50 km', text: 'Halfway to somewhere.' },
+  { age: 60, label: 'Year 60', text: 'Wisdom is not knowing more. It is carrying less.' },
+  { age: 70, label: 'Year 70', text: 'The obstacles soften. The geometry becomes beautiful.' },
+  { age: 80, label: 'Year 80', text: 'A long fall. A good fall. Still falling.' },
+  { age: 90, label: 'Year 90', text: 'The void and you are old friends.' },
+  { age: 100, label: '100 km', text: 'Dawn breaks.' },
+  { age: 100, label: 'Year 100', text: 'A hundred years of descent. What a journey.' },
+];
 
 // ── Accelerometer ────────────────────────────────────────────────────────
 let accelInited = false;
@@ -1112,9 +1106,8 @@ document.getElementById('reset-btn').onclick = () => {
   harmonyIndex = 0; harmonicCooldown = 0;
   activeEffects = { wave: 0, trail: 0, pulse: 0, magnet: 0 };
   waveRings = [];
-  lastMilestone = 0; milestoneText = null; milestoneSlowMo = 0;
   journeyLog = []; updateJourneyPanel();
-  lastChapter = 0; chapterDisplay = null; chapterSlowMo = 0;
+  lastChapter = -1; chapterDisplay = null; chapterSlowMo = 0;
   ragdolls = [new Ragdoll(W/2, 0, 'emy')];
   spheres = [];
   for(let i=0;i<8;i++) spawnSphereAtDepth(i*120+Math.random()*80);
@@ -2325,173 +2318,98 @@ function frame(now){
   // ── Update Journey Panel ──
   function updateJourneyPanel(){
     const el = document.getElementById('journey-log');
-    if(!el) return;
-    if(journeyLog.length === 0) return;
+    if(!el || journeyLog.length === 0) return;
     let html = '';
     for(let i = journeyLog.length - 1; i >= 0; i--){
       const e = journeyLog[i];
-      const icon = e.type === 'chapter' ? '📖' : '🎯';
-      html += `<div class="journey-entry"><div class="journey-icon">${icon}</div><div class="journey-entry-text"><strong>${e.label}</strong> — ${e.text || e.label}</div></div>`;
+      html += `<div class="journey-entry"><div class="journey-icon">${e.label.startsWith('Year') || e.label === 'Birth' ? '📖' : '🎯'}</div><div class="journey-entry-text"><strong>${e.label}</strong> — ${e.text}</div></div>`;
     }
     el.innerHTML = html;
   }
 
-  // ── Milestone & Chapter Logic ──
-  // Milestones
-  for(const m of milestones){
-    if(depthMeters >= m && lastMilestone < m){
-      lastMilestone = m;
-      if(!chapterDisplay){
-        milestoneSlowMo = 0.5;
-        const quips = {
-          500: '500 m — the descent begins',
-          10000: '10 km — the void stretches on',
-          25000: '25 km — gravity feels different now',
-          50000: '50 km — halfway to somewhere',
-          100000: '100 km — dawn breaks',
-        };
-        milestoneText = {text: quips[m] || (m >= 1000 ? (m/1000) + ' km' : m + ' m'), life: 2.5};
-        journeyLog.push({type:'milestone', label: m >= 1000 ? (m/1000) + ' km' : m + ' m', text: quips[m] || ''});
-        updateJourneyPanel();
-        playMilestoneChord();
-      }
-      // Spawn celebration particles (screen space) — reduced
-      for(let i = 0; i < 20; i++){
-        particles.push({
-          x: W/2, y: H/2 + cameraY,
-          vx: (Math.random()-0.5)*300, vy: (Math.random()-0.5)*300,
-          life: 1.5 + Math.random(), decay: 0.4 + Math.random()*0.3,
-          size: 2 + Math.random()*2, hue: Math.random()*360, sparkle: false,
-        });
-      }
-    }
-  }
-  if(milestoneSlowMo > 0){
-    milestoneSlowMo -= rawDt;
-    targetTimeScale = 0.3;
-  } else if(milestoneSlowMo !== -1 && !isSlowed){
-    targetTimeScale = 1.0;
-    milestoneSlowMo = -1;
-  }
-  if(milestoneText){
-    milestoneText.life -= rawDt;
-    if(milestoneText.life <= 0) milestoneText = null;
-  }
-
-  // Life Chapters
+  // ── Chapter Logic (unified) ──
   for(const ch of lifeChapters){
     const triggerDepth = ch.age * 1000;
-    if(depthMeters >= triggerDepth && lastChapter < ch.age){
-      lastChapter = ch.age;
-      if(!milestoneText){
-        chapterSlowMo = 1.0;
-        chapterDisplay = {text: ch.text, life: 6.0, phase: 'fadein'};
-        journeyLog.push({type:'chapter', label: ch.age < 1 ? 'Birth' : 'Year ' + ch.age, text: ch.text});
+    if(depthMeters >= triggerDepth && lastChapter < lifeChapters.indexOf(ch)){
+      lastChapter = lifeChapters.indexOf(ch);
+      if(!chapterDisplay){
+        const isMilestone = ch.label.endsWith('km') || ch.label.endsWith('m');
+        chapterSlowMo = isMilestone ? 0.5 : 1.0;
+        chapterDisplay = {text: ch.text, life: isMilestone ? 2.5 : 6.0, phase: 'fadein'};
+        journeyLog.push({label: ch.label, text: ch.text});
         updateJourneyPanel();
         playMilestoneChord();
+        if(isMilestone){
+          for(let i = 0; i < 20; i++){
+            particles.push({
+              x: W/2, y: H/2 + cameraY,
+              vx: (Math.random()-0.5)*300, vy: (Math.random()-0.5)*300,
+              life: 1.5 + Math.random(), decay: 0.4 + Math.random()*0.3,
+              size: 2 + Math.random()*2, hue: Math.random()*360, sparkle: false,
+            });
+          }
+        }
       }
     }
   }
   if(chapterSlowMo > 0){
     chapterSlowMo -= rawDt;
-    targetTimeScale = 0.15;
-  } else if(chapterSlowMo !== -1 && !isSlowed && milestoneSlowMo <= 0){
+    targetTimeScale = 0.2;
+  } else if(chapterSlowMo !== -1 && !isSlowed){
     targetTimeScale = 1.0;
     chapterSlowMo = -1;
   }
   if(chapterDisplay){
+    const maxLife = chapterDisplay.life > 3 ? 6.0 : 2.5;
     chapterDisplay.life -= rawDt;
-    if(chapterDisplay.life > 5.0) chapterDisplay.phase = 'fadein';
+    if(chapterDisplay.life > maxLife - 1) chapterDisplay.phase = 'fadein';
     else if(chapterDisplay.life > 2.0) chapterDisplay.phase = 'hold';
     else chapterDisplay.phase = 'fadeout';
     if(chapterDisplay.life <= 0) chapterDisplay = null;
   }
 
-  // ── Draw Milestone Text (screen space) — speech bubble ──
-  if(milestoneText){
-    const mAlpha = Math.min(milestoneText.life / 0.5, 1) * Math.min(milestoneText.life, 1);
-    const words = milestoneText.text.split(' ');
-    const elapsed = 2.0 - milestoneText.life;
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.font = '300 1rem sans-serif';
-    // Measure full text for bubble
-    let fullWidth = ctx.measureText(milestoneText.text).width;
-    const padX = 28, padY = 16;
-    const bx = W/2, by = H * 0.38;
-    const bw = fullWidth + padX * 2;
-    const bh = 40 + padY;
-    // Bubble body
-    ctx.fillStyle = `rgba(${theme.accent[0]},${theme.accent[1]},${theme.accent[2]},${mAlpha * 0.15})`;
-    ctx.strokeStyle = `rgba(${theme.accent[0]},${theme.accent[1]},${theme.accent[2]},${mAlpha * 0.4})`;
-    ctx.lineWidth = 1;
-    roundRect(ctx, bx - bw/2, by - bh/2, bw, bh, 16);
-    ctx.fill(); ctx.stroke();
-    // Bubble tail
-    ctx.fillStyle = `rgba(${theme.accent[0]},${theme.accent[1]},${theme.accent[2]},${mAlpha * 0.15})`;
-    ctx.beginPath();
-    ctx.moveTo(bx - 10, by + bh/2);
-    ctx.lineTo(bx, by + bh/2 + 14);
-    ctx.lineTo(bx + 10, by + bh/2);
-    ctx.fill();
-    // Words appearing one by one
-    let xOff = -fullWidth / 2;
-    ctx.textAlign = 'left';
-    for(let i = 0; i < words.length; i++){
-      const wordStart = i * 0.15;
-      const wordElapsed = Math.max(0, elapsed - wordStart);
-      const wAlpha = Math.min(wordElapsed / 0.25, 1) * mAlpha;
-      const bounce = wordElapsed < 0.3 ? Math.sin(wordElapsed / 0.3 * PI) * 4 : 0;
-      const ww = ctx.measureText(words[i] + ' ').width;
-      ctx.fillStyle = `rgba(255,255,255,${wAlpha * 0.9})`;
-      ctx.fillText(words[i], bx + xOff, by + 4 - bounce);
-      xOff += ww;
-    }
-    ctx.restore();
-  }
-
-  // ── Draw Chapter Text (screen space) — speech bubble with word reveal ──
+  // ── Draw Chapter Text (screen space) — speech bubble ──
   if(chapterDisplay){
+    const maxLife = chapterDisplay.life > 3 ? 6.0 : 2.5;
+    const isShort = maxLife < 3;
     let cAlpha;
-    if(chapterDisplay.phase === 'fadein') cAlpha = Math.min((6.0 - chapterDisplay.life) / 0.8, 1);
+    const fadeDur = isShort ? 0.5 : 0.8;
+    if(chapterDisplay.phase === 'fadein') cAlpha = Math.min((maxLife - chapterDisplay.life) / fadeDur, 1);
     else if(chapterDisplay.phase === 'hold') cAlpha = 1.0;
     else cAlpha = chapterDisplay.life / 2.0;
     cAlpha = Math.max(0, Math.min(1, cAlpha));
-    const elapsed = 6.0 - chapterDisplay.life;
+    const elapsed = maxLife - chapterDisplay.life;
     const words = chapterDisplay.text.split(' ');
     const a = theme.accent2;
     ctx.save();
     ctx.textAlign = 'center';
-    ctx.font = '300 0.9rem sans-serif';
-    // Measure for bubble sizing
+    ctx.font = isShort ? '300 1rem sans-serif' : '300 0.9rem sans-serif';
+    const maxLineW = Math.min(W * 0.75, isShort ? 500 : 420);
     const lines = []; let line = '';
     for(const w of words){
       const test = line + w + ' ';
-      if(ctx.measureText(test).width > Math.min(W * 0.75, 420) - 40){ lines.push(line); line = w + ' '; }
+      if(ctx.measureText(test).width > maxLineW - 40){ lines.push(line); line = w + ' '; }
       else line = test;
     }
     lines.push(line);
-    const lineH = 24;
+    const lineH = isShort ? 22 : 24;
     const padX = 24, padY = 18;
     let maxW = 0;
     for(const l of lines) maxW = Math.max(maxW, ctx.measureText(l.trim()).width);
     const bw = maxW + padX * 2;
     const bh = lines.length * lineH + padY * 2;
     const bx = W/2, by = H * 0.42;
-    // Bubble body
     ctx.fillStyle = `rgba(${a[0]},${a[1]},${a[2]},${cAlpha * 0.1})`;
     ctx.strokeStyle = `rgba(${a[0]},${a[1]},${a[2]},${cAlpha * 0.3})`;
     ctx.lineWidth = 1;
     roundRect(ctx, bx - bw/2, by - bh/2, bw, bh, 14);
     ctx.fill(); ctx.stroke();
-    // Bubble tail
     ctx.fillStyle = `rgba(${a[0]},${a[1]},${a[2]},${cAlpha * 0.1})`;
     ctx.beginPath();
     ctx.moveTo(bx - 12, by + bh/2);
     ctx.lineTo(bx, by + bh/2 + 16);
     ctx.lineTo(bx + 12, by + bh/2);
     ctx.fill();
-    // Words reveal one by one with stagger
     let wordIdx = 0;
     ctx.textAlign = 'left';
     const startY = by - bh/2 + padY + lineH / 2;
