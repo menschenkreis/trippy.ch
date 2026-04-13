@@ -1065,7 +1065,17 @@ muteBtn.onclick = () => {
   muteBtn.textContent = isMuted ? '🔇' : '🔊';
   muteBtn.classList.toggle('is-on', !isMuted);
   if(!isMuted) initAudio();
+  // Hide hint on first unmute
+  const hint = document.getElementById('sound-hint');
+  if(hint) hint.style.display = 'none';
 };
+
+  // Hide sound hint after 8s
+  setTimeout(()=>{
+    const hint = document.getElementById('sound-hint');
+    if(hint && isMuted) hint.style.opacity = '0';
+    setTimeout(()=>{ if(hint) hint.style.display = 'none'; }, 1500);
+  }, 8000);
 
 const tiltBtn = document.getElementById('tilt-btn');
 tiltBtn.onclick = () => {
