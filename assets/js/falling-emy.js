@@ -2771,6 +2771,35 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 
+window.addEventListener('load', () => {
+  if(window._fe){
+    const saved = window._fe.loadProgress();
+    if(saved && saved.depthMeters >= 10){
+      const modal = document.getElementById('resume-modal');
+      modal.style.display='flex';
+      const rd = document.getElementById('resume-depth');
+      if(rd) rd.textContent = window._fe.formatDepth(saved.depthMeters);
+      const rm = document.getElementById('resume-meta');
+      if(rm) rm.innerHTML = `${saved.score.toLocaleString()} points<br>${window._fe.formatTimeAgo(saved.savedAt)}`;
+      
+      const rb = document.getElementById('resume-btn');
+      if(rb) rb.onclick = () => {
+        window._fe.restoreFromSave(saved);
+        modal.style.display='none';
+        const intro = document.getElementById('intro-sequence');
+        if(intro){ intro.style.display='none'; intro.remove(); }
+        window.dispatchEvent(new CustomEvent('intro-complete'));
+      };
+      
+      const nb = document.getElementById('new-journey-btn');
+      if(nb) nb.onclick = () => {
+        window._fe.clearSave();
+        modal.style.display='none';
+      };
+    }
+  }
+});
+
 // ── Gate: hide UI during intro, game canvas visible underneath ─────
 const introEl = document.getElementById('intro-sequence');
 if(introEl){
@@ -2778,25 +2807,6 @@ if(introEl){
   ui.forEach(e=>{if(e)e.style.opacity='0'; e.style.transition='opacity 1.5s ease';});
   window.addEventListener('intro-complete',()=>{
     ui.forEach(e=>{if(e)e.style.opacity='1'});
-    // Show resume modal after intro
-    if(window._fe){
-      const saved = window._fe.loadProgress();
-      if(saved && saved.depthMeters >= 10){
-        const modal = document.getElementById('resume-modal');
-        modal.style.display='flex';
-        document.getElementById('resume-depth').textContent = window._fe.formatDepth(saved.depthMeters);
-        document.getElementById('resume-meta').innerHTML =
-          `${saved.score.toLocaleString()} points<br>${window._fe.formatTimeAgo(saved.savedAt)}`;
-        document.getElementById('resume-btn').onclick = () => {
-          window._fe.restoreFromSave(saved);
-          modal.style.display='none';
-        };
-        document.getElementById('new-journey-btn').onclick = () => {
-          window._fe.clearSave();
-          modal.style.display='none';
-        };
-      }
-    }
   });
 }
 
