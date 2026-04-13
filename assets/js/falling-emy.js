@@ -2874,26 +2874,26 @@ if(introEl){
 
 function updateSoundHint() {
   const hint = document.getElementById('sound-hint');
-  if(!hint || hint.style.display === 'none') return;
+  if(!hint) return;
   const depthM = Math.max(0, cameraY / 100);
   
-  // Show hint regardless of intro state once we are in the main loop
-  if(depthM < 50) {
-    hint.style.opacity = '1';
-    hint.style.display = 'block'; // Ensure it's not hidden
-    // Gentle pulsation
-    const pulse = 0.8 + Math.sin(time * 3) * 0.2;
-    hint.style.transform = `scale(${pulse})`;
-  } else if(depthM < 100) {
-    hint.style.opacity = '1';
-    hint.style.display = 'block';
-    hint.style.transform = 'scale(1)';
+  if(depthM < 100) {
+    // FORCE visibility - override any other script
+    hint.style.setProperty('display', 'block', 'important');
+    hint.style.setProperty('opacity', '1', 'important');
+    
+    if(depthM < 50) {
+      const pulse = 0.8 + Math.sin(time * 3) * 0.2;
+      hint.style.transform = `scale(${pulse})`;
+    } else {
+      hint.style.transform = 'scale(1)';
+    }
   } else {
-    // Start fading at 100m
+    // Only here do we allow it to fade
+    hint.style.removeProperty('opacity');
     hint.style.transition = 'opacity 2.5s ease, transform 2.5s ease';
     hint.style.opacity = '0';
     hint.style.transform = 'scale(0.8)';
-    // Remove after long fade
     setTimeout(() => { 
       if(hint.style.opacity === '0') {
         hint.style.display = 'none';
