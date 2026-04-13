@@ -176,8 +176,11 @@ let lastChapter = -1;
 let firedChapters = new Set();
 
 const lifeChapters = [
-  { age: 0.05, label: 'Birth', text: 'No past. But so much future ahead.' },
-  { age: 1, label: 'Year 1', text: 'Every sensation is brand new. The world is pure wonder.' },
+  { depth: 5, label: 'Birth', text: 'No past. But so much future ahead.' },
+  { depth: 100, label: 'Flow', text: 'Life is not a problem to be solved, but a reality to be experienced.' },
+  { depth: 200, label: 'Resistance', text: 'The obstacle is the path. Every collision is an awakening.' },
+  { depth: 500, label: 'Descent', text: 'To fall is to surrender. To surrender is to find the rhythm of the void.' },
+  { depth: 1000, label: 'Year 1', text: 'A thousand meters of wonder. The world is finally becoming real.' },
   { age: 2, label: 'Year 2', text: 'Learning to walk. Every fall is a discovery.' },
   { age: 3, label: 'Year 3', text: 'Why? Why? Why? The universe is infinite questions.' },
   { age: 4, label: 'Year 4', text: 'Imagination runs wild. Everything is alive.' },
@@ -191,19 +194,14 @@ const lifeChapters = [
   { age: 13, label: 'Year 13', text: 'The void gets deeper.' },
   { age: 15, label: 'Year 15', text: 'First love. First heartbreak. The obstacles get sharper.' },
   { age: 18, label: 'Year 18', text: 'Adulthood arrives. Nobody feels ready.' },
-  { age: 0.5, label: '500 m', text: 'The descent begins.' },
-  { age: 10, label: '10 km', text: 'The void stretches on.' },
   { age: 25, label: 'Year 25', text: 'A quarter century. Who am I now?' },
-  { age: 25, label: '25 km', text: 'Gravity feels different now.' },
   { age: 30, label: 'Year 30', text: 'The fall feels different from here.' },
   { age: 40, label: 'Year 40', text: 'Not a crisis — a clearing.' },
   { age: 50, label: 'Year 50', text: 'Half a century. Grace finds its rhythm.' },
-  { age: 50, label: '50 km', text: 'Halfway to somewhere.' },
   { age: 60, label: 'Year 60', text: 'Wisdom is not knowing more. It is carrying less.' },
   { age: 70, label: 'Year 70', text: 'The obstacles soften. The geometry becomes beautiful.' },
   { age: 80, label: 'Year 80', text: 'A long fall. A good fall. Still falling.' },
   { age: 90, label: 'Year 90', text: 'The void and you are old friends.' },
-  { age: 100, label: '100 km', text: 'Dawn breaks.' },
   { age: 100, label: 'Year 100', text: 'A hundred years of descent. What a journey.' },
 ];
 
@@ -2625,13 +2623,13 @@ function frame(now){
   // ── Chapter Logic (unified) ──
   for(let ci = 0; ci < lifeChapters.length; ci++){
     const ch = lifeChapters[ci];
-    const triggerDepth = ch.age * 1000;
+    const triggerDepth = ch.depth !== undefined ? ch.depth : ch.age * 1000;
     if(depthMeters >= triggerDepth && !firedChapters.has(ci)){
       if(!chapterDisplay){
         firedChapters.add(ci);
-        const isMilestone = ch.label.endsWith('km') || ch.label.endsWith('m');
-        chapterSlowMo = isMilestone ? 0.5 : 1.0;
-        chapterDisplay = {text: ch.text, life: isMilestone ? 2.5 : 6.0, phase: 'fadein'};
+        const isMilestone = ch.label.endsWith('km') || ch.label.endsWith('m') || ch.depth !== undefined;
+        chapterSlowMo = isMilestone ? 0.8 : 1.2;
+        chapterDisplay = {text: ch.text, life: isMilestone ? 3.5 : 6.0, phase: 'fadein'};
         journeyLog.push({label: ch.label, text: ch.text});
         updateJourneyPanel();
         playMilestoneChord();
