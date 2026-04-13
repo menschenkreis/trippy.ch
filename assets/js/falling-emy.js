@@ -1577,7 +1577,7 @@ function drawKaleidoscope(cx, cy, radius, folds, rotation, hueOffset, alpha, par
 
 function drawStarfield(parallax){
   // Deterministic star positions based on grid cells
-  const isDistant = parallax < 0.1;
+  const isDistant = parallax < 0.14;
   const starSpacing = isDistant ? 120 : 80;
   const scrollY = cameraY * parallax;
   const startCellY = Math.floor(scrollY / starSpacing) - 1;
@@ -1650,7 +1650,7 @@ function drawBackground(){
   // Stars (screen space — must reset transform since we're inside camera transform)
   ctx.save();
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  drawStarfield(0.08); // distant tiny stars — slow parallax
+  drawStarfield(0.12); // distant tiny stars
   drawStarfield(0.15); // closer stars
   ctx.restore();
 
