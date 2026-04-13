@@ -467,23 +467,23 @@ function collideRagdollSphere(ragdoll, sphere, dt){
 
 // ── Impact particles ─────────────────────────────────────────────────────
 let particles = [];
-const MAX_PARTICLES = 200;
+const MAX_PARTICLES = 300;
 
 function spawnImpactParticles(x, y, hue){
-  const count = 8 + Math.floor(Math.random()*8);
+  const count = 12 + Math.floor(Math.random()*12); // more particles like fireworks
   for(let i=0;i<count;i++){
     if(particles.length >= MAX_PARTICLES) particles.shift();
     const angle = Math.random() * TAU;
-    const speed = 30 + Math.random() * 120;
+    const speed = 50 + Math.random() * 200; // fast initial burst
     particles.push({
       x, y,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 20,
+      vy: Math.sin(angle) * speed - 30, // slight upward bias
       life: 1.0,
-      decay: 0.6 + Math.random() * 1.2,
-      size: 1 + Math.random() * 3,
-      hue: hue + Math.random() * 60 - 30,
-      sparkle: Math.random() > 0.6, // some get cross sparkle
+      decay: 0.5 + Math.random() * 1.5,
+      size: 0.5 + Math.random() * 1.5,
+      hue: hue + Math.random() * 40 - 20,
+      sparkle: Math.random() > 0.8,
     });
   }
 }
@@ -491,42 +491,45 @@ function spawnImpactParticles(x, y, hue){
 function updateParticles(dt){
   for(let i = particles.length-1; i >= 0; i--){
     const p = particles[i];
-    p.vy += 80 * dt; // slight gravity
+    p.vy += 150 * dt; // gravity
     p.x += p.vx * dt;
     p.y += p.vy * dt;
-    p.vx *= 0.98;
-    p.vy *= 0.98;
+    p.vx *= 0.92; // heavy friction (firework style)
+    p.vy *= 0.92;
     p.life -= p.decay * dt;
     if(p.life <= 0) particles.splice(i, 1);
   }
 }
 
 function drawParticles(){
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen'; // additive blending for bright sparks
   for(const p of particles){
-    const alpha = p.life * 0.8;
-    const twinkle = 0.5 + 0.5 * Math.sin(time * 8 + p.hue);
-    const s = p.size * (0.5 + 0.5 * twinkle) * p.life;
+    const alpha = p.life * (p.life > 0.5 ? 1.0 : p.life * 2.0); // fade out at end
+    const twinkle = 0.5 + 0.5 * Math.sin(time * 15 + p.hue);
+    const s = p.size * (0.8 + 0.4 * twinkle);
 
     // Glow
-    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, s*3);
-    grad.addColorStop(0, `hsla(${p.hue},80%,70%,${alpha*0.4})`);
-    grad.addColorStop(1, `hsla(${p.hue},80%,50%,0)`);
+    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, s*6);
+    grad.addColorStop(0, `hsla(${p.hue},90%,60%,${alpha*0.6})`);
+    grad.addColorStop(1, `hsla(${p.hue},90%,40%,0)`);
     ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(p.x, p.y, s*3, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x, p.y, s*6, 0, TAU); ctx.fill();
 
     // Core
-    ctx.fillStyle = `hsla(${p.hue},70%,85%,${alpha})`;
+    ctx.fillStyle = `hsla(${p.hue},100%,90%,${alpha})`;
     ctx.beginPath(); ctx.arc(p.x, p.y, s, 0, TAU); ctx.fill();
 
-    // Cross sparkle for sparkly ones
-    if(p.sparkle && p.life > 0.4){
-      const len = s * 4 * p.life;
-      ctx.strokeStyle = `hsla(${p.hue},60%,80%,${alpha*0.3})`;
+    // Cross sparkle
+    if(p.sparkle && p.life > 0.5){
+      const len = s * 5 * p.life;
+      ctx.strokeStyle = `hsla(${p.hue},80%,90%,${alpha*0.5})`;
       ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.moveTo(p.x-len, p.y); ctx.lineTo(p.x+len, p.y); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(p.x, p.y-len); ctx.lineTo(p.x, p.y+len); ctx.stroke();
     }
   }
+  ctx.restore();
 }
 
 // ── State ────────────────────────────────────────────────────────────────
@@ -889,16 +892,15 @@ function drawSphere(s){
   ctx.save();
   ctx.translate(s.x, s.y);
 
-  // Impact Flash Aura
+  // Impact Flash Aura (Subtle)
   if(s.impactFlash > 0){
     const f = s.impactFlash;
-    const grad = ctx.createRadialGradient(0,0,r, 0,0,r*(1.5 + f*2.0));
-    grad.addColorStop(0, `hsla(${s.hue},80%,60%,${f*0.6})`);
-    grad.addColorStop(0.3, `hsla(${s.hue},100%,80%,${f*0.3})`);
+    const grad = ctx.createRadialGradient(0,0,r, 0,0,r*(1.1 + f*0.4));
+    grad.addColorStop(0, `hsla(${s.hue},80%,60%,${f*0.15})`);
     grad.addColorStop(1, `hsla(${s.hue},100%,100%,0)`);
     ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(0,0,r*(1.5 + f*2.0),0,TAU); ctx.fill();
-    s.impactFlash -= 0.03; // decay per frame
+    ctx.beginPath(); ctx.arc(0,0,r*(1.1 + f*0.4),0,TAU); ctx.fill();
+    s.impactFlash -= 0.05; // decay faster
     if(s.impactFlash < 0) s.impactFlash = 0;
   }
 
