@@ -684,6 +684,8 @@ footer a:hover { color: var(--pink); }
 }
 
 #intro-embark {
+  -webkit-appearance: none;
+  appearance: none;
   background: rgba(140, 120, 200, 0.06);
   border: 1px solid rgba(140, 120, 200, 0.2);
   color: rgba(200, 185, 230, 0.75);
@@ -720,9 +722,10 @@ footer a:hover { color: var(--pink); }
   font-family: inherit;
   transition: all 0.5s ease;
   backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   margin-top: 0.8rem;
-  display: block;
-  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
 }
 #intro-restart:hover {
   background: rgba(140, 120, 200, 0.12);
