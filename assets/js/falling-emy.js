@@ -347,6 +347,57 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     
     osc1.start(now); osc1.stop(now + duration * 0.5 + 0.1);
 
+  } else if (type === 'merkaba') {
+    // Shimmering Arpeggio (Root, Fifth, Octave)
+    const freqs = [freq, freq * 1.5, freq * 2];
+    freqs.forEach((f, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(f, now);
+      
+      const tStart = now + i * 0.08; // stagger the notes
+      gain.gain.setValueAtTime(0, tStart);
+      gain.gain.linearRampToValueAtTime(vol * 0.4, tStart + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, tStart + duration);
+      
+      osc.connect(gain);
+      gain.connect(panner);
+      panner.connect(masterGain);
+      
+      osc.start(tStart);
+      osc.stop(tStart + duration + 0.1);
+    });
+
+  } else if (type === 'vesica') {
+    // Deep Choir Pad (Filtered sawtooth + sub oscillator)
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const gain1 = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    
+    osc1.type = 'sawtooth';
+    osc2.type = 'sine';
+    osc1.frequency.setValueAtTime(freq * 0.5, now);
+    osc2.frequency.setValueAtTime(freq * 0.25, now);
+    
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(freq * 4, now);
+    filter.frequency.exponentialRampToValueAtTime(freq * 0.5, now + duration * 2);
+    
+    gain1.gain.setValueAtTime(0, now);
+    gain1.gain.linearRampToValueAtTime(vol * 0.5, now + 0.1); // slow attack
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + duration * 2); // long fade
+    
+    osc1.connect(filter);
+    osc2.connect(filter);
+    filter.connect(gain1);
+    gain1.connect(panner);
+    panner.connect(masterGain);
+    
+    osc1.start(now); osc1.stop(now + duration * 2 + 0.1);
+    osc2.start(now); osc2.stop(now + duration * 2 + 0.1);
+
   } else {
     const osc1 = audioCtx.createOscillator();
     const gain1 = audioCtx.createGain();
@@ -546,8 +597,15 @@ for(let i=0;i<8;i++) spawnSphereAtDepth(i * 120 + Math.random()*80);
 
 function spawnSphereAtDepth(yWorld, forceType=null){
   let type = 'sphere';
-  if (forceType) type = forceType;
-  else if (Math.random() < 0.05) type = 'heart';
+  if (forceType) {
+    type = forceType;
+  } else {
+    // Reduced frequency of special obstacles (approx 1.5% each)
+    const r = Math.random();
+    if (r < 0.015) type = 'heart';
+    else if (r < 0.030) type = 'merkaba';
+    else if (r < 0.045) type = 'vesica';
+  }
 
   spheres.push(new Sphere(
     Math.random()*W,
@@ -944,6 +1002,73 @@ function drawSphere(s){
     }
     ctx.closePath();
     ctx.stroke();
+
+  } else if (s.type === 'merkaba') {
+    const hue = (60 + time*15 + s.hue) % 360; 
+    ctx.rotate(time * 0.5 + s.rotation);
+    
+    // Golden Glow
+    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.6);
+    grad.addColorStop(0, `hsla(${hue},90%,60%,0.15)`);
+    grad.addColorStop(1, `hsla(${hue},90%,60%,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0,0,r*1.6,0,TAU); ctx.fill();
+
+    ctx.strokeStyle = `hsla(${hue},90%,70%,0.9)`;
+    ctx.lineWidth = 1.5;
+
+    // Draw two interlocking triangles (Star of David / 2D projection of Merkaba)
+    const drawTri = (rotOffset) => {
+      ctx.beginPath();
+      for(let i=0; i<=3; i++) {
+        const a = i * TAU/3 + rotOffset;
+        if(i===0) ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r);
+        else ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+      }
+      ctx.stroke();
+    };
+
+    drawTri(0);
+    drawTri(PI/3);
+
+    // Inner glowing ring
+    ctx.strokeStyle = `hsla(${hue},80%,50%,0.5)`;
+    ctx.beginPath(); ctx.arc(0,0,r*0.5,0,TAU); ctx.stroke();
+    
+    // Core dot
+    ctx.fillStyle = `hsla(${hue},100%,80%,0.8)`;
+    ctx.beginPath(); ctx.arc(0,0,3,0,TAU); ctx.fill();
+
+  } else if (s.type === 'vesica') {
+    const hue = (280 + time*10 + s.hue) % 360; 
+    ctx.rotate(s.rotation + time*0.2);
+    const offset = r * 0.45;
+    const sr = r * 0.7;
+    
+    // Deep Indigo/Violet Glow
+    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+    grad.addColorStop(0, `hsla(${hue},80%,60%,0.2)`);
+    grad.addColorStop(1, `hsla(${hue},80%,60%,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
+
+    ctx.strokeStyle = `hsla(${hue},80%,65%,0.9)`;
+    ctx.lineWidth = 1.5;
+
+    // Two overlapping circles
+    ctx.beginPath(); ctx.arc(-offset, 0, sr, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(offset, 0, sr, 0, TAU); ctx.stroke();
+    
+    // Central almond intersection fill
+    ctx.fillStyle = `hsla(${hue},70%,60%,0.2)`;
+    ctx.beginPath();
+    ctx.arc(-offset, 0, sr, -Math.acos(offset/sr), Math.acos(offset/sr));
+    ctx.arc(offset, 0, sr, PI - Math.acos(offset/sr), PI + Math.acos(offset/sr));
+    ctx.fill();
+    
+    // Core dot
+    ctx.fillStyle = `hsla(${hue},90%,80%,0.6)`;
+    ctx.beginPath(); ctx.arc(0,0,2.5,0,TAU); ctx.fill();
 
   } else if(s.type === 'challenge'){
     // Spiky abstract challenge shape
