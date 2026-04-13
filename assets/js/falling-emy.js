@@ -282,7 +282,7 @@ function initAudio(){
   masterGain.connect(audioCtx.destination);
 }
 
-function playImpactSound(force, hue, xPos){
+function playImpactSound(force, hue, xPos, type){
   if(isMuted || !audioCtx) return;
   if(force < 1.5) return; // ignore tiny grazes
   const now = audioCtx.currentTime;
@@ -302,36 +302,80 @@ function playImpactSound(force, hue, xPos){
   const panner = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : audioCtx.createGain();
   if(panner.pan) panner.pan.value = Math.max(-1, Math.min(1, (xPos / W) * 2 - 1));
 
-  // Osc 1: Sine (round body)
-  const osc1 = audioCtx.createOscillator();
-  const gain1 = audioCtx.createGain();
-  osc1.type = 'sine';
-  osc1.frequency.setValueAtTime(freq, now);
-  
-  gain1.gain.setValueAtTime(0, now);
-  gain1.gain.linearRampToValueAtTime(vol * 0.8, now + 0.005);
-  gain1.gain.exponentialRampToValueAtTime(0.001, now + duration);
+  if (type === 'heart') {
+    // Warm, resonant major chord (root + fifth) with softer attack
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const gain1 = audioCtx.createGain();
+    
+    osc1.type = 'sine';
+    osc2.type = 'sine';
+    osc1.frequency.setValueAtTime(freq, now);
+    osc2.frequency.setValueAtTime(freq * 1.5, now); // perfect fifth
+    
+    gain1.gain.setValueAtTime(0, now);
+    gain1.gain.linearRampToValueAtTime(vol * 1.2, now + 0.05); // softer attack
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + duration * 1.5); // longer tail
+    
+    osc1.connect(gain1);
+    osc2.connect(gain1);
+    gain1.connect(panner);
+    panner.connect(masterGain);
+    
+    osc1.start(now); osc1.stop(now + duration * 1.5 + 0.1);
+    osc2.start(now); osc2.stop(now + duration * 1.5 + 0.1);
 
-  // Osc 2: Triangle (bright, plucky attack)
-  const osc2 = audioCtx.createOscillator();
-  const gain2 = audioCtx.createGain();
-  osc2.type = 'triangle';
-  osc2.frequency.setValueAtTime(freq * 2, now); // an octave up
-  
-  gain2.gain.setValueAtTime(0, now);
-  gain2.gain.linearRampToValueAtTime(vol * 0.5, now + 0.002);
-  gain2.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.25); // decays much faster
+  } else if (type === 'challenge') {
+    // Low, distorted, slightly dissonant thud
+    const osc1 = audioCtx.createOscillator();
+    const gain1 = audioCtx.createGain();
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(freq * 0.25, now); // 2 octaves down
+    osc1.frequency.exponentialRampToValueAtTime(freq * 0.125, now + 0.1); // pitch dive
+    
+    gain1.gain.setValueAtTime(0, now);
+    gain1.gain.linearRampToValueAtTime(vol * 0.8, now + 0.01);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.5); // fast decay
+    
+    osc1.connect(gain1);
+    gain1.connect(panner);
+    panner.connect(masterGain);
+    
+    osc1.start(now); osc1.stop(now + duration * 0.5 + 0.1);
 
-  osc1.connect(gain1);
-  osc2.connect(gain2);
-  gain1.connect(panner);
-  gain2.connect(panner);
-  panner.connect(masterGain);
+  } else {
+    // Default crystalline pluck (spheres)
+    // Osc 1: Sine (round body)
+    const osc1 = audioCtx.createOscillator();
+    const gain1 = audioCtx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(freq, now);
+    
+    gain1.gain.setValueAtTime(0, now);
+    gain1.gain.linearRampToValueAtTime(vol * 0.8, now + 0.005);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
-  osc1.start(now);
-  osc1.stop(now + duration + 0.1);
-  osc2.start(now);
-  osc2.stop(now + duration + 0.1);
+    // Osc 2: Triangle (bright, plucky attack)
+    const osc2 = audioCtx.createOscillator();
+    const gain2 = audioCtx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(freq * 2, now); // an octave up
+    
+    gain2.gain.setValueAtTime(0, now);
+    gain2.gain.linearRampToValueAtTime(vol * 0.5, now + 0.002);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.25); // decays much faster
+
+    osc1.connect(gain1);
+    osc2.connect(gain2);
+    gain1.connect(panner);
+    gain2.connect(panner);
+    panner.connect(masterGain);
+
+    osc1.start(now);
+    osc1.stop(now + duration + 0.1);
+    osc2.start(now);
+    osc2.stop(now + duration + 0.1);
+  }
 }
 
 function collideParticleSphere(p, s, dt, impactData){
@@ -373,7 +417,7 @@ function collideRagdollSphere(ragdoll, sphere, dt){
   }
   if(hit){
     spawnImpactParticles(sphere.x, sphere.y, sphere.hue);
-    playImpactSound(impactData.maxForce, sphere.hue, sphere.x);
+    playImpactSound(impactData.maxForce, sphere.hue, sphere.x, sphere.type);
   }
 }
 
