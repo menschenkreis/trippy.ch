@@ -252,7 +252,7 @@ class Ragdoll {
 let audioCtx;
 let masterGain;
 let lastImpactTime = 0;
-let isMuted = true;
+let isMuted = false;
 
 function initAudio(){
   if(audioCtx) return;
