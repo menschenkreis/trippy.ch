@@ -45,24 +45,39 @@ let dragParticle = null;
 let accelInited = false;
 function initAccel() {
   if (accelInited) return;
-  accelInited = true;
+  
+  const setupEvents = () => {
+    window.addEventListener('deviceorientation', e => {
+      let gamma = e.gamma;
+      if (gamma === null) return;
+      
+      // Handle screen orientation
+      let angle = (window.screen && window.screen.orientation) ? window.screen.orientation.angle : (window.orientation || 0);
+      let tilt = gamma;
+      if (angle === 90) tilt = e.beta;
+      else if (angle === -90) tilt = -e.beta;
+      
+      let tiltX = Math.max(-45, Math.min(45, tilt)) / 45; // -1 to 1
+      gravityX = tiltX * GRAVITY * 0.8;
+    }, {passive: true});
+    accelInited = true;
+  };
+
+  // iOS 13+ requires permission for deviceorientation, and it MUST be tied to a touchend or click event.
   if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
     DeviceOrientationEvent.requestPermission().then(perm => {
       if (perm === 'granted') {
-        window.addEventListener('deviceorientation', onOrientation, {passive: true});
+        setupEvents();
       }
-    }).catch(console.error);
+    }).catch(e => console.warn("Orientation permission error:", e));
   } else {
-    window.addEventListener('deviceorientation', onOrientation, {passive: true});
+    setupEvents();
   }
 }
 
-function onOrientation(e) {
-  // gamma: left-to-right tilt in degrees [-90, 90]
-  let gamma = e.gamma || 0;
-  let tiltX = Math.max(-45, Math.min(45, gamma)) / 45; // -1 to 1
-  gravityX = tiltX * GRAVITY * 0.8;
-}
+// Bind to strong user-interaction events as pointerdown is sometimes ignored by iOS security
+document.addEventListener('click', initAccel, {once: true});
+document.addEventListener('touchend', initAccel, {once: true});
 let dragOffsetX = 0, dragOffsetY = 0;
 let touchX = 0, touchY = 0;
 
