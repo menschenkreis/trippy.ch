@@ -2677,13 +2677,13 @@ function frame(now){
 
   // ── Draw Chapter Text (screen space) — speech bubble ──
   if(chapterDisplay){
-    const maxLife = chapterDisplay.life > 3 ? 6.0 : 2.5;
-    const isShort = maxLife < 3;
+    const maxLife = chapterDisplay.life > 4 ? 6.0 : 3.5;
+    const isShort = maxLife < 4;
     let cAlpha;
-    const fadeDur = isBirth ? 1.2 : (isShort ? 0.5 : 0.8);
+    const fadeDur = 1.0;
     if(chapterDisplay.phase === 'fadein') cAlpha = Math.min((maxLife - chapterDisplay.life) / fadeDur, 1);
     else if(chapterDisplay.phase === 'hold') cAlpha = 1.0;
-    else cAlpha = chapterDisplay.life / 2.0;
+    else cAlpha = Math.max(0, chapterDisplay.life / fadeDur);
     cAlpha = Math.max(0, Math.min(1, cAlpha));
     const elapsed = maxLife - chapterDisplay.life;
     const words = chapterDisplay.text.split(' ');
@@ -2694,7 +2694,7 @@ function frame(now){
     ctx.save();
     ctx.textAlign = 'center';
     ctx.font = isBirth ? '300 1rem sans-serif' : (isShort ? '300 1rem sans-serif' : '300 0.9rem sans-serif');
-    const maxLineW = Math.min(W * 0.75, isShort ? 500 : 420);
+    const maxLineW = Math.min(W * 0.75, 420);
     const lines = []; let line = '';
     for(const w of words){
       const test = line + w + ' ';
@@ -2703,39 +2703,67 @@ function frame(now){
     }
     lines.push(line);
     const lineH = isShort ? 22 : 24;
-    const padX = 24, padY = 18;
+    const padX = 24, padY = 20;
     let maxW = 0;
     for(const l of lines) maxW = Math.max(maxW, ctx.measureText(l.trim()).width);
     const bw = maxW + padX * 2;
     const bh = lines.length * lineH + padY * 2;
     const bx = W/2, by = H * 0.42;
+
+    // ── Animated Thought Bubble (Organic Shape) ──
+    ctx.translate(bx, by);
+    const wobble = Math.sin(time * 2) * 5;
+    const scale = 1 + Math.sin(time * 1.5) * 0.02;
+    ctx.scale(scale, scale);
+    
+    // Bubble shadows/glow
     ctx.fillStyle = `rgba(${a[0]},${a[1]},${a[2]},${cAlpha * fillA})`;
     ctx.strokeStyle = `rgba(${a[0]},${a[1]},${a[2]},${cAlpha * borderA})`;
-    ctx.lineWidth = 1;
-    roundRect(ctx, bx - bw/2, by - bh/2, bw, bh, 14);
-    ctx.fill(); ctx.stroke();
-    ctx.fillStyle = `rgba(${a[0]},${a[1]},${a[2]},${cAlpha * fillA})`;
+    ctx.lineWidth = 1.5;
+    
+    // Draw organic rounded rect
     ctx.beginPath();
-    ctx.moveTo(bx - 12, by + bh/2);
-    ctx.lineTo(bx, by + bh/2 + 16);
-    ctx.lineTo(bx + 12, by + bh/2);
+    const r = 25, w = bw, h = bh;
+    const x = -w/2, y = -h/2;
+    // Top
+    ctx.moveTo(x + r, y + Math.sin(time*2)*2);
+    ctx.quadraticCurveTo(bx-bx, y + Math.sin(time*2.1)*4, x + w - r, y + Math.sin(time*2.2)*2);
+    // Right
+    ctx.quadraticCurveTo(x + w + Math.sin(time*2.3)*3, by-by, x + w - r, y + h + Math.sin(time*2.4)*2);
+    // Bottom
+    ctx.quadraticCurveTo(bx-bx, y + h + Math.sin(time*2.5)*5, x + r, y + h + Math.sin(time*2.6)*2);
+    // Left
+    ctx.quadraticCurveTo(x + Math.sin(time*2.7)*3, by-by, x + r, y + Math.sin(time*2)*2);
     ctx.fill();
+    ctx.stroke();
+
+    // Small thought circles
+    for(let i=0; i<3; i++) {
+      const circleAlpha = cAlpha * (0.3 - i*0.08);
+      const cr = 8 - i*2;
+      const co = 15 + i*12;
+      const cx = -15 - i*8;
+      const cy = h/2 + co;
+      ctx.beginPath();
+      ctx.arc(cx + Math.sin(time*2+i)*3, cy, cr, 0, TAU);
+      ctx.fillStyle = `rgba(${a[0]},${a[1]},${a[2]},${circleAlpha})`;
+      ctx.fill();
+    }
+
     let wordIdx = 0;
     ctx.textAlign = 'left';
-    const startY = by - bh/2 + padY + lineH / 2;
+    const startY = -h/2 + padY + lineH / 2;
     for(let li = 0; li < lines.length; li++){
       const lineWords = lines[li].trim().split(' ');
-      let lx = bx - maxW / 2;
+      let lx = -maxW / 2;
       for(let wi = 0; wi < lineWords.length; wi++){
-        const wordStagger = isBirth ? 0.25 : 0.12;
+        const wordStagger = 0.12;
         const wordStart = wordIdx * wordStagger;
         const wordElapsed = Math.max(0, elapsed - wordStart);
-        const wFade = isBirth ? 0.5 : 0.3;
-        const wBounceDur = isBirth ? 0.5 : 0.35;
-        const wAlpha = Math.min(wordElapsed / wFade, 1) * cAlpha;
-        const bounce = wordElapsed < wBounceDur ? Math.sin(wordElapsed / wBounceDur * PI) * 4 : 0;
+        const wAlpha = Math.min(wordElapsed / 0.4, 1) * cAlpha;
+        const bounce = wordElapsed < 0.4 ? Math.sin(wordElapsed / 0.4 * PI) * 3 : 0;
         const ww = ctx.measureText(lineWords[wi] + ' ').width;
-        ctx.fillStyle = `rgba(255,255,255,${wAlpha * 0.85})`;
+        ctx.fillStyle = `rgba(255,255,255,${wAlpha * 0.9})`;
         ctx.fillText(lineWords[wi], lx, startY + li * lineH - bounce);
         lx += ww;
         wordIdx++;
