@@ -1593,8 +1593,8 @@ function drawStarfield(parallax){
       const h2 = (((seed * 83492791) >>> 0) % 1000) / 1000;
       const h3 = (((seed * 49297347) >>> 0) % 1000) / 1000;
 
-      // Only ~40% of cells have a star (distant layer: 30%)
-      if(h1 > (isDistant ? 0.3 : 0.4)) continue;
+      // Only ~40% of cells have a star (distant layer: 55%)
+      if(h1 > (isDistant ? 0.55 : 0.4)) continue;
 
       const sx = cx * starSpacing + h2 * starSpacing;
       const sy = cy * starSpacing + h3 * starSpacing - scrollY;
