@@ -952,16 +952,6 @@ function collideRagdollSphere(ragdoll, sphere, dt){
       portal = {
         x: sphere.x, y: sphere.y, r: sphere.r,
         progress: 0, hue: h, phase: 'expanding',
-        // Shards instead of sparks
-        shards: Array.from({length:12}, (_,i)=>({
-          angle: i * TAU / 12,
-          dist: 0,
-          speed: 150 + Math.random() * 200,
-          rot: Math.random() * TAU,
-          rotSpd: (Math.random()-0.5) * 0.2,
-          size: 15 + Math.random() * 20,
-          life: 1,
-        })),
         targetAccent: [60+Math.random()*180|0, 60+Math.random()*180|0, 60+Math.random()*180|0],
         targetAccent2: [60+Math.random()*180|0, 60+Math.random()*180|0, 60+Math.random()*180|0],
       };
@@ -1972,43 +1962,51 @@ function drawSphere(s){
       ctx.stroke();
     }
   } else if(s.type === 'challenge'){
-    // Spiky abstract challenge shape
-    const hue = (s.hue + time*40) % 360;
-    ctx.rotate(s.rotation * 2);
-    
-    // Danger glow
-    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.5);
-    grad.addColorStop(0, `hsla(${hue},80%,40%,0.2)`);
+    // Smooth crystalline challenge shape
+    const hue = (s.hue + time*25) % 360;
+    const hue2 = (hue + 140) % 360;
+    ctx.rotate(s.rotation);
+
+    // Warm radial glow
+    const grad = ctx.createRadialGradient(0,0,r*0.1, 0,0,r*1.8);
+    grad.addColorStop(0, `hsla(${hue},85%,55%,0.15)`);
+    grad.addColorStop(0.5, `hsla(${hue2},75%,40%,0.06)`);
     grad.addColorStop(1, `hsla(${hue},80%,40%,0)`);
     ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(0,0,r*1.5,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
 
-    ctx.strokeStyle = `hsla(${hue},80%,60%,0.9)`;
-    ctx.fillStyle = `rgba(10,10,15,0.85)`;
+    // Smooth rounded polygon with gentle pulsing
+    const sides = 7;
+    const pulse = 1 + Math.sin(time * 2) * 0.04;
+    ctx.strokeStyle = `hsla(${hue},80%,65%,0.85)`;
+    ctx.fillStyle = `hsla(${hue},60%,12%,0.9)`;
     ctx.lineWidth = 1.5;
-    
-    // Sharp, irregular star
     ctx.beginPath();
-    const spikes = 9;
-    for(let i=0; i<=spikes*2; i++){
-      const angle = i * TAU / (spikes*2);
-      const dist = (i%2 === 0) ? r : r * (0.3 + 0.2*Math.sin(time*10 + i));
-      if(i===0) ctx.moveTo(Math.cos(angle)*dist, Math.sin(angle)*dist);
-      else ctx.lineTo(Math.cos(angle)*dist, Math.sin(angle)*dist);
+    for(let i=0; i<=sides; i++){
+      const a = i * TAU / sides;
+      const d = r * pulse;
+      if(i===0) ctx.moveTo(Math.cos(a)*d, Math.sin(a)*d);
+      else ctx.lineTo(Math.cos(a)*d, Math.sin(a)*d);
     }
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    
-    // Inner frantic pattern
-    ctx.strokeStyle = `hsla(${(hue+180)%360},80%,60%,0.5)`;
-    ctx.beginPath();
-    for(let i=0; i<spikes; i++){
-      const angle = i * TAU / spikes + time;
-      ctx.moveTo(0,0);
-      ctx.lineTo(Math.cos(angle)*r*0.6, Math.sin(angle)*r*0.6);
-    }
-    ctx.stroke();
+
+    // Inner soft glow ring — no lines, just a luminous core
+    const ig = ctx.createRadialGradient(0,0,0, 0,0,r*0.6);
+    ig.addColorStop(0, `hsla(${hue2},90%,70%,0.12)`);
+    ig.addColorStop(0.6, `hsla(${hue},80%,50%,0.05)`);
+    ig.addColorStop(1, `hsla(${hue},80%,50%,0)`);
+    ctx.fillStyle = ig;
+    ctx.beginPath(); ctx.arc(0,0,r*0.6,0,TAU); ctx.fill();
+
+    // Outer soft halo ring
+    ctx.strokeStyle = `hsla(${hue2},70%,60%,0.2)`;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(0,0,r*1.15,0,TAU); ctx.stroke();
+    ctx.strokeStyle = `hsla(${hue},70%,55%,0.08)`;
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(0,0,r*1.4,0,TAU); ctx.stroke();
 
   } else {
     // Normal sacred geometry sphere
@@ -2312,16 +2310,6 @@ function frame(now){
 
   // ── Update Portal ──
   if(portal){
-    if(portal.shards){
-      for(const sh of portal.shards){
-        sh.life -= rawDt * 0.6;
-        sh.rot += sh.rotSpd;
-        sh.dist += sh.speed * rawDt;
-        sh.speed *= 0.98;
-      }
-      portal.shards = portal.shards.filter(sh => sh.life > 0);
-    }
-
     if(portal.phase === 'expanding'){
       portal.progress += rawDt * 0.55;
       portal.r += rawDt * 900;
@@ -2449,45 +2437,32 @@ function frame(now){
       const p = portal.progress;
       const ease = p < 0.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2;
 
-      // Shatter shards - geometric debris
-      for(const sh of (portal.shards || [])){
-        const spx = sx + Math.cos(sh.angle) * sh.dist;
-        const spy = sy + Math.sin(sh.angle) * sh.dist;
-        const sa = sh.life * ease * 0.6;
-        ctx.save();
-        ctx.translate(spx, spy);
-        ctx.rotate(sh.rot);
-        ctx.strokeStyle = `hsla(${h}, 90%, 75%, ${sa})`;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        const ss = sh.size;
-        ctx.moveTo(-ss/2, -ss/2); ctx.lineTo(ss/2, 0); ctx.lineTo(-ss/2, ss/2);
-        ctx.closePath(); ctx.stroke();
-        ctx.restore();
-      }
-
-      // ── IMPLODING RINGS (Reimagined) ──
-      // Instead of expanding out, they suck into the point of impact
+      // Smooth imploding rings
       for(let i = 0; i < 3; i++){
-        const t = (1 - (i / 3 + time * 0.4) % 1);
+        const t = (1 - (i / 3 + time * 0.3) % 1);
         const tr = pr * 1.8 * t;
-        const tAlpha = ease * (1 - t) * 0.4;
-        ctx.strokeStyle = `hsla(${(h + t * 60) % 360},80%,70%,${tAlpha})`;
-        ctx.lineWidth = 1.5;
+        const tAlpha = ease * (1 - t) * 0.35;
+        const tHue = (h + t * 80) % 360;
+        // Soft double-stroke glow ring
+        ctx.strokeStyle = `hsla(${tHue},80%,70%,${tAlpha * 0.3})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(sx, sy, tr, 0, TAU); ctx.stroke();
+        ctx.strokeStyle = `hsla(${tHue},90%,75%,${tAlpha})`;
+        ctx.lineWidth = 1.2;
         ctx.beginPath(); ctx.arc(sx, sy, tr, 0, TAU); ctx.stroke();
       }
 
       // Soft implosion pulse
-      const pulseA = ease * 0.3 * (1 - p);
+      const pulseA = ease * 0.25 * (1 - p);
       const pg = ctx.createRadialGradient(sx, sy, 0, sx, sy, pr * 2);
       pg.addColorStop(0, `hsla(${h}, 100%, 60%, 0)`);
-      pg.addColorStop(0.8, `hsla(${h}, 100%, 70%, ${pulseA * 0.2})`);
+      pg.addColorStop(0.7, `hsla(${h}, 100%, 70%, ${pulseA * 0.15})`);
       pg.addColorStop(1, `hsla(${h}, 100%, 60%, 0)`);
       ctx.fillStyle = pg;
       ctx.fillRect(sx - pr * 2, sy - pr * 2, pr * 4, pr * 4);
 
       // Inner darkening void
-      const voidAlpha = ease * 0.6;
+      const voidAlpha = ease * 0.5;
       const vg = ctx.createRadialGradient(sx, sy, 0, sx, sy, pr * 0.6);
       vg.addColorStop(0, `hsla(${(h+180)%360},60%,5%,${voidAlpha})`);
       vg.addColorStop(0.7, `hsla(${h},50%,8%,${voidAlpha * 0.3})`);
@@ -2495,18 +2470,16 @@ function frame(now){
       ctx.fillStyle = vg;
       ctx.fillRect(0, 0, W, H);
 
-      // Outer chromatic ring (screen blend, 2 instead of 3)
+      // Soft chromatic halo (single ring, screen blend)
       ctx.globalCompositeOperation = 'screen';
-      for(let c = 0; c < 2; c++){
-        const cHue = (h + c * 40) % 360;
-        const cR = pr * (0.92 + c * 0.06);
-        const cg = ctx.createRadialGradient(sx, sy, cR * 0.9, sx, sy, cR * 1.1);
-        cg.addColorStop(0, `hsla(${cHue},100%,70%,0)`);
-        cg.addColorStop(0.5, `hsla(${cHue},100%,75%,${ease * 0.35})`);
-        cg.addColorStop(1, `hsla(${cHue},100%,70%,0)`);
-        ctx.fillStyle = cg;
-        ctx.fillRect(sx - cR * 1.5, sy - cR * 1.5, cR * 3, cR * 3);
-      }
+      const cHue = (h + 30) % 360;
+      const cR = pr * 0.95;
+      const cg = ctx.createRadialGradient(sx, sy, cR * 0.85, sx, sy, cR * 1.15);
+      cg.addColorStop(0, `hsla(${cHue},100%,70%,0)`);
+      cg.addColorStop(0.5, `hsla(${cHue},100%,75%,${ease * 0.3})`);
+      cg.addColorStop(1, `hsla(${cHue},100%,70%,0)`);
+      ctx.fillStyle = cg;
+      ctx.fillRect(sx - cR * 1.5, sy - cR * 1.5, cR * 3, cR * 3);
       ctx.globalCompositeOperation = 'source-over';
 
       // Time distortion vignette
@@ -2518,47 +2491,23 @@ function frame(now){
       ctx.fillRect(0, 0, W, H);
     }
 
-    // ── THRESHOLD: dimension shift ──
+    // ── THRESHOLD: smooth color shift ──
     else if(portal.phase === 'threshold'){
       const p = portal.progress;
       const flash = p < 0.3 ? p / 0.3 : Math.max(0, 1 - (p - 0.3) / 0.7);
       const flashEase = flash * flash;
 
-      // Soft colored pulse instead of white flash
-      ctx.fillStyle = `rgba(${portal.targetAccent[0]},${portal.targetAccent[1]},${portal.targetAccent[2]},${flashEase * 0.15})`;
+      // Soft colored pulse
+      ctx.fillStyle = `rgba(${portal.targetAccent[0]},${portal.targetAccent[1]},${portal.targetAccent[2]},${flashEase * 0.12})`;
       ctx.fillRect(0, 0, W, H);
 
-      // Chromatic scan lines (reduced intensity)
-      if(flash > 0.1){
-        for(let i = 0; i < 8; i++){
-          const y = (H / 8) * i + Math.sin(time * 3 + i) * 15;
-          const barH = 1 + flash * 4;
-          const barHue = (h + i * 45 + time * 60) % 360;
-          ctx.fillStyle = `hsla(${barHue},100%,75%,${flashEase * 0.2})`;
-          ctx.fillRect(0, y, W, barH);
-        }
-      }
-
-      // Soft Radial light rays
-      const rayAlpha = flashEase * 0.1;
-      if(rayAlpha > 0.01){
-        ctx.save();
-        ctx.globalCompositeOperation = 'screen';
-        ctx.translate(sx, sy);
-        for(let i = 0; i < 6; i++){
-          const a = (i / 12) * TAU + time * 0.2;
-          const rayLen = Math.max(W, H) * 1.2;
-          const rayW = 0.03 + Math.sin(time * 1.5 + i) * 0.01;
-          ctx.fillStyle = `hsla(${(h + i * 30) % 360},95%,80%,${rayAlpha})`;
-          ctx.beginPath();
-          ctx.moveTo(0, 0);
-          ctx.lineTo(Math.cos(a - rayW) * rayLen, Math.sin(a - rayW) * rayLen);
-          ctx.lineTo(Math.cos(a + rayW) * rayLen, Math.sin(a + rayW) * rayLen);
-          ctx.closePath();
-          ctx.fill();
-        }
-        ctx.restore();
-      }
+      // Smooth radial glow from center
+      const glowR = Math.max(W,H) * 0.6 * flashEase;
+      const tg = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowR);
+      tg.addColorStop(0, `rgba(${portal.targetAccent[0]},${portal.targetAccent[1]},${portal.targetAccent[2]},${flashEase * 0.08})`);
+      tg.addColorStop(1, `rgba(${portal.targetAccent[0]},${portal.targetAccent[1]},${portal.targetAccent[2]},0)`);
+      ctx.fillStyle = tg;
+      ctx.fillRect(0, 0, W, H);
 
       // New dimension tint (seamlessly integrated)
       if(p > 0.4){
@@ -2576,20 +2525,9 @@ function frame(now){
       const p = portal.progress;
       const ease = p * p * (3 - 2 * p);
 
-      // Fading sparks
-      for(const sp of portal.sparks){
-        const spx = sx + Math.cos(sp.angle) * sp.dist;
-        const spy = sy + Math.sin(sp.angle) * sp.dist;
-        const sa = sp.life * (1 - ease);
-        if(sa > 0.01){
-          ctx.fillStyle = `hsla(${sp.hue},90%,70%,${sa})`;
-          ctx.beginPath(); ctx.arc(spx, spy, sp.size * sp.life, 0, TAU); ctx.fill();
-        }
-      }
-
-      // Gentle pulse from portal center (new dimension breathing)
+      // Gentle breathing glow from portal center
       const pulseR = ease * Math.max(W, H) * 0.8;
-      const pulseA = (1 - ease) * 0.08;
+      const pulseA = (1 - ease) * 0.07;
       const pg = ctx.createRadialGradient(sx, sy, 0, sx, sy, pulseR);
       pg.addColorStop(0, `rgba(${portal.targetAccent2[0]},${portal.targetAccent2[1]},${portal.targetAccent2[2]},${pulseA})`);
       pg.addColorStop(1, `rgba(${portal.targetAccent2[0]},${portal.targetAccent2[1]},${portal.targetAccent2[2]},0)`);
