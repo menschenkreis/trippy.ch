@@ -82,14 +82,14 @@ let activeEffects = { wave: 0, trail: 0, pulse: 0, magnet: 0 };
 let waveRings = []; // {x, y, radius, life}
 
 // ── Milestones ──
-const milestones = [500, 1000, 2000, 5000, 10000, 25000, 50000, 100000];
+const milestones = [500, 10000, 25000, 50000, 100000];
 let lastMilestone = 0;
 let milestoneText = null; // {text, life}
 let milestoneSlowMo = 0;
 
 // ── Life Chapters ──
 const lifeChapters = [
-  { age: 0, text: "The first breath. Pure awareness. No past, no future." },
+  { age: 0.1, text: "The first breath. Pure awareness. No past, no future." },
   { age: 1, text: "Year one. Every sensation is brand new." },
   { age: 2, text: "Learning to walk. Every fall is a discovery." },
   { age: 3, text: "Why? Why? Why? The universe is infinite questions." },
@@ -2325,19 +2325,18 @@ function frame(now){
   for(const m of milestones){
     if(depthMeters >= m && lastMilestone < m){
       lastMilestone = m;
-      milestoneSlowMo = 0.5;
-      const quips = {
-        500: '500 m — the descent begins',
-        1000: '1 km — still falling',
-        2000: '2 km — gaining momentum',
-        5000: '5 km — no turning back',
-        10000: '10 km — the void stretches on',
-        25000: '25 km — gravity feels different now',
-        50000: '50 km — halfway to somewhere',
-        100000: '100 km — dawn breaks',
-      };
-      milestoneText = {text: quips[m] || mLabel, life: 2.5};
-      playMilestoneChord();
+      if(!chapterDisplay){
+        milestoneSlowMo = 0.5;
+        const quips = {
+          500: '500 m — the descent begins',
+          10000: '10 km — the void stretches on',
+          25000: '25 km — gravity feels different now',
+          50000: '50 km — halfway to somewhere',
+          100000: '100 km — dawn breaks',
+        };
+        milestoneText = {text: quips[m] || (m >= 1000 ? (m/1000) + ' km' : m + ' m'), life: 2.5};
+        playMilestoneChord();
+      }
       // Spawn celebration particles (screen space) — reduced
       for(let i = 0; i < 20; i++){
         particles.push({
@@ -2366,9 +2365,11 @@ function frame(now){
     const triggerDepth = ch.age * 1000;
     if(depthMeters >= triggerDepth && lastChapter < ch.age){
       lastChapter = ch.age;
-      chapterSlowMo = 1.0;
-      chapterDisplay = {text: ch.text, life: 6.0, phase: 'fadein'};
-      playMilestoneChord();
+      if(!milestoneText){
+        chapterSlowMo = 1.0;
+        chapterDisplay = {text: ch.text, life: 6.0, phase: 'fadein'};
+        playMilestoneChord();
+      }
     }
   }
   if(chapterSlowMo > 0){
