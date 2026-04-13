@@ -616,6 +616,94 @@ footer a:hover { color: var(--pink); }
   transition: var(--transition-colors);
 }
 
+/* ── Intro Sequence ─────────────────────────────────────────────────── */
+#intro-sequence {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+#intro-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#intro-thought {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(12px) scale(0.97);
+  transition: opacity 1.8s ease, transform 1.8s ease;
+  pointer-events: none;
+}
+#intro-thought.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+#intro-thought::before {
+  content: '';
+  display: block;
+  width: 40px;
+  height: 20px;
+  margin: 0 auto 1rem;
+  background: radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.15), transparent 70%);
+  border-radius: 50%;
+}
+
+#intro-thought-text {
+  font-size: clamp(1.1rem, 3vw, 1.6rem);
+  font-weight: 300;
+  letter-spacing: 0.12em;
+  color: rgba(60, 45, 80, 0.9);
+  font-style: italic;
+  text-shadow: 0 0 30px rgba(180, 160, 220, 0.3);
+}
+
+#intro-prompt {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  margin-top: 2.5rem;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 1.5s ease 0.3s, transform 1.5s ease 0.3s;
+}
+#intro-prompt.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+#intro-embark {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(120, 100, 160, 0.35);
+  color: rgba(60, 45, 80, 0.85);
+  padding: 0.8rem 2.2rem;
+  font-size: clamp(0.9rem, 2vw, 1.1rem);
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  border-radius: 40px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.5s ease;
+  backdrop-filter: blur(12px);
+}
+#intro-embark:hover {
+  background: rgba(255,255,255,0.16);
+  border-color: rgba(120, 100, 160, 0.6);
+  box-shadow: 0 0 30px rgba(140, 120, 200, 0.2);
+  transform: scale(1.04);
+}
+#intro-embark:active {
+  transform: scale(0.98);
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .scroll-hint { animation: none; }
