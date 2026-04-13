@@ -136,6 +136,7 @@ class Sphere {
     this.hue = Math.random()*360;
     this.segments = 3 + Math.floor(Math.random()*5); // sacred geometry sides
     this.sacredType = Math.floor(Math.random() * 3); // 0: polygon, 1: seed of life, 2: metatron
+    this.impactFlash = 0;
   }
   update(dt){
     this.rotation += this.rotSpeed;
@@ -283,7 +284,7 @@ function initAudio(){
   masterGain.connect(audioCtx.destination);
 }
 
-function playImpactSound(force, hue, xPos, type){
+function playImpactSound(force, hue, xPos, type, sacredType){
   if(isMuted || !audioCtx) return;
   if(force < 1.5) return; // ignore tiny grazes
   const now = audioCtx.currentTime;
@@ -345,37 +346,76 @@ function playImpactSound(force, hue, xPos, type){
     osc1.start(now); osc1.stop(now + duration * 0.5 + 0.1);
 
   } else {
-    // Default crystalline pluck (spheres)
-    // Osc 1: Sine (round body)
     const osc1 = audioCtx.createOscillator();
     const gain1 = audioCtx.createGain();
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(freq, now);
-    
-    gain1.gain.setValueAtTime(0, now);
-    gain1.gain.linearRampToValueAtTime(vol * 0.8, now + 0.005);
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-    // Osc 2: Triangle (bright, plucky attack)
     const osc2 = audioCtx.createOscillator();
     const gain2 = audioCtx.createGain();
-    osc2.type = 'triangle';
-    osc2.frequency.setValueAtTime(freq * 2, now); // an octave up
     
+    gain1.gain.setValueAtTime(0, now);
     gain2.gain.setValueAtTime(0, now);
-    gain2.gain.linearRampToValueAtTime(vol * 0.5, now + 0.002);
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.25); // decays much faster
 
-    osc1.connect(gain1);
-    osc2.connect(gain2);
-    gain1.connect(panner);
-    gain2.connect(panner);
+    if (sacredType === 0) {
+      // Polygon: default crystalline pluck
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(freq, now);
+      gain1.gain.linearRampToValueAtTime(vol * 0.8, now + 0.005);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(freq * 2, now); // an octave up
+      gain2.gain.linearRampToValueAtTime(vol * 0.5, now + 0.002);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.25);
+      
+      osc1.connect(gain1);
+      osc2.connect(gain2);
+      gain1.connect(panner);
+      gain2.connect(panner);
+      
+    } else if (sacredType === 1) {
+      // Seed of Life: warm, chorus-like bell (detuned sines)
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(freq, now);
+      gain1.gain.linearRampToValueAtTime(vol * 0.9, now + 0.01);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + duration * 1.2);
+
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(freq * 1.01, now); // detuned for chorus
+      gain2.gain.linearRampToValueAtTime(vol * 0.6, now + 0.015);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + duration * 1.2);
+      
+      osc1.connect(gain1);
+      osc2.connect(gain2);
+      gain1.connect(panner);
+      gain2.connect(panner);
+
+    } else if (sacredType === 2) {
+      // Metatron's Cube: complex metallic chime
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(freq, now);
+      gain1.gain.linearRampToValueAtTime(vol * 0.7, now + 0.005);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      osc2.type = 'square';
+      osc2.frequency.setValueAtTime(freq * 1.5, now); // perfect fifth up for metallic resonance
+      gain2.gain.linearRampToValueAtTime(vol * 0.2, now + 0.002);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.4);
+      
+      const bq = audioCtx.createBiquadFilter();
+      bq.type = 'lowpass';
+      bq.frequency.setValueAtTime(freq * 4, now);
+      bq.frequency.exponentialRampToValueAtTime(freq, now + duration * 0.4);
+      osc2.connect(bq);
+      bq.connect(gain2);
+      
+      osc1.connect(gain1);
+      gain1.connect(panner);
+      gain2.connect(panner);
+    }
+    
     panner.connect(masterGain);
 
-    osc1.start(now);
-    osc1.stop(now + duration + 0.1);
-    osc2.start(now);
-    osc2.stop(now + duration + 0.1);
+    osc1.start(now); osc1.stop(now + duration * 1.2 + 0.1);
+    osc2.start(now); osc2.stop(now + duration * 1.2 + 0.1);
   }
 }
 
@@ -418,7 +458,8 @@ function collideRagdollSphere(ragdoll, sphere, dt){
   }
   if(hit){
     spawnImpactParticles(sphere.x, sphere.y, sphere.hue);
-    playImpactSound(impactData.maxForce, sphere.hue, sphere.x, sphere.type);
+    playImpactSound(impactData.maxForce, sphere.hue, sphere.x, sphere.type, sphere.sacredType);
+    sphere.impactFlash = 1.0;
   }
 }
 
@@ -837,6 +878,19 @@ function drawSphere(s){
 
   ctx.save();
   ctx.translate(s.x, s.y);
+
+  // Impact Flash Aura
+  if(s.impactFlash > 0){
+    const f = s.impactFlash;
+    const grad = ctx.createRadialGradient(0,0,r, 0,0,r*(1.5 + f*2.0));
+    grad.addColorStop(0, `hsla(${s.hue},80%,60%,${f*0.6})`);
+    grad.addColorStop(0.3, `hsla(${s.hue},100%,80%,${f*0.3})`);
+    grad.addColorStop(1, `hsla(${s.hue},100%,100%,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0,0,r*(1.5 + f*2.0),0,TAU); ctx.fill();
+    s.impactFlash -= 0.03; // decay per frame
+    if(s.impactFlash < 0) s.impactFlash = 0;
+  }
 
   if(s.type === 'heart'){
     // Red/pink glowing heart
