@@ -97,9 +97,34 @@ class Sphere {
   }
 }
 
+function hslToRgbArr(h, s, l) {
+  h /= 360;
+  let r, g, b;
+  if(s === 0){ r = g = b = l; } else {
+    const hue2rgb = (p, q, t) => {
+      if(t < 0) t += 1;
+      if(t > 1) t -= 1;
+      if(t < 1/6) return p + (q - p) * 6 * t;
+      if(t < 1/2) return q;
+      if(t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
 // ── Ragdoll ──────────────────────────────────────────────────────────────
 class Ragdoll {
   constructor(x, y){
+    this.hue = Math.random() * 360;
+    this.accent = hslToRgbArr(this.hue, 0.85, 0.6);
+    this.accent2 = hslToRgbArr((this.hue + 40)%360, 0.9, 0.75);
+
     this.particles = [];
     this.constraints = [];
     const s = 18; // segment length
@@ -168,7 +193,65 @@ class Ragdoll {
 }
 
 // ── Collision helpers ────────────────────────────────────────────────────
-function collideParticleSphere(p, s, dt){
+// ── Audio ────────────────────────────────────────────────────────────────
+let audioCtx;
+let masterGain;
+let lastImpactTime = 0;
+
+function initAudio(){
+  if(audioCtx) return;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if(!Ctx) return;
+  audioCtx = new Ctx();
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.4;
+  
+  // Reverb/Delay if possible to make it spatial
+  const delay = audioCtx.createDelay();
+  delay.delayTime.value = 0.3;
+  const feedback = audioCtx.createGain();
+  feedback.gain.value = 0.4;
+  delay.connect(feedback);
+  feedback.connect(delay);
+  delay.connect(masterGain);
+  
+  masterGain.connect(delay); // send everything to delay too
+  masterGain.connect(audioCtx.destination);
+}
+
+function playImpactSound(force, hue){
+  if(!audioCtx) return;
+  if(force < 2.0) return; // ignore tiny grazes
+  const now = audioCtx.currentTime;
+  if(now - lastImpactTime < 0.05) return; // throttle
+  lastImpactTime = now;
+  
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  
+  // Pentatonic scale mapped to hue
+  const baseFreq = 110; // A2
+  const pentatonic = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31, 33, 36];
+  const noteIdx = Math.floor((hue / 360) * pentatonic.length) % pentatonic.length;
+  const freq = baseFreq * Math.pow(2, pentatonic[noteIdx]/12);
+  
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(freq, now);
+  
+  // Pluck envelope mapped to force
+  const vol = Math.min(force * 0.02, 0.5);
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(vol, now + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4 + Math.random()*0.3);
+  
+  osc.connect(gain);
+  gain.connect(masterGain);
+  
+  osc.start(now);
+  osc.stop(now + 1.0);
+}
+
+function collideParticleSphere(p, s, dt, impactData){
   const dx = p.x-s.x, dy = p.y-s.y;
   const d = Math.sqrt(dx*dx+dy*dy) || 0.001;
   const minD = (p.radius||3) + s.r;
@@ -176,17 +259,18 @@ function collideParticleSphere(p, s, dt){
     const nx = dx/d, ny = dy/d;
     const overlap = minD - d;
     if(!p.pinned){
-      // Push particle out
       p.x += nx * overlap * 0.4;
       p.y += ny * overlap * 0.4;
     }
-    // Push the sphere away too (the key change)
     const pushForce = overlap * 0.6;
     s.x -= nx * pushForce;
     s.y -= ny * pushForce;
-    // Transfer velocity (frictionless)
+    
     const vx = p.x - p.ox, vy = p.y - p.oy;
     const dot = vx*nx + vy*ny;
+    const impactVel = -dot;
+    if(impactVel > impactData.maxForce) impactData.maxForce = impactVel;
+    
     if(dot < 0){
       p.ox = p.x - (vx - 2*dot*nx)*0.8;
       p.oy = p.y - (vy - 2*dot*ny)*0.8;
@@ -196,14 +280,18 @@ function collideParticleSphere(p, s, dt){
 
 function collideRagdollSphere(ragdoll, sphere, dt){
   let hit = false;
+  let impactData = { maxForce: 0 };
   for(const p of ragdoll.particles){
     const dx = p.x-sphere.x, dy = p.y-sphere.y;
     const d = Math.sqrt(dx*dx+dy*dy) || 0.001;
     const minD = (p.radius||3) + sphere.r;
     if(d < minD) hit = true;
-    collideParticleSphere(p, sphere, dt);
+    collideParticleSphere(p, sphere, dt, impactData);
   }
-  if(hit) spawnImpactParticles(sphere.x, sphere.y, sphere.hue);
+  if(hit){
+    spawnImpactParticles(sphere.x, sphere.y, sphere.hue);
+    playImpactSound(impactData.maxForce, sphere.hue);
+  }
 }
 
 // ── Impact particles ─────────────────────────────────────────────────────
@@ -295,6 +383,7 @@ function spawnSphereNear(x,y){
 
 // ── Input ────────────────────────────────────────────────────────────────
 canvas.addEventListener('pointerdown', e => {
+  initAudio();
   const x = e.clientX, y = e.clientY;
   touchX = x; touchY = y;
   // Slow everything on touch
@@ -667,8 +756,8 @@ function drawSphere(s){
 
 function drawRagdoll(ragdoll){
   const ps = ragdoll.particles;
-  const a = theme.accent;
-  const a2 = theme.accent2;
+  const a = ragdoll.accent;
+  const a2 = ragdoll.accent2;
 
   // Glow on joints
   for(const p of ps){
