@@ -704,6 +704,33 @@ footer a:hover { color: var(--pink); }
   transform: scale(0.98);
 }
 
+#intro-restart {
+  background: rgba(140, 120, 200, 0.06);
+  border: 1px solid rgba(140, 120, 200, 0.2);
+  color: rgba(200, 185, 230, 0.75);
+  padding: 0.8rem 2.2rem;
+  font-size: clamp(0.9rem, 2vw, 1.1rem);
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  border-radius: 40px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.5s ease;
+  backdrop-filter: blur(12px);
+  margin-top: 0.8rem;
+  display: block;
+  width: 100%;
+}
+#intro-restart:hover {
+  background: rgba(140, 120, 200, 0.12);
+  border-color: rgba(140, 120, 200, 0.4);
+  box-shadow: 0 0 25px rgba(140, 120, 200, 0.12);
+  transform: scale(1.04);
+}
+#intro-restart:active {
+  transform: scale(0.98);
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .scroll-hint { animation: none; }

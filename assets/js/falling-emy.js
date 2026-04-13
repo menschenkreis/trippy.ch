@@ -2881,7 +2881,7 @@ function checkResume(){
         const restartBtn = document.createElement('button');
         restartBtn.id = 'intro-restart';
         restartBtn.textContent = "Embark again";
-        restartBtn.style.cssText = "margin-top:1rem;font-size:0.75rem;opacity:0.5;background:transparent;border:1px solid rgba(255,255,255,0.1);color:white;padding:0.4rem 1.2rem;border-radius:20px;cursor:pointer;font-family:inherit;transition:opacity 0.3s";
+        restartBtn.style.cssText = '';
         restartBtn.onclick = (e) => {
           e.preventDefault(); e.stopPropagation();
           window._fe.clearSave();
