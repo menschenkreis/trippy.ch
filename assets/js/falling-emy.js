@@ -40,6 +40,29 @@ let timeScale = 1.0;
 let targetTimeScale = 1.0;
 let dragRagdoll = null;
 let dragParticle = null;
+
+// ── Accelerometer ────────────────────────────────────────────────────────
+let accelInited = false;
+function initAccel() {
+  if (accelInited) return;
+  accelInited = true;
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission().then(perm => {
+      if (perm === 'granted') {
+        window.addEventListener('deviceorientation', onOrientation, {passive: true});
+      }
+    }).catch(console.error);
+  } else {
+    window.addEventListener('deviceorientation', onOrientation, {passive: true});
+  }
+}
+
+function onOrientation(e) {
+  // gamma: left-to-right tilt in degrees [-90, 90]
+  let gamma = e.gamma || 0;
+  let tiltX = Math.max(-45, Math.min(45, gamma)) / 45; // -1 to 1
+  gravityX = tiltX * GRAVITY * 0.8;
+}
 let dragOffsetX = 0, dragOffsetY = 0;
 let touchX = 0, touchY = 0;
 
@@ -422,6 +445,7 @@ function spawnSphereNear(x,y){
 // ── Input ────────────────────────────────────────────────────────────────
 canvas.addEventListener('pointerdown', e => {
   initAudio();
+  initAccel();
   const x = e.clientX, y = e.clientY;
   touchX = x; touchY = y;
   // Slow everything on touch
