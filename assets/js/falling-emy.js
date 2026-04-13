@@ -2882,29 +2882,26 @@ function updateSoundHint() {
   if(!hint || hint.style.display === 'none') return;
   const depthM = Math.max(0, cameraY / 100);
   
-  // Show hint after intro is complete OR if we resumed deep into the journey
-  const isIntroComplete = hint.dataset.introComplete === 'true';
-  const isDeepResumed = cameraY > 500; // if we resumed, cameraY will be high immediately
-
-  if(isIntroComplete || isDeepResumed) {
-    if(depthM < 50) {
-      hint.style.opacity = '1';
-      // Gentle pulsation
-      const pulse = 0.8 + Math.sin(time * 3) * 0.2;
-      hint.style.transform = `scale(${pulse})`;
-    } else if(depthM < 100) {
-      hint.style.opacity = '1';
-      hint.style.transform = 'scale(1)';
-    } else {
-      hint.style.opacity = '0';
-      hint.style.transform = 'scale(1)';
-      // Completely remove from layout after fade
-      setTimeout(() => { 
-        if(hint.style.opacity === '0') {
-          hint.style.display = 'none';
-        }
-      }, 2000);
-    }
+  // Show hint regardless of intro state once we are in the main loop
+  if(depthM < 50) {
+    hint.style.opacity = '1';
+    // Gentle pulsation
+    const pulse = 0.8 + Math.sin(time * 3) * 0.2;
+    hint.style.transform = `scale(${pulse})`;
+  } else if(depthM < 100) {
+    hint.style.opacity = '1';
+    hint.style.transform = 'scale(1)';
+  } else {
+    // Start fading at 100m
+    hint.style.transition = 'opacity 2.5s ease, transform 2.5s ease';
+    hint.style.opacity = '0';
+    hint.style.transform = 'scale(0.8)';
+    // Remove after long fade
+    setTimeout(() => { 
+      if(hint.style.opacity === '0') {
+        hint.style.display = 'none';
+      }
+    }, 3000);
   }
 }
 
