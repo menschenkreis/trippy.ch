@@ -977,7 +977,7 @@ let nextChallengeY = 10000;
 
 // Spawn initial
 ragdolls.push(new Ragdoll(W/2, 0, 'emy'));
-for(let i=0;i<8;i++) spawnSphereAtDepth(i * 120 + Math.random()*80);
+// No initial spheres — intro handles the first moments
 
 let nextShapeY = 5000; // first shape allowed at 50m
 

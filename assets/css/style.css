@@ -653,7 +653,7 @@ footer a:hover { color: var(--pink); }
   width: 40px;
   height: 20px;
   margin: 0 auto 1rem;
-  background: radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.15), transparent 70%);
+  background: radial-gradient(ellipse at 50% 0%, rgba(180,150,255,0.1), transparent 70%);
   border-radius: 50%;
 }
 
@@ -661,9 +661,9 @@ footer a:hover { color: var(--pink); }
   font-size: clamp(1.1rem, 3vw, 1.6rem);
   font-weight: 300;
   letter-spacing: 0.12em;
-  color: rgba(80, 65, 110, 0.85);
+  color: rgba(200, 185, 230, 0.75);
   font-style: italic;
-  text-shadow: 0 0 30px rgba(160, 140, 200, 0.25);
+  text-shadow: 0 0 30px rgba(140, 120, 200, 0.2);
 }
 
 #intro-prompt {
@@ -681,9 +681,9 @@ footer a:hover { color: var(--pink); }
 }
 
 #intro-embark {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(120, 100, 160, 0.25);
-  color: rgba(80, 65, 110, 0.8);
+  background: rgba(140, 120, 200, 0.06);
+  border: 1px solid rgba(140, 120, 200, 0.2);
+  color: rgba(200, 185, 230, 0.75);
   padding: 0.8rem 2.2rem;
   font-size: clamp(0.9rem, 2vw, 1.1rem);
   font-weight: 400;
@@ -695,9 +695,9 @@ footer a:hover { color: var(--pink); }
   backdrop-filter: blur(12px);
 }
 #intro-embark:hover {
-  background: rgba(255,255,255,0.12);
-  border-color: rgba(120, 100, 160, 0.45);
-  box-shadow: 0 0 25px rgba(140, 120, 200, 0.15);
+  background: rgba(140, 120, 200, 0.12);
+  border-color: rgba(140, 120, 200, 0.4);
+  box-shadow: 0 0 25px rgba(140, 120, 200, 0.12);
   transform: scale(1.04);
 }
 #intro-embark:active {
