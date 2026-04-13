@@ -754,13 +754,6 @@ function collideRagdollSphere(ragdoll, sphere, dt){
     }
 
     // Portal trigger
-    // Change ragdoll color on challenge hit
-    if(sphere.type === 'challenge' && ragdoll === ragdolls[0]){
-      const newHue = Math.random() * 360;
-      ragdoll.hue = newHue;
-      ragdoll.accent = hslToRgbArr(newHue, 0.95, 0.7);
-      ragdoll.accent2 = hslToRgbArr((newHue + 40) % 360, 1.0, 0.8);
-    }
     if(sphere.type === 'challenge' && !portal){
       const h = (sphere.hue + time * 40) % 360;
       portal = {
@@ -1714,20 +1707,6 @@ function drawRagdoll(ragdoll){
   const a = ragdoll.accent;
   const a2 = ragdoll.accent2;
 
-  // Age-based scale: baby (0.35) at start → adult (1.0) at 16000m
-  const depthMeters = Math.max(0, cameraY / 100);
-  const ageScale = ragdoll === ragdolls[0]
-    ? Math.min(0.35 + depthMeters / 16000 * 0.65, 1.0)
-    : 1.0;
-
-  if(ageScale !== 1.0){
-    const head = ps[0];
-    ctx.save();
-    ctx.translate(head.x, head.y);
-    ctx.scale(ageScale, ageScale);
-    ctx.translate(-head.x, -head.y);
-  }
-
   // Glow on joints
   for(const p of ps){
     const grad = ctx.createRadialGradient(p.x,p.y,0, p.x,p.y,12);
@@ -1804,8 +1783,6 @@ function drawRagdoll(ragdoll){
   ctx.font = '200 0.5rem monospace';
   ctx.textAlign = 'center';
   ctx.fillText(ragdoll.name, head.x, head.y - 25);
-
-  if(ageScale !== 1.0) ctx.restore();
 }
 
 // ── Camera follows ragdoll + spawn spheres ahead ──────────────────────
