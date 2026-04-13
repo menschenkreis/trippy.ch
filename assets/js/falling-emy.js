@@ -2153,8 +2153,8 @@ function frame(now){
     }
   }
 
-  // Update impact particles
-  updateParticles(dt * timeScale);
+  // Update impact particles (once per frame, not per substep)
+  updateParticles(rawDt);
   updateScoreElements(rawDt);
 
   // Clamp ragdoll to screen width
