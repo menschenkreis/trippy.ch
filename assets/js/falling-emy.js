@@ -2197,6 +2197,7 @@ function frame(now){
 
   time += rawDt;
   autoSave(time);
+  updateSoundHint();
   const dt = (rawDt * timeScale) / SUBSTEPS;
 
   // Physics substeps
@@ -2806,8 +2807,30 @@ if(introEl){
   const ui=[document.querySelector('.top-controls'),document.querySelector('.bottom-left'),document.querySelector('.back-link'),document.getElementById('sound-hint')];
   ui.forEach(e=>{if(e)e.style.opacity='0'; e.style.transition='opacity 1.5s ease';});
   window.addEventListener('intro-complete',()=>{
-    ui.forEach(e=>{if(e)e.style.opacity='1'});
+    ui.forEach(e=>{
+      if(e) {
+        if(e.id === 'sound-hint') e.dataset.introComplete = 'true';
+        else e.style.opacity='1';
+      }
+    });
   });
+}
+
+function updateSoundHint() {
+  const hint = document.getElementById('sound-hint');
+  if(!hint) return;
+  const depthM = Math.max(0, cameraY / 100);
+  
+  // Show hint after intro is complete
+  if(hint.dataset.introComplete === 'true') {
+    if(depthM < 100) {
+      hint.style.opacity = '1';
+    } else {
+      hint.style.opacity = '0';
+      // Completely remove from layout after fade
+      setTimeout(() => { if(hint.style.opacity === '0') hint.style.display = 'none'; }, 2000);
+    }
+  }
 }
 
 })();
