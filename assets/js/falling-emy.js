@@ -760,12 +760,9 @@ function collideParticleSphere(p, s, dt, impactData){
     const nx = dx/d, ny = dy/d;
     const overlap = minD - d;
     if(!p.pinned){
-      p.x += nx * overlap * 0.3;
-      p.y += ny * overlap * 0.3;
+      p.x += nx * overlap;
+      p.y += ny * overlap;
     }
-    const pushForce = overlap * 0.35;
-    s.x -= nx * pushForce;
-    s.y -= ny * pushForce;
     
     const vx = p.x - p.ox, vy = p.y - p.oy;
     const dot = vx*nx + vy*ny;
