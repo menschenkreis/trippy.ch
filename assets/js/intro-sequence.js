@@ -1,289 +1,116 @@
-// ── Intro Sequence — Emy's Birth Narrative ─────────────────────────────
+// ── Intro Sequence — Emy's Birth Narrative (Canvas 2D) ──────────────────
 (function () {
   const intro = document.getElementById('intro-sequence');
   if (!intro) return;
 
   const canvas = document.getElementById('intro-canvas');
-  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-  if (!gl) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
 
   let W, H, time = 0;
-  let phase = 'void'; // void → thought → prompt → born → done
+  let phase = 'void';
   let phaseStart = 0;
   let mouseX = 0.5, mouseY = 0.5;
-  let brightness = 1.0; // 1 = bright void, 0 = normal dark
+  let brightness = 1.0;
   let targetBrightness = 1.0;
-  let fadeOut = 0; // 0 = visible, 1 = gone
+  let fadeOut = 0;
   let birthStarted = false;
+  let raf;
 
   const VOID_DURATION = 3000;
   const THOUGHT_DELAY = 1500;
   const PROMPT_DELAY = 2000;
+  const TAU = Math.PI * 2;
 
   function resize() {
     const dpr = Math.min(window.devicePixelRatio, 2);
-    canvas.width = canvas.clientWidth * dpr;
-    canvas.height = canvas.clientHeight * dpr;
-    W = canvas.width; H = canvas.height;
-    gl.viewport(0, 0, W, H);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  // ── Sacred Geometry Shader ──────────────────────────────────────────
-  const vsSrc = `attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}`;
+  // ── Sacred Geometry Drawing Helpers ──────────────────────────────────
+  function drawCircle(x, y, r, color, alpha, lineWidth) {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TAU);
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = lineWidth || 1;
+    ctx.stroke();
+  }
 
-  const fsSrc = `
-precision highp float;
-uniform float t;
-uniform vec2 res;
-uniform vec2 mouse;
-uniform float brightness;
-uniform float fadeOut;
+  function drawLine(x1, y1, x2, y2, color, alpha, lineWidth) {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = lineWidth || 0.8;
+    ctx.stroke();
+  }
 
-#define PI 3.14159265359
-#define TAU 6.28318530718
-
-float hash(vec2 p){
-  return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453);
-}
-
-// Rotating 2D matrix
-mat2 rot(float a){
-  float c=cos(a), s=sin(a);
-  return mat2(c,-s,s,c);
-}
-
-// SDF for circle
-float sdCircle(vec2 p, float r){
-  return length(p)-r;
-}
-
-// SDF for line segment
-float sdSegment(vec2 p, vec2 a, vec2 b){
-  vec2 pa=p-a, ba=b-a;
-  float h=clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0);
-  return length(pa-ba*h);
-}
-
-// Flower of Life circle pattern
-float flowerOfLife(vec2 p, float r, float layers){
-  float d = 1e9;
-  // Center circle
-  d = min(d, sdCircle(p, r));
-  for(int layer=1; layer<=6; layer++){
-    float angle = float(layer) * TAU / 6.0;
-    vec2 offset = vec2(cos(angle), sin(angle)) * r;
-    d = min(d, sdCircle(p - offset, r));
-    // Second ring
-    for(int j=0; j<6; j++){
-      float a2 = float(j) * TAU / 6.0 + angle;
-      vec2 off2 = offset + vec2(cos(a2), sin(a2)) * r;
-      d = min(d, sdCircle(p - off2, r));
+  function drawFlowerOfLife(cx, cy, r, color, alpha) {
+    // Center
+    drawCircle(cx, cy, r, color, alpha, 1);
+    for (let i = 0; i < 6; i++) {
+      const a = i * TAU / 6;
+      const ox = cx + Math.cos(a) * r;
+      const oy = cy + Math.sin(a) * r;
+      drawCircle(ox, oy, r, color, alpha, 1);
+      // Second ring
+      for (let j = 0; j < 6; j++) {
+        const a2 = j * TAU / 6 + a;
+        drawCircle(ox + Math.cos(a2) * r, oy + Math.sin(a2) * r, color, color, alpha * 0.6, 0.6);
+      }
     }
   }
-  return d;
-}
 
-// Metatron's Cube lines
-float metatron(vec2 p, float r){
-  float d = 1e9;
-  vec2 pts[13];
-  pts[0] = vec2(0.0);
-  for(int i=0; i<6; i++){
-    float a = float(i) * TAU / 6.0;
-    pts[i+1] = vec2(cos(a), sin(a)) * r;
-    pts[i+7] = vec2(cos(a), sin(a)) * r * 2.0;
-  }
-  // Connect inner to outer
-  for(int i=0; i<6; i++){
-    for(int j=1; j<=6; j++){
-      d = min(d, sdSegment(p, pts[i+1], pts[j+7]));
+  function drawMetatronsCube(cx, cy, r, color, alpha) {
+    const pts = [[0, 0]];
+    for (let i = 0; i < 6; i++) {
+      const a = i * TAU / 6;
+      pts.push([Math.cos(a) * r, Math.sin(a) * r]);
+    }
+    for (let i = 0; i < 6; i++) {
+      const a = i * TAU / 6;
+      pts.push([Math.cos(a) * r * 2, Math.sin(a) * r * 2]);
+    }
+    // Inner to outer connections
+    for (let i = 1; i <= 6; i++) {
+      for (let j = 7; j <= 12; j++) {
+        drawLine(cx + pts[i][0], cy + pts[i][1], cx + pts[j][0], cy + pts[j][1], color, alpha, 0.6);
+      }
+    }
+    // Outer ring
+    for (let i = 7; i <= 12; i++) {
+      const next = i === 12 ? 7 : i + 1;
+      drawLine(cx + pts[i][0], cy + pts[i][1], cx + pts[next][0], cy + pts[next][1], color, alpha, 0.7);
+    }
+    // Inner ring
+    for (let i = 1; i <= 6; i++) {
+      const next = i === 6 ? 1 : i + 1;
+      drawLine(cx + pts[i][0], cy + pts[i][1], cx + pts[next][0], cy + pts[next][1], color, alpha, 0.7);
+    }
+    // Inner hex cross-connections
+    for (let i = 1; i <= 6; i++) {
+      for (let j = i + 2; j <= 6; j++) {
+        if (j !== 7 - i) {
+          drawLine(cx + pts[i][0], cy + pts[i][1], cx + pts[j][0], cy + pts[j][1], color, alpha * 0.5, 0.5);
+        }
+      }
     }
   }
-  // Connect outer ring
-  for(int i=0; i<6; i++){
-    d = min(d, sdSegment(p, pts[i+7], pts[((i+1)%6)+7]));
-    d = min(d, sdSegment(p, pts[i+1], pts[((i+1)%6)+1]));
-  }
-  // Inner hex connections
-  for(int i=0; i<6; i++){
-    for(int j=i+2; j<6; j++){
-      if(j != 5-i) d = min(d, sdSegment(p, pts[i+1], pts[j+1]));
-    }
-  }
-  return d;
-}
 
-// Sri Yantra-like triangle layers
-float yantraTriangles(vec2 p, float r){
-  float d = 1e9;
-  for(int i=0; i<9; i++){
-    float angle = float(i) * TAU / 9.0;
-    float r2 = r * (0.3 + float(i) * 0.1);
-    float flip = mod(float(i), 2.0) < 1.0 ? 1.0 : -1.0;
-    vec2 a = vec2(cos(angle - 0.5), sin(angle - 0.5) * flip) * r2;
-    vec2 b = vec2(cos(angle + 0.5), sin(angle + 0.5) * flip) * r2;
-    vec2 c = vec2(cos(angle + PI), sin(angle + PI) * flip) * r2;
-    d = min(d, min(min(
-      sdSegment(p, a, b),
-      sdSegment(p, b, c)),
-      sdSegment(p, c, a)));
-  }
-  return d;
-}
-
-void main(){
-  vec2 uv = gl_FragCoord.xy / res;
-  float aspect = res.x / res.y;
-  vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
-
-  // Parallax from mouse
-  vec2 parallax = (mouse - 0.5) * 0.05;
-
-  float s = t * 0.08;
-
-  // ── Bright ethereal background ────────────────────────────────────
-  vec3 bgBright = vec3(0.95, 0.92, 1.0); // soft luminous white-lavender
-  vec3 bgDark = vec3(0.02, 0.01, 0.04);
-  vec3 bg = mix(bgDark, bgBright, brightness);
-
-  // Soft radial glow
-  float glow = exp(-length(p) * 1.8);
-  vec3 glowCol = mix(vec3(0.6, 0.5, 0.9), vec3(0.4, 0.7, 0.9), sin(s*0.3)*0.5+0.5);
-  bg += glowCol * glow * 0.15 * brightness;
-
-  // ── Sacred Geometry Layers ────────────────────────────────────────
-
-  // Layer 1: Flower of Life (slow parallax)
-  vec2 p1 = p + parallax * 1.5;
-  p1 *= rot(s * 0.05);
-  float flower = flowerOfLife(p1, 0.22 + sin(s*0.2)*0.01, 2.0);
-  float flowerLine = smoothstep(0.003, 0.0, flower);
-  vec3 flowerCol = mix(vec3(0.5, 0.3, 0.8), vec3(0.3, 0.6, 0.9), sin(s*0.4)*0.5+0.5);
-
-  // Layer 2: Metatron's Cube (medium parallax, different rotation)
-  vec2 p2 = p + parallax * 2.5 - vec2(0.1, 0.05);
-  p2 *= rot(-s * 0.03);
-  float met = metatron(p2, 0.18 + sin(s*0.15)*0.008);
-  float metLine = smoothstep(0.002, 0.0, met);
-  vec3 metCol = mix(vec3(0.8, 0.5, 0.9), vec3(0.4, 0.8, 0.7), sin(s*0.25)*0.5+0.5);
-
-  // Layer 3: Yantra triangles (fastest parallax, subtle)
-  vec2 p3 = p + parallax * 4.0 + vec2(0.05, -0.1);
-  p3 *= rot(s * 0.07);
-  float yan = yantraTriangles(p3, 0.35);
-  float yanLine = smoothstep(0.002, 0.0, yan);
-  vec3 yanCol = vec3(0.9, 0.7, 0.5);
-
-  // ── Soft glow around geometry lines ──────────────────────────────
-  float flowerGlow = exp(-abs(flower) * 40.0) * 0.3;
-  float metGlow = exp(-abs(met) * 50.0) * 0.2;
-  float yanGlow = exp(-abs(yan) * 60.0) * 0.15;
-
-  // ── Floating particles / light motes ─────────────────────────────
-  float particles = 0.0;
-  for(int i=0; i<20; i++){
-    float fi = float(i);
-    vec2 pp = vec2(
-      sin(fi*1.7 + s*0.3 + fi*0.5) * 0.8,
-      cos(fi*2.3 + s*0.2 + fi*0.3) * 0.6
-    ) + parallax * (2.0 + fi * 0.3);
-    float size = 0.001 + sin(fi*3.7 + s) * 0.0005;
-    particles += exp(-length(p - pp) / size) * 0.15;
-  }
-
-  // ── Compose ──────────────────────────────────────────────────────
-  vec3 col = bg;
-
-  // Geometry lines and glow — only in bright phase
-  float geoAlpha = brightness;
-  col += flowerCol * (flowerLine * 0.6 + flowerGlow) * geoAlpha;
-  col += metCol * (metLine * 0.4 + metGlow) * geoAlpha;
-  col += yanCol * (yanLine * 0.15 + yanGlow) * geoAlpha;
-
-  // Particles
-  vec3 particleCol = mix(vec3(1.0, 0.9, 0.7), vec3(0.7, 0.9, 1.0), sin(s)*0.5+0.5);
-  col += particleCol * particles * brightness;
-
-  // ── Stars emerging during birth transition ───────────────────────
-  float starPhase = 1.0 - smoothstep(0.0, 0.5, brightness);
-  if(starPhase > 0.0){
-    float stars = 0.0;
-    for(int i=0; i<80; i++){
-      float fi = float(i);
-      vec2 sp = vec2(
-        hash(vec2(fi, 1.0)) - 0.5,
-        hash(vec2(1.0, fi)) - 0.5
-      ) * vec2(aspect, 1.0) * 1.5;
-      float twinkle = sin(fi*7.3 + t*2.0) * 0.5 + 0.5;
-      float star = exp(-length(p - sp) / (0.001 + twinkle * 0.001));
-      stars += star * (0.3 + twinkle * 0.7);
-    }
-    col += vec3(0.9, 0.92, 1.0) * stars * starPhase * 0.8;
-  }
-
-  // ── Soft warm center glow (Emy's presence) ───────────────────────
-  float emyGlow = exp(-length(p) * 3.5) * 0.12;
-  vec3 emyCol = mix(vec3(1.0, 0.85, 0.7), vec3(0.8, 0.7, 1.0), sin(s*0.5)*0.5+0.5);
-  col += emyCol * emyGlow * brightness;
-
-  // ── Vignette ─────────────────────────────────────────────────────
-  float vig = 1.0 - length((uv - 0.5) * 1.3);
-  vig = smoothstep(0.0, 0.55, vig);
-  col *= vig * 0.7 + 0.3;
-
-  // ── Fade out ─────────────────────────────────────────────────────
-  col = mix(col, bgDark, fadeOut);
-
-  // Film grain
-  col += (hash(uv * res + fract(t * 7.0)) - 0.5) * 0.01;
-
-  // Tone map
-  col = col / (col + 0.5);
-  col = pow(col, vec3(0.95));
-
-  gl_FragColor = vec4(col, 1.0 - fadeOut);
-}`;
-
-  function compile(type, src) {
-    const s = gl.createShader(type);
-    gl.shaderSource(s, src);
-    gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-      console.error(gl.getShaderInfoLog(s));
-      return null;
-    }
-    return s;
-  }
-
-  const vs = compile(gl.VERTEX_SHADER, vsSrc);
-  const fs = compile(gl.FRAGMENT_SHADER, fsSrc);
-  if (!vs || !fs) { intro.remove(); return; }
-
-  const prog = gl.createProgram();
-  gl.attachShader(prog, vs);
-  gl.attachShader(prog, fs);
-  gl.linkProgram(prog);
-  gl.useProgram(prog);
-
-  const buf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
-  const pLoc = gl.getAttribLocation(prog, 'p');
-  gl.enableVertexAttribArray(pLoc);
-  gl.vertexAttribPointer(pLoc, 2, gl.FLOAT, false, 0, 0);
-
-  const uT = gl.getUniformLocation(prog, 't');
-  const uRes = gl.getUniformLocation(prog, 'res');
-  const uMouse = gl.getUniformLocation(prog, 'mouse');
-  const uBright = gl.getUniformLocation(prog, 'brightness');
-  const uFade = gl.getUniformLocation(prog, 'fadeOut');
-
-  // ── DOM Elements ──────────────────────────────────────────────────
+  // ── DOM Elements ─────────────────────────────────────────────────────
   const thoughtBubble = document.getElementById('intro-thought');
   const promptArea = document.getElementById('intro-prompt');
   const embarkBtn = document.getElementById('intro-embark');
 
-  // ── Phase Management ──────────────────────────────────────────────
+  // ── Phase Management ─────────────────────────────────────────────────
   function setPhase(newPhase) {
     phase = newPhase;
     phaseStart = performance.now();
@@ -300,12 +127,9 @@ void main(){
     if (birthStarted) return;
     birthStarted = true;
     targetBrightness = 0.0;
-
-    // Hide text elements
     thoughtBubble.classList.remove('visible');
     promptArea.classList.remove('visible');
 
-    // After transition, reveal main site
     setTimeout(() => {
       fadeOut = 1.0;
       intro.style.opacity = '0';
@@ -314,13 +138,13 @@ void main(){
         intro.style.display = 'none';
         intro.remove();
         phase = 'done';
-        // Dispatch event so main.js can start if needed
+        cancelAnimationFrame(raf);
         window.dispatchEvent(new CustomEvent('intro-complete'));
       }, 1500);
     }, 2500);
   }
 
-  // ── Events ────────────────────────────────────────────────────────
+  // ── Events ───────────────────────────────────────────────────────────
   document.addEventListener('mousemove', (e) => {
     mouseX = e.clientX / window.innerWidth;
     mouseY = 1.0 - e.clientY / window.innerHeight;
@@ -339,18 +163,51 @@ void main(){
     setPhase('born');
   });
 
-  // Skip on scroll or any key
   let skipReady = false;
   window.addEventListener('scroll', () => { if (skipReady) startBirth(); }, { once: true });
   window.addEventListener('keydown', () => { if (skipReady) startBirth(); }, { once: true });
 
-  // ── Render Loop ───────────────────────────────────────────────────
+  // ── Particle System ──────────────────────────────────────────────────
+  const particles = [];
+  for (let i = 0; i < 40; i++) {
+    particles.push({
+      x: Math.random() * 2 - 1,
+      y: Math.random() * 2 - 1,
+      vx: (Math.random() - 0.5) * 0.0003,
+      vy: (Math.random() - 0.5) * 0.0003,
+      size: 1 + Math.random() * 2.5,
+      phase: Math.random() * TAU,
+      speed: 0.5 + Math.random() * 1.5,
+    });
+  }
+
+  // ── Stars (for birth transition) ─────────────────────────────────────
+  const stars = [];
+  for (let i = 0; i < 120; i++) {
+    stars.push({
+      x: Math.random(),
+      y: Math.random(),
+      size: 0.5 + Math.random() * 2,
+      twinkleSpeed: 1 + Math.random() * 4,
+      twinklePhase: Math.random() * TAU,
+    });
+  }
+
+  // ── Simple hash for consistent noise ─────────────────────────────────
+  function hash(n) {
+    let x = Math.sin(n * 127.1 + n * 311.7) * 43758.5453;
+    return x - Math.floor(x);
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────
   function frame(ts) {
     if (phase === 'done') return;
+    raf = requestAnimationFrame(frame);
 
     time = ts * 0.001;
+    const s = time * 0.08;
 
-    // Auto phase transitions
+    // Phase transitions
     if (phase === 'void' && ts - phaseStart > VOID_DURATION) {
       setPhase('thought');
     } else if (phase === 'thought' && ts - phaseStart > THOUGHT_DELAY) {
@@ -359,20 +216,147 @@ void main(){
       skipReady = true;
     }
 
-    // Smooth brightness transition
+    // Smooth brightness
     brightness += (targetBrightness - brightness) * 0.03;
 
-    gl.uniform1f(uT, time);
-    gl.uniform2f(uRes, W, H);
-    gl.uniform2f(uMouse, mouseX, mouseY);
-    gl.uniform1f(uBright, brightness);
-    gl.uniform1f(uFade, fadeOut);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    requestAnimationFrame(frame);
+    // Smooth fadeOut
+    fadeOut += (fadeOut > 0.5 ? 1 : fadeOut) * 0.01; // handled by CSS mostly
+
+    // Parallax
+    const px = (mouseX - 0.5);
+    const py = (mouseY - 0.5);
+
+    // ── Background ──────────────────────────────────────────────────
+    // Bright luminous background fading to dark
+    const br = brightness;
+    const bgR = Math.round(240 * br + 2 * (1 - br));
+    const bgG = Math.round(235 * br + 1 * (1 - br));
+    const bgB = Math.round(255 * br + 4 * (1 - br));
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = `rgb(${bgR},${bgG},${bgB})`;
+    ctx.fillRect(0, 0, W, H);
+
+    // Radial glow
+    const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.6);
+    const hueShift = Math.sin(s * 0.3) * 0.5 + 0.5;
+    const gr = Math.round((150 + hueShift * 50) * br);
+    const gg = Math.round((130 + (1 - hueShift) * 70) * br);
+    const gb = Math.round((230 + hueShift * 20) * br);
+    grad.addColorStop(0, `rgba(${gr},${gg},${gb},${0.12 * br})`);
+    grad.addColorStop(1, `rgba(${gr},${gg},${gb},0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // ── Sacred Geometry ─────────────────────────────────────────────
+    const geoAlpha = br * 0.35;
+    if (geoAlpha > 0.01) {
+      ctx.save();
+      ctx.translate(W / 2, H / 2);
+
+      // Layer 1: Flower of Life (slow parallax)
+      const scale1 = Math.min(W, H) * 0.35;
+      ctx.save();
+      ctx.translate(px * 30, py * 20);
+      ctx.rotate(s * 0.05);
+      const fc1 = `hsl(${270 + Math.sin(s * 0.4) * 30}, 60%, ${50 + br * 20}%)`;
+      drawFlowerOfLife(0, 0, scale1 * 0.18, fc1, geoAlpha);
+      ctx.restore();
+
+      // Layer 2: Metatron's Cube (medium parallax)
+      const scale2 = Math.min(W, H) * 0.3;
+      ctx.save();
+      ctx.translate(px * 50 - 15, py * 35 - 10);
+      ctx.rotate(-s * 0.03);
+      const fc2 = `hsl(${200 + Math.sin(s * 0.25) * 40}, 50%, ${55 + br * 15}%)`;
+      drawMetatronsCube(0, 0, scale2 * 0.12, fc2, geoAlpha * 0.7);
+      ctx.restore();
+
+      // Layer 3: Simple yantra triangles (fastest parallax)
+      ctx.save();
+      ctx.translate(px * 70 + 20, py * 50 - 20);
+      ctx.rotate(s * 0.07);
+      const fc3 = `hsl(${40 + Math.sin(s * 0.2) * 20}, 50%, ${60 + br * 15}%)`;
+      const yanAlpha = geoAlpha * 0.3;
+      const yanR = scale2 * 0.2;
+      for (let i = 0; i < 9; i++) {
+        const a = i * TAU / 9;
+        const flip = i % 2 === 0 ? 1 : -1;
+        const r2 = yanR * (0.4 + i * 0.08);
+        const ax = Math.cos(a - 0.5) * r2;
+        const ay = Math.sin(a - 0.5) * r2 * flip;
+        const bx = Math.cos(a + 0.5) * r2;
+        const by = Math.sin(a + 0.5) * r2 * flip;
+        const cx2 = Math.cos(a + Math.PI) * r2;
+        const cy2 = Math.sin(a + Math.PI) * r2 * flip;
+        drawLine(ax, ay, bx, by, fc3, yanAlpha, 0.5);
+        drawLine(bx, by, cx2, cy2, fc3, yanAlpha, 0.5);
+        drawLine(cx2, cy2, ax, ay, fc3, yanAlpha, 0.5);
+      }
+      ctx.restore();
+
+      ctx.restore();
+    }
+
+    // ── Particles (light motes) ─────────────────────────────────────
+    for (const p of particles) {
+      p.x += p.vx + px * 0.0002;
+      p.y += p.vy + py * 0.0002;
+      // Wrap
+      if (p.x > 1.2) p.x = -1.2;
+      if (p.x < -1.2) p.x = 1.2;
+      if (p.y > 1.2) p.y = -1.2;
+      if (p.y < -1.2) p.y = 1.2;
+
+      const twinkle = Math.sin(time * p.speed + p.phase) * 0.5 + 0.5;
+      const sx = W / 2 + p.x * W / 2;
+      const sy = H / 2 + p.y * H / 2;
+      const particleAlpha = br * (0.15 + twinkle * 0.35);
+
+      ctx.globalAlpha = particleAlpha;
+      const pH = (200 + Math.sin(time * 0.5 + p.phase) * 60) % 360;
+      ctx.fillStyle = `hsl(${pH}, 40%, 85%)`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, p.size * (0.8 + twinkle * 0.4), 0, TAU);
+      ctx.fill();
+    }
+
+    // ── Stars (emerging during birth) ───────────────────────────────
+    const starPhase = 1 - brightness;
+    if (starPhase > 0.01) {
+      for (const st of stars) {
+        const twinkle = Math.sin(time * st.twinkleSpeed + st.twinklePhase) * 0.5 + 0.5;
+        const sx = st.x * W;
+        const sy = st.y * H;
+        ctx.globalAlpha = starPhase * (0.2 + twinkle * 0.6);
+        ctx.fillStyle = `rgba(220, 225, 255, 1)`;
+        ctx.beginPath();
+        ctx.arc(sx, sy, st.size * (0.6 + twinkle * 0.5), 0, TAU);
+        ctx.fill();
+      }
+    }
+
+    // ── Emy's center glow ───────────────────────────────────────────
+    const emyGrad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.min(W, H) * 0.25);
+    const emyHue = 280 + Math.sin(s * 0.5) * 40;
+    emyGrad.addColorStop(0, `hsla(${emyHue}, 40%, 80%, ${0.08 * br})`);
+    emyGrad.addColorStop(1, `hsla(${emyHue}, 40%, 80%, 0)`);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = emyGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // ── Vignette ────────────────────────────────────────────────────
+    const vigGrad = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.2, W / 2, H / 2, Math.max(W, H) * 0.7);
+    vigGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    vigGrad.addColorStop(1, `rgba(0,0,0,${0.3 * br})`);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = vigGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.globalAlpha = 1;
   }
 
   window.addEventListener('resize', resize);
   resize();
   phaseStart = performance.now();
-  requestAnimationFrame(frame);
+  raf = requestAnimationFrame(frame);
 })();
