@@ -76,7 +76,20 @@ function updateJourneyPanel(){
   let html = '';
   for(let i = journeyLog.length - 1; i >= 0; i--){
     const e = journeyLog[i];
-    html += `<div class="journey-entry"><div class="journey-icon">${e.label.startsWith('Year') || e.label === 'Birth' ? '📖' : '🎯'}</div><div class="journey-entry-text"><strong>${e.label}</strong> - ${e.text}</div></div>`;
+    const isAge = e.label.startsWith('year ');
+    const isBirth = e.label === 'birth';
+    const size = 18, cx = 9, cy = 9;
+    let svg;
+    if(isBirth){
+      svg = `<svg width="${size}" height="${size}" viewBox="0 0 18 18"><circle cx="${cx}" cy="${cy}" r="7" fill="none" stroke="currentColor" stroke-width="1" opacity="0.7"/><circle cx="${cx}" cy="${cy}" r="2" fill="currentColor" opacity="0.8"/></svg>`;
+    } else if(isAge){
+      // concentric rings (time/life)
+      svg = `<svg width="${size}" height="${size}" viewBox="0 0 18 18"><circle cx="${cx}" cy="${cy}" r="3" fill="none" stroke="currentColor" stroke-width="1" opacity="0.6"/><circle cx="${cx}" cy="${cy}" r="6" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.4"/><circle cx="${cx}" cy="${cy}" r="8" fill="none" stroke="currentColor" stroke-width="0.6" opacity="0.25"/></svg>`;
+    } else {
+      // seed of life (sacred geometry)
+      svg = `<svg width="${size}" height="${size}" viewBox="0 0 18 18"><circle cx="${cx}" cy="${cx}" r="3" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.5"/><circle cx="${cx}" cy="${cx-3}" r="3" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.4"/><circle cx="${cx+2.6}" cy="${cx-1.5}" r="3" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.4"/><circle cx="${cx+2.6}" cy="${cx+1.5}" r="3" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.4"/><circle cx="${cx}" cy="${cx+3}" r="3" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.4"/><circle cx="${cx-2.6}" cy="${cx+1.5}" r="3" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.4"/><circle cx="${cx-2.6}" cy="${cx-1.5}" r="3" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.4"/></svg>`;
+    }
+    html += `<div class="journey-entry"><div class="journey-icon">${svg}</div><div class="journey-entry-text"><strong>${e.label}</strong> — ${e.text}</div></div>`;
   }
   el.innerHTML = html;
 }
