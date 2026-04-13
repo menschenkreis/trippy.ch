@@ -2850,10 +2850,17 @@ function updateSoundHint() {
   
   // Show hint after intro is complete
   if(hint.dataset.introComplete === 'true') {
-    if(depthM < 100) {
+    if(depthM < 50) {
       hint.style.opacity = '1';
+      // Gentle pulsation
+      const pulse = 0.8 + Math.sin(time * 3) * 0.2;
+      hint.style.transform = `scale(${pulse})`;
+    } else if(depthM < 100) {
+      hint.style.opacity = '1';
+      hint.style.transform = 'scale(1)';
     } else {
       hint.style.opacity = '0';
+      hint.style.transform = 'scale(1)';
       // Completely remove from layout after fade
       setTimeout(() => { if(hint.style.opacity === '0') hint.style.display = 'none'; }, 2000);
     }
