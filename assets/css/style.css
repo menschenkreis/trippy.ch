@@ -623,9 +623,8 @@ footer a:hover { color: var(--pink); }
   z-index: 500;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   flex-direction: column;
-  padding-top: 20vh;
 }
 
 #intro-canvas {
@@ -672,8 +671,7 @@ footer a:hover { color: var(--pink); }
   position: relative;
   z-index: 1;
   text-align: center;
-  margin-top: auto;
-  margin-bottom: 15vh;
+  margin-top: 2.5rem;
   opacity: 0;
   transform: translateY(10px);
   transition: opacity 1.5s ease 0.3s, transform 1.5s ease 0.3s;
