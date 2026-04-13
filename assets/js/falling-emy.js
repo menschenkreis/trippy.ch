@@ -56,6 +56,56 @@ let targetTimeScale = 1.0;
 let dragRagdoll = null;
 let dragParticle = null;
 
+// ── Collision Harmonics ──
+let harmonyIndex = 0;
+const pentatonicScale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21]; // C D E G A c d e g a
+
+// ── Power-Up Effects ──
+let activeEffects = { wave: 0, trail: 0, pulse: 0 };
+let waveRings = []; // {x, y, radius, life}
+
+// ── Milestones ──
+const milestones = [500, 1000, 2000, 5000, 10000, 25000, 50000, 100000];
+let lastMilestone = 0;
+let milestoneText = null; // {text, life}
+let milestoneSlowMo = 0;
+
+// ── Life Chapters ──
+const lifeChapters = [
+  { age: 1, text: "The first breath. Pure awareness. No past, no future." },
+  { age: 2, text: "Learning to walk. Every fall is a discovery." },
+  { age: 3, text: "Why? Why? Why? The universe is infinite questions." },
+  { age: 4, text: "Imagination runs wild. Everything is alive." },
+  { age: 5, text: "The first day of something bigger." },
+  { age: 6, text: "Friendships form. The world gets wider." },
+  { age: 7, text: "Losing teeth. Growing. Things fall away to make room." },
+  { age: 8, text: "Reading opens doors to a thousand worlds." },
+  { age: 9, text: "Almost double digits. Time starts to feel real." },
+  { age: 10, text: "A whole decade. You have no idea how fast this goes." },
+  { age: 11, text: "The in-between years. Neither child nor teenager." },
+  { age: 12, text: "A turning point. Everything begins to change." },
+  { age: 13, text: "Teenage years. The void gets deeper." },
+  { age: 14, text: "Rebellion. Questioning everything you were told." },
+  { age: 15, text: "First love, first heartbreak. The obstacles get sharper." },
+  { age: 16, text: "Finding your people. Or learning to be alone." },
+  { age: 17, text: "The edge of something vast." },
+  { age: 18, text: "Adulthood arrives. Nobody feels ready." },
+  { age: 20, text: "The twenties. A blur of motion and mistakes." },
+  { age: 25, text: "A quarter century. Who am I now?" },
+  { age: 30, text: "Thirty. The fall feels different from here." },
+  { age: 35, text: "The gravity of choices becomes undeniable." },
+  { age: 40, text: "Midlife. Not a crisis — a clearing." },
+  { age: 50, text: "Half a century of falling. Grace finds its rhythm." },
+  { age: 60, text: "Wisdom isn't knowing more. It's carrying less." },
+  { age: 70, text: "The obstacles soften. The geometry becomes beautiful." },
+  { age: 80, text: "A long fall. A good fall. Still falling." },
+  { age: 90, text: "Nearly a century. The void and you are old friends." },
+  { age: 100, text: "A hundred years of descent. What a journey." },
+];
+let lastChapter = 0;
+let chapterDisplay = null; // {text, life, phase}
+let chapterSlowMo = 0;
+
 // ── Accelerometer ────────────────────────────────────────────────────────
 let accelInited = false;
 function initAccel() {
@@ -391,6 +441,52 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     osc1.start(now); osc1.stop(now + duration * 1.5 + 0.1);
     osc2.start(now); osc2.stop(now + duration * 1.5 + 0.1);
 
+  } else if (type === 'wave') {
+    // Filtered sweep
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq * 2, now);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.5, now + duration);
+    filter.type = 'bandpass'; filter.frequency.value = freq; filter.Q.value = 5;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(vol * 0.6, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    osc.connect(filter); filter.connect(gain); gain.connect(panner);
+    panner.connect(masterGain);
+    if(delayNode) panner.connect(delayNode);
+    osc.start(now); osc.stop(now + duration + 0.1);
+  } else if (type === 'trail') {
+    // Shimmer
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc1.type = 'sine'; osc2.type = 'triangle';
+    osc1.frequency.setValueAtTime(freq * 3, now);
+    osc2.frequency.setValueAtTime(freq * 4.01, now);
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(vol * 0.3, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.8);
+    osc1.connect(gain); osc2.connect(gain); gain.connect(panner);
+    panner.connect(masterGain);
+    if(delayNode) panner.connect(delayNode);
+    osc1.start(now); osc1.stop(now + duration + 0.1);
+    osc2.start(now); osc2.stop(now + duration + 0.1);
+  } else if (type === 'pulse') {
+    // Bass thump
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq * 0.5, now);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.125, now + 0.15);
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(vol * 0.9, now + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc.connect(gain); gain.connect(panner);
+    panner.connect(masterGain);
+    if(delayNode) panner.connect(delayNode);
+    osc.start(now); osc.stop(now + 0.4);
   } else if (type === 'chakra') {
     // Singing bowl resonance
     const osc1 = audioCtx.createOscillator();
@@ -520,6 +616,25 @@ function playImpactSound(force, hue, xPos, type, sacredType){
   }
 }
 
+function playMilestoneChord(){
+  if(isMuted || !audioCtx) return;
+  const now = audioCtx.currentTime;
+  const baseFreq = 261.63; // C4
+  const chordFreqs = [baseFreq, baseFreq * 1.26, baseFreq * 1.5]; // C E G
+  for(const freq of chordFreqs){
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now);
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.12, now + 0.1);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+    osc.connect(gain); gain.connect(masterGain);
+    if(delayNode) gain.connect(delayNode);
+    osc.start(now); osc.stop(now + 2.6);
+  }
+}
+
 function collideParticleSphere(p, s, dt, impactData){
   const dx = p.x-s.x, dy = p.y-s.y;
   const d = Math.sqrt(dx*dx+dy*dy) || 0.001;
@@ -566,7 +681,30 @@ function collideRagdollSphere(ragdoll, sphere, dt){
     const now = time;
     if(now - lastHitTime < COMBO_WINDOW){ comboCount++; } else { comboCount = 1; }
     lastHitTime = now;
-    const basePoints = sphere.type === 'challenge' ? 50 : (sphere.type === 'heart' ? 25 : 15);
+
+    // ── Collision Harmonics ──
+    harmonyIndex = (harmonyIndex + 1) % pentatonicScale.length;
+    if(comboCount > 1 && audioCtx && !isMuted){
+      const hNow = audioCtx.currentTime;
+      const hFreq = 220 * Math.pow(2, pentatonicScale[Math.min(comboCount-1, pentatonicScale.length-1)]/12);
+      const hOsc = audioCtx.createOscillator();
+      const hGain = audioCtx.createGain();
+      hOsc.type = 'sine';
+      hOsc.frequency.setValueAtTime(hFreq, hNow);
+      hGain.gain.setValueAtTime(0, hNow);
+      hGain.gain.linearRampToValueAtTime(0.15, hNow + 0.02);
+      hGain.gain.exponentialRampToValueAtTime(0.001, hNow + 0.4);
+      hOsc.connect(hGain); hGain.connect(masterGain);
+      if(delayNode) hGain.connect(delayNode);
+      hOsc.start(hNow); hOsc.stop(hNow + 0.5);
+    }
+
+    // ── Power-Up Activation ──
+    if(sphere.type === 'wave') activeEffects.wave = 4;
+    else if(sphere.type === 'trail') activeEffects.trail = 5;
+    else if(sphere.type === 'pulse') activeEffects.pulse = 3;
+
+    const basePoints = sphere.type === 'challenge' ? 50 : (sphere.type === 'heart' ? 25 : (['wave','trail','pulse'].includes(sphere.type) ? 30 : 15));
     const multiplier = Math.min(comboCount, 10);
     const pts = basePoints * multiplier;
     score += pts;
@@ -822,6 +960,9 @@ function spawnSphereAtDepth(yWorld, forceType=null){
     else if (r < 0.030) type = 'yinyang';
     else if (r < 0.045) type = 'vesica';
     else if (r < 0.060) type = 'chakra';
+    else if (r < 0.080) type = 'wave';
+    else if (r < 0.100) type = 'trail';
+    else if (r < 0.120) type = 'pulse';
   }
 
   spheres.push(new Sphere(
@@ -922,6 +1063,11 @@ document.getElementById('reset-btn').onclick = () => {
   portal = null;
   score = 0; displayScore = 0; comboCount = 0; lastHitTime = 0;
   scorePopups = []; scoreFlies = [];
+  harmonyIndex = 0;
+  activeEffects = { wave: 0, trail: 0, pulse: 0 };
+  waveRings = [];
+  lastMilestone = 0; milestoneText = null; milestoneSlowMo = 0;
+  lastChapter = 0; chapterDisplay = null; chapterSlowMo = 0;
   ragdolls = [new Ragdoll(W/2, 0, 'emy')];
   spheres = [];
   for(let i=0;i<8;i++) spawnSphereAtDepth(i*120+Math.random()*80);
@@ -1356,6 +1502,58 @@ function drawSphere(s){
     ctx.fillStyle = `hsla(${hue},90%,80%,0.6)`;
     ctx.beginPath(); ctx.arc(0,0,2.5,0,TAU); ctx.fill();
 
+  } else if(s.type === 'wave'){
+    // Cyan triangle
+    ctx.rotate(s.rotation);
+    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+    grad.addColorStop(0, `hsla(180,80%,60%,0.2)`);
+    grad.addColorStop(1, `hsla(180,80%,60%,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
+    ctx.strokeStyle = `hsla(180,80%,65%,0.9)`;
+    ctx.fillStyle = `hsla(180,70%,50%,0.2)`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for(let i=0;i<3;i++){
+      const a = i*TAU/3 - PI/2;
+      if(i===0) ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r);
+      else ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else if(s.type === 'trail'){
+    // Magenta diamond
+    ctx.rotate(s.rotation * 1.5);
+    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+    grad.addColorStop(0, `hsla(300,80%,60%,0.2)`);
+    grad.addColorStop(1, `hsla(300,80%,60%,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
+    ctx.strokeStyle = `hsla(300,80%,65%,0.9)`;
+    ctx.fillStyle = `hsla(300,70%,50%,0.2)`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0,-r); ctx.lineTo(r*0.7,0); ctx.lineTo(0,r); ctx.lineTo(-r*0.7,0);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else if(s.type === 'pulse'){
+    // Gold star
+    ctx.rotate(s.rotation * 2);
+    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+    grad.addColorStop(0, `hsla(45,90%,60%,0.2)`);
+    grad.addColorStop(1, `hsla(45,90%,60%,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
+    ctx.strokeStyle = `hsla(45,90%,60%,0.9)`;
+    ctx.fillStyle = `hsla(45,80%,50%,0.2)`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    const pts = 5;
+    for(let i=0;i<=pts*2;i++){
+      const a = i*TAU/(pts*2) - PI/2;
+      const d = (i%2===0) ? r : r*0.45;
+      if(i===0) ctx.moveTo(Math.cos(a)*d, Math.sin(a)*d);
+      else ctx.lineTo(Math.cos(a)*d, Math.sin(a)*d);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
   } else if(s.type === 'challenge'){
     // Spiky abstract challenge shape
     const hue = (s.hue + time*40) % 360;
@@ -1684,6 +1882,63 @@ function frame(now){
   drawBackground();
   for(const s of spheres) drawSphere(s);
   for(const r of ragdolls) drawRagdoll(r);
+  // ── Active Power-Up Effects (world space) ──
+  const head = ragdolls.length > 0 ? ragdolls[0].particles[0] : null;
+  const headX = head ? head.x : W/2;
+  const headY = head ? head.y : cameraY + H*0.35;
+
+  // Wave effect: decrement timer, spawn rings
+  if(activeEffects.wave > 0){
+    activeEffects.wave -= rawDt;
+    // Spawn ring every ~0.5s
+    if(Math.floor(activeEffects.wave * 2) !== Math.floor((activeEffects.wave + rawDt) * 2) || activeEffects.wave + rawDt > 4){
+      waveRings.push({x: headX, y: headY, radius: 5, life: 1.0});
+    }
+  }
+  for(let i = waveRings.length-1; i >= 0; i--){
+    const wr = waveRings[i];
+    wr.radius += rawDt * 150;
+    wr.life -= rawDt * 0.8;
+    if(wr.life <= 0){ waveRings.splice(i, 1); continue; }
+    ctx.strokeStyle = `hsla(200,80%,65%,${wr.life * 0.6})`;
+    ctx.lineWidth = 2 * wr.life;
+    ctx.shadowColor = `hsla(200,90%,60%,${wr.life * 0.4})`;
+    ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.arc(wr.x, wr.y, wr.radius, 0, TAU); ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+
+  // Trail effect: spawn sparks from ragdoll head
+  if(activeEffects.trail > 0){
+    activeEffects.trail -= rawDt;
+    if(particles.length < MAX_PARTICLES){
+      for(let i = 0; i < 2; i++){
+        particles.push({
+          x: headX + (Math.random()-0.5)*8, y: headY + (Math.random()-0.5)*8,
+          vx: (Math.random()-0.5)*30, vy: (Math.random()-0.5)*30 + 20,
+          life: 1.0, decay: 2.0 + Math.random(), size: 1.5 + Math.random()*2,
+          hue: 300 + Math.random()*60, sparkle: Math.random() > 0.5,
+        });
+      }
+    }
+  }
+
+  // Pulse effect: golden ring around head
+  if(activeEffects.pulse > 0){
+    activeEffects.pulse -= rawDt;
+    const pAlpha = Math.min(activeEffects.pulse / 0.5, 1.0) * 0.7;
+    const pPulse = 30 + 15 * Math.sin(time * 8);
+    ctx.strokeStyle = `hsla(45,90%,60%,${pAlpha})`;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = `hsla(45,90%,55%,${pAlpha * 0.6})`;
+    ctx.shadowBlur = 15;
+    ctx.beginPath(); ctx.arc(headX, headY, pPulse, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = `hsla(45,80%,70%,${pAlpha * 0.4})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(headX, headY, pPulse * 1.5, 0, TAU); ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
   drawParticles();
   drawScoreElements(); // popups in world space
 
@@ -1939,6 +2194,111 @@ function frame(now){
     ctx.fillStyle = `rgba(${a3[0]},${a3[1]},${a3[2]},${ca * 0.5})`;
     ctx.font = '600 0.55rem monospace';
     ctx.fillText(`×${Math.min(comboCount, 10)}`, W - 20, H - 52);
+  }
+
+  // ── Milestone & Chapter Logic ──
+  // Milestones
+  for(const m of milestones){
+    if(depthMeters >= m && lastMilestone < m){
+      lastMilestone = m;
+      milestoneSlowMo = 0.5;
+      const mLabel = m >= 1000 ? (m/1000) + ' km' : m + ' m';
+      milestoneText = {text: mLabel, life: 2.0};
+      playMilestoneChord();
+      // Spawn celebration particles (screen space)
+      for(let i = 0; i < 40; i++){
+        particles.push({
+          x: W/2, y: H/2 + cameraY,
+          vx: (Math.random()-0.5)*300, vy: (Math.random()-0.5)*300,
+          life: 1.5 + Math.random(), decay: 0.4 + Math.random()*0.3,
+          size: 3 + Math.random()*4, hue: Math.random()*360, sparkle: true,
+        });
+      }
+    }
+  }
+  if(milestoneSlowMo > 0){
+    milestoneSlowMo -= rawDt;
+    targetTimeScale = 0.3;
+  } else if(milestoneSlowMo !== -1 && !isSlowed){
+    targetTimeScale = 1.0;
+    milestoneSlowMo = -1;
+  }
+  if(milestoneText){
+    milestoneText.life -= rawDt;
+    if(milestoneText.life <= 0) milestoneText = null;
+  }
+
+  // Life Chapters
+  for(const ch of lifeChapters){
+    if(depthMeters >= ch.age * 1000 && lastChapter < ch.age){
+      lastChapter = ch.age;
+      chapterSlowMo = 1.0;
+      chapterDisplay = {text: ch.text, life: 6.0, phase: 'fadein'};
+      playMilestoneChord();
+    }
+  }
+  if(chapterSlowMo > 0){
+    chapterSlowMo -= rawDt;
+    targetTimeScale = 0.15;
+  } else if(chapterSlowMo !== -1 && !isSlowed && milestoneSlowMo <= 0){
+    targetTimeScale = 1.0;
+    chapterSlowMo = -1;
+  }
+  if(chapterDisplay){
+    chapterDisplay.life -= rawDt;
+    if(chapterDisplay.life > 5.0) chapterDisplay.phase = 'fadein';
+    else if(chapterDisplay.life > 2.0) chapterDisplay.phase = 'hold';
+    else chapterDisplay.phase = 'fadeout';
+    if(chapterDisplay.life <= 0) chapterDisplay = null;
+  }
+
+  // ── Draw Milestone Text (screen space) ──
+  if(milestoneText){
+    const mAlpha = milestoneText.life / 2.0;
+    ctx.fillStyle = `rgba(255,255,255,${mAlpha * 0.9})`;
+    ctx.font = '600 2rem monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = `rgba(255,255,255,${mAlpha * 0.5})`;
+    ctx.shadowBlur = 20;
+    ctx.fillText(milestoneText.text, W/2, H/2);
+    ctx.shadowBlur = 0;
+  }
+
+  // ── Draw Chapter Text (screen space) ──
+  if(chapterDisplay){
+    let cAlpha;
+    if(chapterDisplay.phase === 'fadein') cAlpha = (6.0 - chapterDisplay.life); // 0→1 over 1s
+    else if(chapterDisplay.phase === 'hold') cAlpha = 1.0;
+    else cAlpha = chapterDisplay.life / 2.0; // 1→0 over 2s
+    cAlpha = Math.max(0, Math.min(1, cAlpha));
+
+    // Semi-transparent backdrop
+    ctx.fillStyle = `rgba(0,0,0,${cAlpha * 0.5})`;
+    const boxW = Math.min(W * 0.85, 500);
+    const boxH = 80;
+    ctx.fillRect((W - boxW)/2, H/2 - boxH/2, boxW, boxH);
+
+    // Text
+    ctx.fillStyle = `rgba(255,255,255,${cAlpha * 0.9})`;
+    ctx.font = '300 0.9rem sans-serif';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = `rgba(200,200,255,${cAlpha * 0.4})`;
+    ctx.shadowBlur = 12;
+    // Word wrap
+    const words = chapterDisplay.text.split(' ');
+    const lines = []; let line = '';
+    for(const w of words){
+      const test = line + w + ' ';
+      if(ctx.measureText(test).width > boxW - 40){ lines.push(line); line = w + ' '; }
+      else line = test;
+    }
+    lines.push(line);
+    const lineH = 22;
+    const startY = H/2 - (lines.length * lineH) / 2 + lineH / 2;
+    for(let i = 0; i < lines.length; i++){
+      ctx.fillText(lines[i].trim(), W/2, startY + i * lineH);
+    }
+    ctx.shadowBlur = 0;
   }
 
   // Stars in screen space with parallax
