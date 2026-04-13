@@ -552,11 +552,18 @@ function collideRagdollSphere(ragdoll, sphere, dt){
     playImpactSound(impactData.maxForce, sphere.hue, sphere.x, sphere.type, sphere.sacredType);
     sphere.impactFlash = 1.0;
     if(sphere.type === 'challenge' && !portal){
+      const h = (sphere.hue + time * 40) % 360;
       portal = {
         x: sphere.x, y: sphere.y, r: sphere.r,
-        progress: 0,
-        hue: (sphere.hue + time * 40) % 360,
-        phase: 'expanding',
+        progress: 0, hue: h, phase: 'expanding',
+        sparks: Array.from({length:60}, (_,i)=>({
+          angle: i * TAU / 60,
+          speed: 300 + Math.random() * 500,
+          dist: 0,
+          size: 1 + Math.random() * 2.5,
+          hue: (h + i * 6) % 360,
+          life: 1,
+        })),
         targetAccent: [60+Math.random()*180|0, 60+Math.random()*180|0, 60+Math.random()*180|0],
         targetAccent2: [60+Math.random()*180|0, 60+Math.random()*180|0, 60+Math.random()*180|0],
       };
@@ -1480,20 +1487,28 @@ function frame(now){
 
   // ── Update Portal ──
   if(portal){
+    for(const sp of portal.sparks){
+      sp.angle += rawDt * 1.8;
+      sp.dist += sp.speed * rawDt;
+      sp.life -= rawDt * 0.6;
+    }
+    portal.sparks = portal.sparks.filter(sp => sp.life > 0);
+
     if(portal.phase === 'expanding'){
-      portal.progress += rawDt * 0.8;
-      portal.r += rawDt * 1200;
-      if(portal.progress >= 1){
-        portal.phase = 'holding'; portal.progress = 0;
+      portal.progress += rawDt * 0.55;
+      portal.r += rawDt * 900;
+      if(portal.progress >= 1){ portal.phase = 'threshold'; portal.progress = 0; }
+    } else if(portal.phase === 'threshold'){
+      portal.progress += rawDt * 1.2;
+      if(portal.progress >= 0.5 && !portal.colorsApplied){
+        portal.colorsApplied = true;
         window.manualThemeSet = true;
         theme.accent = portal.targetAccent;
         theme.accent2 = portal.targetAccent2;
       }
-    } else if(portal.phase === 'holding'){
-      portal.progress += rawDt * 2.5;
-      if(portal.progress >= 1){ portal.phase = 'fading'; portal.progress = 0; }
-    } else if(portal.phase === 'fading'){
-      portal.progress += rawDt * 1.5;
+      if(portal.progress >= 1){ portal.phase = 'emerging'; portal.progress = 0; }
+    } else if(portal.phase === 'emerging'){
+      portal.progress += rawDt * 0.8;
       if(portal.progress >= 1) portal = null;
     }
   }
@@ -1514,48 +1529,205 @@ function frame(now){
     const sx = portal.x;
     const sy = portal.y - cameraY;
     const pr = portal.r;
-    let alpha;
-    if(portal.phase === 'expanding') alpha = Math.min(portal.progress * 1.5, 1);
-    else if(portal.phase === 'holding') alpha = 1;
-    else alpha = 1 - portal.progress;
+    const h = portal.hue;
+    ctx.save();
 
-    if(alpha > 0.01){
-      // Ring glow (screen blend)
-      const ringA = (portal.phase === 'expanding') ? alpha * 0.8
-        : (portal.phase === 'holding') ? 0.3 * (1 - portal.progress)
-        : alpha * 0.3;
-      if(ringA > 0.01){
+    // ── EXPANDING: the portal tears open ──
+    if(portal.phase === 'expanding'){
+      const p = portal.progress;
+      const ease = p < 0.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2;
+
+      // Spiraling sacred geometry rings
+      for(let ring = 0; ring < 3; ring++){
+        const ringR = pr * (0.7 + ring * 0.25);
+        const ringAlpha = ease * (0.5 - ring * 0.12);
+        const ringHue = (h + ring * 40 + time * 80) % 360;
+        const segments = 6 + ring * 2;
         ctx.save();
-        ctx.globalCompositeOperation = 'screen';
-        const rg = ctx.createRadialGradient(sx, sy, pr*0.85, sx, sy, pr*1.15);
-        rg.addColorStop(0, `hsla(${portal.hue},90%,60%,0)`);
-        rg.addColorStop(0.4, `hsla(${portal.hue},90%,70%,${ringA*0.6})`);
-        rg.addColorStop(0.6, `hsla(${(portal.hue+60)%360},90%,70%,${ringA*0.4})`);
-        rg.addColorStop(1, `hsla(${(portal.hue+120)%360},90%,60%,0)`);
-        ctx.fillStyle = rg;
-        ctx.fillRect(sx-pr*1.5, sy-pr*1.5, pr*3, pr*3);
-        // Inner swirl fill
-        const ia = alpha * (portal.phase === 'expanding' ? 0.35
-          : portal.phase === 'holding' ? 0.12*(1-portal.progress)
-          : alpha * 0.12);
-        ctx.globalCompositeOperation = 'source-over';
-        const ig = ctx.createRadialGradient(sx, sy, 0, sx, sy, pr*0.9);
-        ig.addColorStop(0, `hsla(${(portal.hue+180)%360},80%,20%,${ia})`);
-        ig.addColorStop(0.5, `hsla(${portal.hue},70%,15%,${ia*0.5})`);
-        ig.addColorStop(1, `hsla(${(portal.hue+90)%360},60%,10%,0)`);
-        ctx.fillStyle = ig;
-        ctx.fillRect(0, 0, W, H);
+        ctx.translate(sx, sy);
+        ctx.rotate(time * (1.5 + ring * 0.5) * (ring % 2 ? -1 : 1));
+        ctx.strokeStyle = `hsla(${ringHue},90%,65%,${ringAlpha})`;
+        ctx.lineWidth = 1.5 - ring * 0.3;
+        ctx.shadowColor = `hsla(${ringHue},90%,60%,${ringAlpha * 0.8})`;
+        ctx.shadowBlur = 20;
+        ctx.beginPath();
+        for(let i = 0; i <= segments; i++){
+          const a = i * TAU / segments;
+          const wobble = Math.sin(time * 3 + i + ring) * ringR * 0.08;
+          const d = ringR + wobble;
+          if(i===0) ctx.moveTo(Math.cos(a)*d, Math.sin(a)*d);
+          else ctx.lineTo(Math.cos(a)*d, Math.sin(a)*d);
+        }
+        ctx.closePath(); ctx.stroke();
+        if(ring === 0){
+          ctx.lineWidth = 0.5;
+          ctx.globalAlpha = ringAlpha * 0.4;
+          for(let i = 0; i < segments; i++){
+            for(let j = i+2; j < segments; j++){
+              const a1 = i*TAU/segments, a2 = j*TAU/segments;
+              ctx.beginPath();
+              ctx.moveTo(Math.cos(a1)*ringR, Math.sin(a1)*ringR);
+              ctx.lineTo(Math.cos(a2)*ringR, Math.sin(a2)*ringR);
+              ctx.stroke();
+            }
+          }
+        }
         ctx.restore();
       }
-      // Color wash during hold/fade
-      if(portal.phase === 'holding' || portal.phase === 'fading'){
-        const wa = (portal.phase === 'holding') ? 0.06*(1-portal.progress) : 0.06*alpha;
-        if(wa > 0.005){
-          ctx.fillStyle = `hsla(${(portal.hue+180)%360},50%,50%,${wa})`;
-          ctx.fillRect(0, 0, W, H);
+
+      // Vortex tunnel rings
+      const tunnelR = pr * 0.95;
+      for(let i = 0; i < 8; i++){
+        const t = (i / 8 + time * 0.5) % 1;
+        const tr = tunnelR * t;
+        const tAlpha = ease * (1 - t) * 0.3;
+        ctx.strokeStyle = `hsla(${(h + t * 120) % 360},85%,60%,${tAlpha})`;
+        ctx.lineWidth = 1;
+        ctx.shadowBlur = 0;
+        ctx.beginPath(); ctx.arc(sx, sy, tr, 0, TAU); ctx.stroke();
+      }
+
+      // Portal sparks
+      for(const sp of portal.sparks){
+        const spx = sx + Math.cos(sp.angle) * sp.dist;
+        const spy = sy + Math.sin(sp.angle) * sp.dist;
+        const sa = sp.life * ease;
+        ctx.fillStyle = `hsla(${sp.hue},90%,70%,${sa})`;
+        ctx.shadowColor = `hsla(${sp.hue},90%,60%,${sa})`;
+        ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.arc(spx, spy, sp.size * sp.life, 0, TAU); ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+
+      // Inner darkening void
+      const voidAlpha = ease * 0.5;
+      const vg = ctx.createRadialGradient(sx, sy, 0, sx, sy, pr * 0.6);
+      vg.addColorStop(0, `hsla(${(h+180)%360},60%,5%,${voidAlpha})`);
+      vg.addColorStop(0.7, `hsla(${h},50%,8%,${voidAlpha * 0.3})`);
+      vg.addColorStop(1, `hsla(${h},40%,5%,0)`);
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, W, H);
+
+      // Outer chromatic ring (screen blend)
+      ctx.globalCompositeOperation = 'screen';
+      for(let c = 0; c < 3; c++){
+        const cHue = (h + c * 40) % 360;
+        const cR = pr * (0.92 + c * 0.06);
+        const cg = ctx.createRadialGradient(sx, sy, cR * 0.9, sx, sy, cR * 1.1);
+        cg.addColorStop(0, `hsla(${cHue},100%,70%,0)`);
+        cg.addColorStop(0.5, `hsla(${cHue},100%,75%,${ease * 0.35})`);
+        cg.addColorStop(1, `hsla(${cHue},100%,70%,0)`);
+        ctx.fillStyle = cg;
+        ctx.fillRect(sx - cR * 1.5, sy - cR * 1.5, cR * 3, cR * 3);
+      }
+      ctx.globalCompositeOperation = 'source-over';
+
+      // Time distortion vignette
+      const vigAlpha = ease * 0.15;
+      const vig = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.3, W/2, H/2, Math.max(W,H)*0.7);
+      vig.addColorStop(0, `rgba(0,0,0,0)`);
+      vig.addColorStop(1, `rgba(0,0,0,${vigAlpha})`);
+      ctx.fillStyle = vig;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // ── THRESHOLD: white flash + dimension shift ──
+    else if(portal.phase === 'threshold'){
+      const p = portal.progress;
+      const flash = p < 0.3 ? p / 0.3 : Math.max(0, 1 - (p - 0.3) / 0.7);
+      const flashEase = flash * flash;
+
+      // White flash
+      ctx.fillStyle = `rgba(255,255,255,${flashEase * 0.7})`;
+      ctx.fillRect(0, 0, W, H);
+
+      // Chromatic scan lines
+      if(flash > 0.1){
+        for(let i = 0; i < 12; i++){
+          const y = (H / 12) * i + Math.sin(time * 5 + i) * 20;
+          const barH = 2 + flash * 6;
+          const barHue = (h + i * 30 + time * 100) % 360;
+          ctx.fillStyle = `hsla(${barHue},100%,70%,${flashEase * 0.3})`;
+          ctx.fillRect(0, y, W, barH);
         }
       }
+
+      // Radial light rays
+      const rayAlpha = flashEase * 0.25;
+      if(rayAlpha > 0.01){
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        ctx.translate(sx, sy);
+        for(let i = 0; i < 16; i++){
+          const a = (i / 16) * TAU + time * 0.3;
+          const rayLen = Math.max(W, H) * 1.5;
+          const rayW = 0.04 + Math.sin(time * 2 + i) * 0.02;
+          ctx.fillStyle = `hsla(${(h + i * 22) % 360},90%,75%,${rayAlpha})`;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(a - rayW) * rayLen, Math.sin(a - rayW) * rayLen);
+          ctx.lineTo(Math.cos(a + rayW) * rayLen, Math.sin(a + rayW) * rayLen);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      // Lingering sparks
+      for(const sp of portal.sparks){
+        const spx = sx + Math.cos(sp.angle) * sp.dist;
+        const spy = sy + Math.sin(sp.angle) * sp.dist;
+        const sa = sp.life * 0.6;
+        ctx.fillStyle = `hsla(${sp.hue},90%,70%,${sa})`;
+        ctx.beginPath(); ctx.arc(spx, spy, sp.size * sp.life, 0, TAU); ctx.fill();
+      }
+
+      // New dimension tint after midpoint
+      if(p > 0.5){
+        const tintFade = (p - 0.5) * 2;
+        const tg = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H)*0.7);
+        tg.addColorStop(0, `rgba(${portal.targetAccent[0]},${portal.targetAccent[1]},${portal.targetAccent[2]},${tintFade * 0.08})`);
+        tg.addColorStop(1, `rgba(0,0,0,${tintFade * 0.15})`);
+        ctx.fillStyle = tg;
+        ctx.fillRect(0, 0, W, H);
+      }
     }
+
+    // ── EMERGING: new dimension settles ──
+    else if(portal.phase === 'emerging'){
+      const p = portal.progress;
+      const ease = p * p * (3 - 2 * p);
+
+      // Fading sparks
+      for(const sp of portal.sparks){
+        const spx = sx + Math.cos(sp.angle) * sp.dist;
+        const spy = sy + Math.sin(sp.angle) * sp.dist;
+        const sa = sp.life * (1 - ease);
+        if(sa > 0.01){
+          ctx.fillStyle = `hsla(${sp.hue},90%,70%,${sa})`;
+          ctx.beginPath(); ctx.arc(spx, spy, sp.size * sp.life, 0, TAU); ctx.fill();
+        }
+      }
+
+      // Gentle pulse from portal center (new dimension breathing)
+      const pulseR = ease * Math.max(W, H) * 0.8;
+      const pulseA = (1 - ease) * 0.08;
+      const pg = ctx.createRadialGradient(sx, sy, 0, sx, sy, pulseR);
+      pg.addColorStop(0, `rgba(${portal.targetAccent2[0]},${portal.targetAccent2[1]},${portal.targetAccent2[2]},${pulseA})`);
+      pg.addColorStop(1, `rgba(${portal.targetAccent2[0]},${portal.targetAccent2[1]},${portal.targetAccent2[2]},0)`);
+      ctx.fillStyle = pg;
+      ctx.fillRect(0, 0, W, H);
+
+      // Fading vignette lift
+      const liftA = (1 - ease) * 0.12;
+      const lv = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.4, W/2, H/2, Math.max(W,H)*0.75);
+      lv.addColorStop(0, `rgba(0,0,0,0)`);
+      lv.addColorStop(1, `rgba(0,0,0,${liftA})`);
+      ctx.fillStyle = lv;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    ctx.restore();
   }
 
   // ── Depth Meter & Sunrise Overlay ──
