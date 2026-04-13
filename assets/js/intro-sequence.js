@@ -20,17 +20,12 @@
   const THOUGHT_DELAY = 1800;
   const PROMPT_DELAY = 2000;
 
-  // ── Emy ──────────────────────────────────────────────────────────────
-  const emy = { y: -120, targetY: 0, bobPhase: 0, swayPhase: Math.random() * TAU, scale: 1.4, settled: false };
-  const EA = [180, 100, 255], EA2 = [255, 80, 200];
-
   function resize() {
     const dpr = Math.min(window.devicePixelRatio, 2);
     W = window.innerWidth; H = window.innerHeight;
     canvas.width = W * dpr; canvas.height = H * dpr;
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    emy.targetY = H * 0.35;
   }
 
   // ── Sacred Geometry Drawing ──────────────────────────────────────────
@@ -121,60 +116,7 @@
     }
   }
 
-  // ── Draw Emy ─────────────────────────────────────────────────────────
-  function drawEmy(cx, cy, sc, alpha) {
-    const s = 18 * sc;
-    const pts = [
-      [cx, cy - s*3.2],                          // head
-      [cx, cy - s*2.6],                          // neck
-      [cx - s*1.3, cy - s*2.0], [cx + s*1.3, cy - s*2.0], // shoulders
-      [cx - s*2.2, cy - s*0.8], [cx + s*2.2, cy - s*0.8], // elbows
-      [cx - s*2.8, cy + s*0.3], [cx + s*2.8, cy + s*0.3], // hands
-      [cx - s*0.6, cy + s*0.2], [cx + s*0.6, cy + s*0.2], // hips
-      [cx - s*0.7, cy + s*1.6], [cx + s*0.7, cy + s*1.6], // knees
-      [cx - s*0.9, cy + s*3.0], [cx + s*0.9, cy + s*3.0], // feet
-    ];
-    const limbs = [[0,1],[1,2],[1,3],[2,4],[3,5],[4,6],[5,7],[1,8],[1,9],[8,9],[8,10],[9,11],[10,12],[11,13]];
 
-    // Joint glows
-    for (const p of pts) {
-      const g = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], 14 * sc);
-      g.addColorStop(0, `rgba(${EA[0]},${EA[1]},${EA[2]},${0.12 * alpha})`);
-      g.addColorStop(1, `rgba(${EA[0]},${EA[1]},${EA[2]},0)`);
-      ctx.fillStyle = g; ctx.globalAlpha = 1;
-      ctx.beginPath(); ctx.arc(p[0], p[1], 14 * sc, 0, TAU); ctx.fill();
-    }
-    // Limb glow
-    ctx.lineCap = 'round';
-    for (const [a, b] of limbs) {
-      ctx.lineWidth = 5 * sc; ctx.globalAlpha = 0.1 * alpha;
-      ctx.strokeStyle = `rgb(${EA[0]},${EA[1]},${EA[2]})`;
-      ctx.beginPath(); ctx.moveTo(pts[a][0], pts[a][1]); ctx.lineTo(pts[b][0], pts[b][1]); ctx.stroke();
-    }
-    // Limbs
-    for (const [a, b] of limbs) {
-      ctx.lineWidth = 2 * sc; ctx.globalAlpha = 0.6 * alpha;
-      ctx.strokeStyle = `rgb(${EA[0]},${EA[1]},${EA[2]})`;
-      ctx.beginPath(); ctx.moveTo(pts[a][0], pts[a][1]); ctx.lineTo(pts[b][0], pts[b][1]); ctx.stroke();
-    }
-    // Joints
-    for (let i = 0; i < pts.length; i++) {
-      const isHead = i === 0;
-      const r = (isHead ? 6 : 2.5) * sc;
-      const col = isHead ? EA2 : EA;
-      ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`; ctx.globalAlpha = 0.8 * alpha;
-      ctx.beginPath(); ctx.arc(pts[i][0], pts[i][1], r, 0, TAU); ctx.fill();
-    }
-    // Head glow
-    const hg = ctx.createRadialGradient(pts[0][0], pts[0][1], 0, pts[0][0], pts[0][1], 22 * sc);
-    hg.addColorStop(0, `rgba(${EA2[0]},${EA2[1]},${EA2[2]},${0.18 * alpha})`);
-    hg.addColorStop(1, `rgba(${EA2[0]},${EA2[1]},${EA2[2]},0)`);
-    ctx.fillStyle = hg; ctx.globalAlpha = 1;
-    ctx.beginPath(); ctx.arc(pts[0][0], pts[0][1], 22 * sc, 0, TAU); ctx.fill();
-    // Third eye
-    ctx.fillStyle = `rgba(255,255,255,${0.5 * alpha})`; ctx.globalAlpha = 1;
-    ctx.beginPath(); ctx.arc(pts[0][0], pts[0][1] - 2 * sc, 1.5 * sc, 0, TAU); ctx.fill();
-  }
 
   // ── Motes ────────────────────────────────────────────────────────────
   const motes = Array.from({length: 50}, () => ({
@@ -234,9 +176,9 @@
     const px = (mouseX - 0.5), py = (mouseY - 0.5);
     const minDim = Math.min(W, H);
 
-    // ── Dark background (semi-transparent so game bleeds through) ────
+    // ── Semi-transparent background — game canvas shows through ────
     ctx.globalAlpha = 1;
-    ctx.fillStyle = 'rgba(8,6,15,0.88)';
+    ctx.fillStyle = 'rgba(8,6,15,0.7)';
     ctx.fillRect(0, 0, W, H);
 
     // Soft center glow
@@ -319,14 +261,6 @@
       ctx.beginPath(); ctx.arc(W/2 + m.x * W/2, H/2 + m.y * H/2, m.size * (0.6 + tw * 0.5), 0, TAU); ctx.fill();
     }
 
-    // ── Emy floating in from top ────────────────────────────────────
-    emy.y += (emy.targetY - emy.y) * 0.008;
-    if (Math.abs(emy.y - emy.targetY) < 0.5) emy.settled = true;
-    emy.bobPhase += 0.012;
-    const bob = emy.settled ? Math.sin(emy.bobPhase) * 5 : 0;
-    const sway = Math.sin(emy.swayPhase + time * 0.25) * 10;
-    const emyAlpha = Math.min(1, Math.max(0, (emy.y + 60) / 150));
-    drawEmy(W/2 + sway, emy.y + bob, emy.scale, emyAlpha);
 
     // ── Vignette ────────────────────────────────────────────────────
     const vig = ctx.createRadialGradient(W/2, H/2, minDim * 0.15, W/2, H/2, Math.max(W, H) * 0.7);
