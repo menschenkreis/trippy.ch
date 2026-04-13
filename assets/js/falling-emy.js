@@ -1884,6 +1884,7 @@ function updateCamera(){
   
   while(spheres.length < 12){
     spawnSphereAtDepth(aheadY + Math.random()*300);
+    if(spheres.length < 1) break; // safety: avoid infinite loop at shallow depth
   }
 }
 
@@ -1894,6 +1895,7 @@ function recycleObjects(){
   const aheadY = cameraY + H + 100;
   while(spheres.length < 10){
     spawnSphereAtDepth(aheadY + Math.random()*400);
+    if(spheres.length < 1) break; // safety: avoid infinite loop at shallow depth
   }
 }
 
