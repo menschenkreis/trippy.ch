@@ -154,6 +154,18 @@ function resize(){
 }
 window.addEventListener('resize', resize); resize();
 
+// ── Canvas context loss recovery (mobile tab switch, signal loss) ──
+canvas.addEventListener('webglcontextlost', e => e.preventDefault());
+canvas.addEventListener('contextlost', e => { e.preventDefault(); console.warn('[falling-emy] canvas context lost, waiting for restore...'); });
+canvas.addEventListener('contextrestored', () => { console.log('[falling-emy] canvas context restored'); resize(); });
+
+// Resume audio context on tab visibility change (mobile browsers suspend it)
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && audioCtx && audioCtx.state === 'suspended'){
+    audioCtx.resume();
+  }
+});
+
 // ── Theme ────────────────────────────────────────────────────────────────
 const themes = [
   { accent:[180,100,255], accent2:[255,80,200], bg:'#08060f', name:'violet' },
@@ -2386,6 +2398,9 @@ function recycleObjects(){
 let lastTime = 0;
 function frame(now){
   requestAnimationFrame(frame);
+  try {
+  // Guard against huge time jumps (tab switch, background)
+  if(now - lastTime > 500) lastTime = now - 16;
   const rawDt = Math.min((now - lastTime)/1000, 0.033);
   lastTime = now;
 
@@ -2927,6 +2942,7 @@ function frame(now){
     ctx.textAlign = 'center';
     ctx.fillText('hold to slow', W/2, H - 30);
   }
+  } catch(e) { console.error('[falling-emy] frame error:', e); }
 }
 requestAnimationFrame(frame);
 
