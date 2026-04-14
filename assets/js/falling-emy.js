@@ -247,6 +247,7 @@ const themes = [
   { accent:[40,255,140],  accent2:[180,80,255],  bg:'#061208', name:'jade' },
   { accent:[255,60,80],   accent2:[255,220,50],  bg:'#0f0608', name:'crimson' },
   { accent:[255,200,255], accent2:[100,180,255], bg:'#0a0810', name:'frost' },
+  { accent:[0,255,180],   accent2:[200,80,255],  bg:'#060f0d', name:'aurora' },
 ];
 let themeIdx = 0;
 let theme = themes[0];
@@ -567,6 +568,8 @@ class Ragdoll {
     const rFoot = new Particle(x + s*0.9, y + s*3);
 
     this.particles = [head,neck,lShoulder,rShoulder,lElbow,rElbow,lHand,rHand,lHip,rHip,lKnee,rKnee,lFoot,rFoot];
+    this.headTrail = [];
+    this.trailMaxLen = 28;
 
     const C = (a,b,d,stiff)=> this.constraints.push(new Constraint(this.particles[a],this.particles[b],d||s,stiff||1));
     C(0,1,s);       // head-neck
@@ -1880,6 +1883,80 @@ function drawStarfield(parallax){
   }
 }
 
+// ── Ambient nebula clouds ─────────────────────────────────────────────────
+// Five large soft color-cloud blobs drifting very slowly upward, drawn in
+// screen space so they feel independent of the camera scroll.
+const NEBULA_DEFS = [
+  { xFrac:0.25, baseY:0,    parallax:0.07, radius:320, hueOffset:0,   driftSpeed:0.11 },
+  { xFrac:0.75, baseY:0.6,  parallax:0.10, radius:260, hueOffset:110, driftSpeed:0.09 },
+  { xFrac:0.50, baseY:1.2,  parallax:0.05, radius:370, hueOffset:230, driftSpeed:0.08 },
+  { xFrac:0.15, baseY:1.8,  parallax:0.13, radius:220, hueOffset:165, driftSpeed:0.13 },
+  { xFrac:0.85, baseY:0.35, parallax:0.08, radius:290, hueOffset:290, driftSpeed:0.10 },
+];
+function drawNebulae(){
+  // Derive the theme accent hue from the RGB triple so we tint nebulae to match.
+  const ar = theme.accent; const aa = Math.atan2(ar[2]-ar[1], ar[0]-ar[1]);
+  const themeHue = (Math.round(aa * (180/Math.PI)) + 360) % 360;
+  const depthHueShift = (cameraY * 0.0015) % 360;
+  for(let i = 0; i < NEBULA_DEFS.length; i++){
+    const nd = NEBULA_DEFS[i];
+    // Vertical position: repeating screen-height bands drifting upward with parallax
+    const scrolled = cameraY * nd.parallax;
+    const bandH = H * 2;
+    const cy = ((nd.baseY * H - scrolled % bandH) % bandH + bandH) % bandH - H * 0.1;
+    // Gentle horizontal oscillation
+    const cx = W * nd.xFrac + Math.sin(time * nd.driftSpeed + i * 1.3) * W * 0.09;
+    const hue = (themeHue + nd.hueOffset + depthHueShift) % 360;
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, nd.radius);
+    grad.addColorStop(0,   `hsla(${hue},75%,55%,0.09)`);
+    grad.addColorStop(0.5, `hsla(${(hue+30)%360},70%,45%,0.05)`);
+    grad.addColorStop(1,   `hsla(${hue},65%,40%,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(cx, cy, nd.radius, 0, TAU); ctx.fill();
+  }
+}
+
+// ── Ambient light motes ───────────────────────────────────────────────────
+// 60 tiny luminous particles drift upward while the ragdoll falls down —
+// a zen duality of descent and ascent. Fully deterministic (no allocations).
+const MOTE_COUNT = 60;
+function drawAmbientMotes(){
+  const ar = theme.accent;
+  const themeHue = Math.round((Math.atan2(ar[2]-ar[1], ar[0]-ar[1]) * 180/Math.PI + 360)) % 360;
+  for(let i = 0; i < MOTE_COUNT; i++){
+    // Deterministic seed per mote
+    const seed = i * 48271 + 1;
+    const h1 = ((seed * 16807) & 0x7fffffff) / 0x7fffffff;
+    const h2 = ((seed * 2147483647) & 0x7fffffff) / 0x7fffffff;
+    const h3 = ((seed * 48271 + 7) & 0x7fffffff) / 0x7fffffff;
+    const h4 = ((seed * 1103515245) & 0x7fffffff) / 0x7fffffff;
+
+    // Each mote drifts upward at a unique speed; position loops seamlessly
+    const speed = 8 + h4 * 18; // px per second
+    const baseX = h1 * W;
+    const baseY = h2 * H;
+    const mx = baseX + Math.sin(time * (0.2 + h3 * 0.3) + i) * 18;
+    // Upward drift — modulo H for seamless looping
+    const my = ((baseY - time * speed % H) % H + H) % H;
+
+    const size = 0.8 + h3 * 1.8;
+    const alpha = 0.12 + h4 * 0.28;
+    const hue = (themeHue + h2 * 160 + time * 4) % 360;
+
+    ctx.fillStyle = `hsla(${hue},70%,80%,${alpha})`;
+    ctx.beginPath(); ctx.arc(mx, my, size, 0, TAU); ctx.fill();
+
+    // Subtle cross-sparkle on larger motes at peak alpha
+    if(size > 1.8 && alpha > 0.3){
+      const len = size * 2.5;
+      ctx.strokeStyle = `hsla(${hue},70%,90%,${alpha * 0.4})`;
+      ctx.lineWidth = 0.4;
+      ctx.beginPath(); ctx.moveTo(mx-len,my); ctx.lineTo(mx+len,my); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(mx,my-len); ctx.lineTo(mx,my+len); ctx.stroke();
+    }
+  }
+}
+
 // Background radial gradient — static per (viewport, theme). Rebuilt only when
 // either version counter changes. Saves one gradient allocation per frame.
 let _bgGrad = null;
@@ -1956,9 +2033,13 @@ function drawBackground(){
   ctx.fillStyle = getBgGradient();
   ctx.fillRect(0,0,W,H);
 
+  // Nebula clouds — screen space (behind stars)
+  drawNebulae();
   // Stars — screen space
   drawStarfield(0.12); // distant tiny stars
   drawStarfield(0.15); // closer stars
+  // Ambient motes drifting upward — screen space
+  drawAmbientMotes();
   ctx.restore();
 
   // ── Parallax kaleidoscope layers (drawn under world transform, as before) ──
@@ -2031,6 +2112,35 @@ function drawSphere(s){
     ctx.beginPath(); ctx.arc(0,0,r*(1.1 + f*0.4),0,TAU); ctx.fill();
     s.impactFlash -= 0.035; // smoother decay
     if(s.impactFlash < 0) s.impactFlash = 0;
+  }
+
+  // ── Multi-ring breathing aura ──
+  // Two extra concentric rings that breathe at different speeds, giving each
+  // sphere a living, hypnotic halo. Double-stroke for cheap glow (no shadowBlur).
+  {
+    const ac = (s.type === 'heart' || s.type === 'chakra' || s.type === 'setback' || s.type === 'yinyang')
+      ? null : theme.accent; // typed spheres use their own hue below
+    const auraHue = s.type === 'heart' ? (330 + time*10 + s.hue) % 360
+      : s.type === 'chakra'   ? [0,30,60,120,240,275,300][s.chakraLevel]
+      : s.type === 'setback'  ? (45 + time*12 + s.hue) % 360
+      : s.type === 'yinyang'  ? (200 + s.hue) % 360
+      : (s.hue + time*15) % 360;
+    const rA = r * (2.05 + 0.28 * Math.sin(time * 0.85 + s.hue));
+    const rB = r * (3.3  + 0.45 * Math.sin(time * 0.48 + s.hue + 1.6));
+    // Ring A
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = `hsla(${auraHue},70%,60%,0.07)`;
+    ctx.beginPath(); ctx.arc(0,0,rA,0,TAU); ctx.stroke();
+    ctx.lineWidth = 0.8;
+    ctx.strokeStyle = `hsla(${auraHue},80%,70%,0.13)`;
+    ctx.beginPath(); ctx.arc(0,0,rA,0,TAU); ctx.stroke();
+    // Ring B (outer, fainter)
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = `hsla(${auraHue},65%,55%,0.04)`;
+    ctx.beginPath(); ctx.arc(0,0,rB,0,TAU); ctx.stroke();
+    ctx.lineWidth = 0.6;
+    ctx.strokeStyle = `hsla(${auraHue},75%,65%,0.07)`;
+    ctx.beginPath(); ctx.arc(0,0,rB,0,TAU); ctx.stroke();
   }
 
   if(s.type === 'heart'){
@@ -2617,6 +2727,31 @@ function drawRagdoll(ragdoll){
   const ps = ragdoll.particles;
   const a = ragdoll.accent;
   const a2 = ragdoll.accent2;
+
+  // ── Comet head trail ──
+  const head0 = ps[0];
+  ragdoll.headTrail.push({ x: head0.x, y: head0.y });
+  if(ragdoll.headTrail.length > ragdoll.trailMaxLen) ragdoll.headTrail.shift();
+  if(ragdoll.headTrail.length >= 3){
+    const tlen = ragdoll.headTrail.length;
+    for(let ti = 1; ti < tlen; ti++){
+      const t = ti / tlen; // 0 (oldest) → 1 (newest)
+      const prev = ragdoll.headTrail[ti - 1];
+      const curr = ragdoll.headTrail[ti];
+      const trailAlpha = t * t * 0.45; // quadratic fade — near-invisible at tail
+      const trailWidth = 0.5 + t * 2.5;
+      // Hue shifts along the trail for an iridescent ribbon feel
+      const trailHue = (ragdoll.hue + 40 + t * 60 + time * 15) % 360;
+      ctx.strokeStyle = `hsla(${trailHue},90%,75%,${trailAlpha})`;
+      ctx.lineWidth = trailWidth;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(prev.x, prev.y);
+      ctx.lineTo(curr.x, curr.y);
+      ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+  }
 
   // Glow on joints
   for(const p of ps){
@@ -3350,6 +3485,90 @@ function frame(now){
     }
 
     ctx.restore();
+  }
+
+  // ── Chord Bloom Sacred Mandala (screen space) ──────────────────────────
+  // When all 5 pentatonic pitch classes hit within the window, a set of
+  // expanding sacred-geometry polygon rings radiates from the screen centre.
+  if(chordBloomFlash > 0){
+    const cf = chordBloomFlash; // 1→0 over ~1.25s
+    const expand = 1 - cf;     // 0→1 as flash fades
+    // Envelope: bell curve so rings fade in AND out
+    const env = cf * Math.sin(expand * PI);
+    const cx = W / 2, cy = H / 2;
+    // 5 rings, one per pentatonic pitch class, polygon sides 3–7
+    const pentatonicHues = [0, 72, 144, 216, 288]; // evenly spaced around hue wheel
+    for(let ri = 0; ri < 5; ri++){
+      const sides = ri + 3; // triangle (3) through heptagon (7)
+      const phase = (ri / 5) * TAU * 0.25; // stagger so rings don't overlap at start
+      const radius = expand * Math.min(W, H) * (0.3 + ri * 0.12) + phase * 8;
+      const hue = (pentatonicHues[ri] + time * 18) % 360;
+      const alpha = env * (0.22 - ri * 0.03);
+      if(alpha <= 0 || radius <= 0) continue;
+      ctx.lineWidth = 3.5 - ri * 0.4;
+      ctx.strokeStyle = `hsla(${hue},90%,70%,${alpha * 0.35})`;
+      ctx.beginPath();
+      for(let vi = 0; vi <= sides; vi++){
+        const angle = vi * TAU / sides - PI / 2;
+        const px = cx + Math.cos(angle) * radius;
+        const py = cy + Math.sin(angle) * radius;
+        if(vi === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.lineWidth = 0.8;
+      ctx.strokeStyle = `hsla(${hue},95%,80%,${alpha})`;
+      ctx.beginPath();
+      for(let vi = 0; vi <= sides; vi++){
+        const angle = vi * TAU / sides - PI / 2;
+        const px = cx + Math.cos(angle) * radius;
+        const py = cy + Math.sin(angle) * radius;
+        if(vi === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    // Soft radial glow at centre during peak
+    if(env > 0.1){
+      const bloomGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 80);
+      const bHue = (time * 40) % 360;
+      bloomGrad.addColorStop(0, `hsla(${bHue},80%,70%,${env * 0.15})`);
+      bloomGrad.addColorStop(1, `hsla(${bHue},80%,60%,0)`);
+      ctx.fillStyle = bloomGrad;
+      ctx.beginPath(); ctx.arc(cx, cy, 80, 0, TAU); ctx.fill();
+    }
+  }
+
+  // ── Slow-Mo Dreamstate (screen space) ─────────────────────────────────
+  // When the user holds to slow time, crystalline rings form around the head.
+  {
+    const dream = clamp((0.25 - timeScale) / 0.22, 0, 1);
+    if(dream > 0){
+      const dhx = head ? headX : W / 2;
+      const dhy = head ? headY - cameraY : H / 2;
+      // Three slowly pulsing rings at different phases
+      const dreamRings = [
+        { r: 28 + 9  * Math.sin(time * 3.8), lw: 2.5 },
+        { r: 50 + 14 * Math.sin(time * 2.9 + 1.2), lw: 1.8 },
+        { r: 76 + 20 * Math.sin(time * 2.1 + 2.4), lw: 1.2 },
+      ];
+      const a2 = theme.accent2;
+      const dHue = (Math.round(Math.atan2(a2[2]-a2[1], a2[0]-a2[1]) * 180/Math.PI) + 360) % 360;
+      for(let di = 0; di < dreamRings.length; di++){
+        const dr = dreamRings[di];
+        const ringAlpha = dream * (0.28 - di * 0.07);
+        ctx.lineWidth = dr.lw * 3;
+        ctx.strokeStyle = `hsla(${(dHue + di*30)%360},80%,70%,${ringAlpha * 0.25})`;
+        ctx.beginPath(); ctx.arc(dhx, dhy, dr.r, 0, TAU); ctx.stroke();
+        ctx.lineWidth = dr.lw * 0.6;
+        ctx.strokeStyle = `hsla(${(dHue + di*30)%360},90%,80%,${ringAlpha})`;
+        ctx.beginPath(); ctx.arc(dhx, dhy, dr.r, 0, TAU); ctx.stroke();
+      }
+      // Subtle central bloom
+      const dg = ctx.createRadialGradient(dhx, dhy, 0, dhx, dhy, 90);
+      dg.addColorStop(0, `hsla(${dHue},75%,65%,${dream * 0.06})`);
+      dg.addColorStop(1, `hsla(${dHue},75%,65%,0)`);
+      ctx.fillStyle = dg;
+      ctx.beginPath(); ctx.arc(dhx, dhy, 90, 0, TAU); ctx.fill();
+    }
   }
 
   // ── Depth Meter & Sunrise Overlay ──
