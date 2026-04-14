@@ -273,6 +273,11 @@ const GRAVITY = 360;
 const DAMPING = 0.998;
 const ITERATIONS = 8;
 const SUBSTEPS = 2;
+// Maximum downward velocity (px/substep). Natural terminal under gravity+damping
+// is ~11.5 px/substep; this cap prevents post-collision spikes from sending the
+// ragdoll faster than the camera can track. Upward velocity is left uncapped so
+// setback bounces remain dramatic.
+const TERMINAL_VY = 22;
 
 let tiltEnabled = false;
 let gravityX = 0, gravityY = GRAVITY;
@@ -438,10 +443,11 @@ class Particle {
     if(this.pinned) return;
     let vx = (this.x - this.ox) * DAMPING;
     let vy = (this.y - this.oy) * DAMPING;
-    // Clamp velocity to prevent NaN/Infinity cascade from aggressive drag
-    const maxV = 800;
-    vx = clamp(vx || 0, -maxV, maxV);
-    vy = clamp(vy || 0, -maxV, maxV);
+    // Horizontal: safety cap only (prevents NaN cascade from aggressive drag)
+    vx = clamp(vx || 0, -800, 800);
+    // Vertical: safety cap upward, terminal-velocity cap downward so the camera
+    // can always track the ragdoll even after collision impulse spikes.
+    vy = clamp(vy || 0, -800, TERMINAL_VY);
     this.ox = this.x; this.oy = this.y;
     this.x += vx + gravityX * dt * dt;
     this.y += vy + gravityY * dt * dt;
