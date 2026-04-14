@@ -998,7 +998,7 @@ function collideRagdollSphere(ragdoll, sphere, dt){
 
     // ── Setback Trampoline: launch ragdoll upward ──
     if(sphere.type === 'setback'){
-      const bounceStrength = 350 + Math.random() * 150; // 350-500 units/sec upward
+      const bounceStrength = 175 + Math.random() * 75; // 175-250 units/sec upward
       for(const p of ragdoll.particles){
         // Set old position above current to create upward velocity
         p.oy = p.y + bounceStrength * 0.016 * 3; // ~3 frames worth of upward velocity
