@@ -80,6 +80,7 @@ function saveProgress(){
       journeyLog, // Save the milestones history
       depthMeters: Math.max(0, cameraY / 100),
       savedAt: Date.now(),
+      audioEnabled: !isMuted, // persist audio toggle across sessions
     };
     const json = JSON.stringify(data);
     localStorage.setItem(SAVE_KEY, json);
@@ -160,6 +161,8 @@ function restoreFromSave(data){
   displayScore = data.score || 0;
   fallSpeed = data.fallSpeed || 0;
   time = data.time || 0;
+  // Restore audio preference so returning players keep their setting
+  if(data.audioEnabled !== undefined) applyAudioPref(data.audioEnabled);
   // Ensure the next challenge/shape is ahead of the restored camera even if
   // save data is stale (otherwise spawns would be instantly culled).
   nextChallengeY = Math.max(data.nextChallengeY || (cameraY + CONFIG.CHALLENGE_SPACING_WORLD), cameraY + 1000);
@@ -480,6 +483,7 @@ class Sphere {
       this.r = 25 + Math.random()*15;
     } else if(type === 'setback'){
       this.r = 30 + Math.random()*18;
+      this.bounceCount = 0; // counts trampoline triggers; capped at 3
     } else if(type === 'chakra'){
       this.r = 28 + Math.random()*20;
     } else {
@@ -1122,12 +1126,16 @@ function collideRagdollSphere(ragdoll, sphere, dt){
     }
 
     // ── Setback Trampoline: launch ragdoll upward ──
-    if(sphere.type === 'setback'){
-      const bounceStrength = 175 + Math.random() * 75; // 175-250 units/sec upward
+    // Maximum 3 bounces per setback sphere. Each successive bounce is 30%
+    // weaker. Overall strength is halved vs. the original (87–125 units/s).
+    // After the third bounce the sphere behaves like any other obstacle.
+    if(sphere.type === 'setback' && sphere.bounceCount < 3){
+      const decay = 1 - sphere.bounceCount * 0.3; // 1.0 → 0.7 → 0.4
+      const bounceStrength = (87 + Math.random() * 38) * decay; // ~half original
       for(const p of ragdoll.particles){
-        // Set old position above current to create upward velocity
-        p.oy = p.y + bounceStrength * 0.016 * 3; // ~3 frames worth of upward velocity
+        p.oy = p.y + bounceStrength * 0.016 * 3;
       }
+      sphere.bounceCount++;
     }
 
     // ── Power-Up Activation ──
@@ -1644,15 +1652,31 @@ document.getElementById('theme-btn').onclick = () => {
 };
 const muteBtn = document.getElementById('mute-btn');
 const soundHintEl = document.getElementById('sound-hint');
-muteBtn.onclick = () => {
-  isMuted = !isMuted;
+
+// Shared helper used by the toggle, restoreFromSave, and boot-time preference
+// restore so all paths stay in sync.
+function applyAudioPref(enabled){
+  isMuted = !enabled;
   muteBtn.textContent = isMuted ? '🔇' : '🔊';
   muteBtn.classList.toggle('is-on', !isMuted);
   muteBtn.style.animation = 'none';
-  if(!isMuted) initAudio();
-  // Hide hint on first unmute
-  if(soundHintEl) soundHintEl.style.display = 'none';
+  if(!isMuted){
+    initAudio();
+    if(soundHintEl) soundHintEl.style.display = 'none';
+  }
+}
+
+muteBtn.onclick = () => {
+  applyAudioPref(isMuted); // isMuted is currently true → enable; false → disable
+  saveProgress();           // persist the new preference immediately
 };
+
+// Restore saved audio preference on boot (before the first frame).
+// This runs even on fresh loads where only the preference was saved.
+(function restoreAudioPrefAtBoot(){
+  const saved = loadProgress();
+  if(saved && saved.audioEnabled) applyAudioPref(true);
+})();
 
 // Auto-fade the sound hint if the user hasn't unmuted within 8s of boot.
 function fadeSoundHintIfStillMuted(){
