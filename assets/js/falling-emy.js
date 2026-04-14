@@ -1,11 +1,54 @@
 // ── Ragdoll Void - Physics + Sacred Geometry ─────────────────────────────────
+//
+// File map:
+//   § 1. Utilities / CONFIG / Persistence
+//   § 2. Canvas + resize + context-loss recovery
+//   § 3. Theme
+//   § 4. Physics constants, game state, score, power-ups, life chapters
+//   § 5. Accelerometer
+//   § 6. Particle / Constraint / Sphere / Ragdoll classes
+//   § 7. Audio (initAudio, playImpactSound, playMilestoneChord)
+//   § 8. Collision (collideParticleSphere, collideRagdollSphere)
+//   § 9. Impact particles (spawn, update, draw) + score elements
+//   §10. Sphere spawning, input, buttons
+//   §11. Sacred geometry + background + sphere/ragdoll draw
+//   §12. Camera + recycling
+//   §13. Main loop (frame)
+//   §14. Resume bridge + intro gate + sound-hint
+// ─────────────────────────────────────────────────────────────────────────────
 (function(){
 'use strict';
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 const PI = Math.PI, TAU = PI*2;
 
-// ── Cookie Save/Resume ──────────────────────────────────────────────────
+// ── § 1. Tiny utilities ─────────────────────────────────────────────────
+const clamp = (v, lo, hi) => v < lo ? lo : (v > hi ? hi : v);
+const lerp  = (a, b, t) => a + (b - a) * t;
+
+// ── § 1. Tuning / magic-number consolidation ────────────────────────────
+// Only values used in more than one place OR clear tuning knobs are hoisted.
+// Numerical values are UNCHANGED from their former inline occurrences.
+const CONFIG = {
+  CAMERA_FOLLOW: 0.08,
+  CAMERA_TARGET_RATIO: 0.35,
+  SHAPE_SPACING_MIN: 120,
+  SHAPE_SPACING_MAX: 800,
+  SHAPE_RAMP_START_M: 25,
+  SHAPE_RAMP_END_M: 100,
+  SHAPE_START_Y: 2500,             // first shape allowed at 25m
+  CHALLENGE_SPACING_WORLD: 10000,  // one challenge every 100m
+  DRAG_LERP: 0.15,
+  SLOWMO_SCALE: 0.05,
+  SOUND_HINT_FADE_M: 50,
+  INTRO_RESUME_MIN_M: 5,
+  BOUNCE: 0.65,
+  FRICTION: 0.05,
+  MAX_CONCURRENT_OSC: 40, // cap concurrent Web Audio oscillators to prevent
+                          // clipping/crackle on dense multi-ragdoll pile-ups
+};
+
+// ── § 1. Cookie Save/Resume ─────────────────────────────────────────────
 const SAVE_KEY = 'falling-emy-save';
 const SAVE_INTERVAL = 3000; // auto-save every 3s
 let lastSaveTime = 0;
@@ -70,9 +113,9 @@ function autoSave(now){
 }
 
 // ── Update Journey Panel (IIFE scope - called from restoreFromSave & frame) ──
+const _journeyLogEl = document.getElementById('journey-log');
 function updateJourneyPanel(){
-  const el = document.getElementById('journey-log');
-  if(!el || journeyLog.length === 0) return;
+  if(!_journeyLogEl || journeyLog.length === 0) return;
   let html = '';
   for(let i = journeyLog.length - 1; i >= 0; i--){
     const e = journeyLog[i];
@@ -91,7 +134,7 @@ function updateJourneyPanel(){
     }
     html += `<div class="journey-entry"><div class="journey-icon">${svg}</div><div class="journey-entry-text"><strong>${e.label}</strong> - ${e.text}</div></div>`;
   }
-  el.innerHTML = html;
+  _journeyLogEl.innerHTML = html;
 }
 
 function restoreFromSave(data){
@@ -100,8 +143,10 @@ function restoreFromSave(data){
   displayScore = data.score || 0;
   fallSpeed = data.fallSpeed || 0;
   time = data.time || 0;
-  nextChallengeY = data.nextChallengeY || (cameraY + 10000);
-  nextShapeY = data.nextShapeY || (cameraY + 2000);
+  // Ensure the next challenge/shape is ahead of the restored camera even if
+  // save data is stale (otherwise spawns would be instantly culled).
+  nextChallengeY = Math.max(data.nextChallengeY || (cameraY + CONFIG.CHALLENGE_SPACING_WORLD), cameraY + 1000);
+  nextShapeY = Math.max(data.nextShapeY || (cameraY + 2000), cameraY + 200);
   themeIdx = data.themeIdx || 0;
   theme = themes[themeIdx];
 
@@ -235,7 +280,6 @@ let waveRings = []; // {x, y, radius, life}
 let journeyLog = []; // {label, text}
 let chapterDisplay = null; // {text, life, phase}
 let chapterSlowMo = 0;
-let lastChapter = -1;
 let firedChapters = new Set();
 
 const lifeChapters = [
@@ -303,7 +347,7 @@ function initAccel() {
       if (angle === 90) tilt = e.beta;
       else if (angle === -90) tilt = -e.beta;
 
-      let tiltX = Math.max(-45, Math.min(45, tilt)) / 45; // -1 to 1
+      const tiltX = clamp(tilt, -45, 45) / 45; // -1 to 1
       if(tiltEnabled) gravityX = tiltX * GRAVITY * 0.8;
       else gravityX = 0;
     }, {passive: true});
@@ -342,8 +386,8 @@ class Particle {
     let vy = (this.y - this.oy) * DAMPING;
     // Clamp velocity to prevent NaN/Infinity cascade from aggressive drag
     const maxV = 800;
-    vx = Math.max(-maxV, Math.min(maxV, vx || 0));
-    vy = Math.max(-maxV, Math.min(maxV, vy || 0));
+    vx = clamp(vx || 0, -maxV, maxV);
+    vy = clamp(vy || 0, -maxV, maxV);
     this.ox = this.x; this.oy = this.y;
     this.x += vx + gravityX * dt * dt;
     this.y += vy + gravityY * dt * dt;
@@ -364,7 +408,7 @@ class Constraint {
     const dx = this.b.x - this.a.x;
     const dy = this.b.y - this.a.y;
     const d = Math.sqrt(dx*dx+dy*dy) || 0.001;
-    const diff = Math.max(-2, Math.min(2, (d - this.dist) / d * this.stiffness));
+    const diff = clamp((d - this.dist) / d * this.stiffness, -2, 2);
     const mx = dx*diff*0.5, my = dy*diff*0.5;
     if(!this.a.pinned){ this.a.x += mx; this.a.y += my; }
     if(!this.b.pinned){ this.b.x -= mx; this.b.y -= my; }
@@ -516,6 +560,10 @@ let masterGain;
 let delayNode;
 let lastImpactTime = 0;
 let isMuted = true;
+// Count of currently playing oscillators (maintained by the createOscillator
+// wrapper installed in initAudio). Used to early-return from playImpactSound
+// on extreme combo pile-ups so we don't clip/crackle on mobile.
+let activeOscCount = 0;
 
 function initAudio(){
   if(audioCtx) return;
@@ -543,11 +591,30 @@ function initAudio(){
 
   // Send echo output to master
   delayNode.connect(masterGain);
+
+  // Wrap createOscillator so every osc made via this ctx participates in the
+  // activeOscCount without touching each individual synth branch below.
+  const rawCreateOsc = audioCtx.createOscillator.bind(audioCtx);
+  audioCtx.createOscillator = function(){
+    const osc = rawCreateOsc();
+    let started = false, ended = false;
+    const rawStart = osc.start.bind(osc);
+    osc.start = function(when){
+      if(!started){ started = true; activeOscCount++; }
+      return rawStart(when);
+    };
+    osc.addEventListener('ended', () => {
+      if(started && !ended){ ended = true; activeOscCount--; }
+    });
+    return osc;
+  };
 }
 
 function playImpactSound(force, hue, xPos, type, sacredType){
   if(isMuted || !audioCtx) return;
   if(force < 1.5) return; // ignore tiny grazes
+  // Bail if the mix is already saturated with in-flight oscillators.
+  if(activeOscCount >= CONFIG.MAX_CONCURRENT_OSC) return;
   const now = audioCtx.currentTime;
   if(now - lastImpactTime < 0.04) return; // throttle overlapping sounds
   lastImpactTime = now;
@@ -1090,7 +1157,8 @@ function spawnImpactParticles(x, y, hue, force){
       life: 1.0,
       decay: 0.7 + Math.random() * 0.6,
       size: 1.0 + Math.random() * 2.2 * (intensity / 5),
-      hue: [hue, hue2, hue3][i % 3] + Math.random() * 40 - 20,
+      // inline ternary avoids a 3-element array allocation per spark
+      hue: (i % 3 === 0 ? hue : i % 3 === 1 ? hue2 : hue3) + Math.random() * 40 - 20,
       type: 'spark',
     };
   }
@@ -1230,24 +1298,29 @@ function updateScoreElements(dt){
   // Combo decay
   if(time - lastHitTime > COMBO_WINDOW) comboCount = 0;
 
-  // Score popups (world space)
-  for(let i = scorePopups.length-1; i >= 0; i--){
-    const p = scorePopups[i];
-    p.y += p.vy * dt;
-    p.vy *= 0.97;
-    p.life -= dt * 1.2;
-    if(p.life <= 0) scorePopups.splice(i, 1);
+  // Score popups (world space) - in-place compaction to avoid splice GC churn
+  {
+    let w = 0;
+    for(let i = 0; i < scorePopups.length; i++){
+      const p = scorePopups[i];
+      p.y += p.vy * dt;
+      p.vy *= 0.97;
+      p.life -= dt * 1.2;
+      if(p.life > 0){ if(w !== i) scorePopups[w] = p; w++; }
+    }
+    scorePopups.length = w;
   }
 
   // Score flies (world space → screen space transition)
   const counterX = W - 20;
   const counterY = H - 38;
-  for(let i = scoreFlies.length-1; i >= 0; i--){
+  let sfWrite = 0;
+  for(let i = 0; i < scoreFlies.length; i++){
     const f = scoreFlies[i];
     f.life -= dt * 0.8;
-    if(f.life <= 0){ scoreFlies.splice(i, 1); continue; }
+    if(f.life <= 0) continue; // drop (do not advance write index)
 
-    if(f.delay > 0){ f.delay -= dt; continue; }
+    if(f.delay > 0){ f.delay -= dt; if(sfWrite !== i) scoreFlies[sfWrite] = f; sfWrite++; continue; }
 
     if(f.phase === 'burst'){
       // Initial burst outward
@@ -1276,7 +1349,10 @@ function updateScoreElements(dt){
       if(d < 30) f.phase = 'arrived';
     }
     // 'arrived' fades out via life
+    if(sfWrite !== i) scoreFlies[sfWrite] = f;
+    sfWrite++;
   }
+  scoreFlies.length = sfWrite;
 }
 
 function drawScoreElements(){
@@ -1416,7 +1492,7 @@ let nextChallengeY = 10000;
 ragdolls.push(new Ragdoll(W/2, 0, 'emy'));
 // No initial spheres - intro handles the first moments
 
-let nextShapeY = 2500; // first shape allowed at 25m
+let nextShapeY = CONFIG.SHAPE_START_Y; // first shape allowed at 25m
 
 function spawnSphereAtDepth(yWorld, forceType=null){
   let type = 'sphere';
@@ -1442,10 +1518,6 @@ function spawnSphereAtDepth(yWorld, forceType=null){
     null,
     type
   ));
-}
-
-function spawnSphereNear(x,y){
-  spawnSphereAtDepth(y + (Math.random()-0.5)*100);
 }
 
 // ── Input ────────────────────────────────────────────────────────────────
@@ -1514,6 +1586,7 @@ document.getElementById('theme-btn').onclick = () => {
   setTheme(themeIdx+1);
 };
 const muteBtn = document.getElementById('mute-btn');
+const soundHintEl = document.getElementById('sound-hint');
 muteBtn.onclick = () => {
   isMuted = !isMuted;
   muteBtn.textContent = isMuted ? '🔇' : '🔊';
@@ -1521,18 +1594,16 @@ muteBtn.onclick = () => {
   muteBtn.style.animation = 'none';
   if(!isMuted) initAudio();
   // Hide hint on first unmute
-  const hint = document.getElementById('sound-hint');
-  if(hint) hint.style.display = 'none';
+  if(soundHintEl) soundHintEl.style.display = 'none';
 };
 
-  // Hide sound hint after 8s
-  setTimeout(()=>{
-    const hint = document.getElementById('sound-hint');
-    if(hint && isMuted) hint.style.opacity = '0';
-    const mb = document.getElementById('mute-btn');
-    if(mb && isMuted) mb.style.animation = 'none';
-    setTimeout(()=>{ if(hint) hint.style.display = 'none'; }, 1500);
-  }, 8000);
+// Auto-fade the sound hint if the user hasn't unmuted within 8s of boot.
+function fadeSoundHintIfStillMuted(){
+  if(soundHintEl && isMuted) soundHintEl.style.opacity = '0';
+  if(muteBtn && isMuted) muteBtn.style.animation = 'none';
+  setTimeout(() => { if(soundHintEl) soundHintEl.style.display = 'none'; }, 1500);
+}
+setTimeout(fadeSoundHintIfStillMuted, 8000);
 
 const tiltBtn = document.getElementById('tilt-btn');
 tiltBtn.onclick = () => {
@@ -1554,8 +1625,8 @@ document.getElementById('reset-btn').onclick = () => {
   journeyLog = []; updateJourneyPanel();
   firedChapters = new Set();
   chapterDisplay = null; chapterSlowMo = 0;
-  nextShapeY = 2500;
-  nextChallengeY = 10000;
+  nextShapeY = CONFIG.SHAPE_START_Y;
+  nextChallengeY = CONFIG.CHALLENGE_SPACING_WORLD;
   particles = []; particleCount = 0;
   ragdolls = [new Ragdoll(W/2, 0, 'emy')];
   spheres = [];
@@ -2476,6 +2547,24 @@ function drawRagdoll(ragdoll){
 }
 
 // ── Camera follows ragdoll + spawn spheres ahead ──────────────────────
+// Shape density: no shapes before SHAPE_RAMP_START_M (25 m). Density then
+// ramps from one shape per SHAPE_SPACING_MAX (800 px) to one per
+// SHAPE_SPACING_MIN (120 px) by SHAPE_RAMP_END_M (100 m) and beyond.
+// Shared between updateCamera() and recycleObjects() so the two call sites
+// cannot drift out of sync.
+function maybeSpawnNextShape(aheadY){
+  const depthM = Math.max(0, cameraY / 100);
+  if(depthM < CONFIG.SHAPE_RAMP_START_M || aheadY <= nextShapeY) return;
+  const ramp = clamp(
+    (depthM - CONFIG.SHAPE_RAMP_START_M) /
+      (CONFIG.SHAPE_RAMP_END_M - CONFIG.SHAPE_RAMP_START_M),
+    0, 1
+  );
+  const interval = lerp(CONFIG.SHAPE_SPACING_MAX, CONFIG.SHAPE_SPACING_MIN, ramp);
+  nextShapeY = aheadY + interval * (0.7 + Math.random() * 0.6);
+  spawnSphereAtDepth(nextShapeY);
+}
+
 function updateCamera(){
   if(ragdolls.length > 0){
     // DISABLE camera follow while dragging to fix the canvas position
@@ -2483,8 +2572,8 @@ function updateCamera(){
 
     const head = ragdolls[0].particles[0];
     // Smoothly follow the ragdoll's head, keeping it at ~35% from top
-    const targetCam = head.y - H * 0.35;
-    cameraY += (targetCam - cameraY) * 0.08;
+    const targetCam = head.y - H * CONFIG.CAMERA_TARGET_RATIO;
+    cameraY += (targetCam - cameraY) * CONFIG.CAMERA_FOLLOW;
   }
   // Spawn new spheres ahead of the camera
   const aheadY = cameraY + H + 200;
@@ -2492,38 +2581,35 @@ function updateCamera(){
   // Every 100m (10000px), spawn a challenge
   if(aheadY > nextChallengeY){
     spawnSphereAtDepth(nextChallengeY, 'challenge');
-    nextChallengeY += 10000;
+    nextChallengeY += CONFIG.CHALLENGE_SPACING_WORLD;
   }
 
-  // ── Shape Density ──
-  // No shapes before 25m (2500px). Density ramps from 1 shape per 800px at 25m
-  // down to 1 shape per 120px at 100m and beyond.
-  const depthM = Math.max(0, cameraY / 100);
-  if(depthM >= 25 && aheadY > nextShapeY){
-    const ramp = Math.min((depthM - 25) / 75, 1.0);
-    const interval = 800 - ramp * 680; // 800px → 120px
-    nextShapeY = aheadY + interval * (0.7 + Math.random() * 0.6);
-    spawnSphereAtDepth(nextShapeY);
-  }
+  maybeSpawnNextShape(aheadY);
 }
 
 function recycleObjects(){
   const behindY = cameraY - 300;
-  spheres = spheres.filter(s => s.y > behindY);
-  // Keep spawning
-  const aheadY = cameraY + H + 100;
-  // Keep spawning - density increases with depth
-  const depthM2 = Math.max(0, cameraY / 100);
-  if(depthM2 >= 25 && aheadY > nextShapeY){
-    const ramp = Math.min((depthM2 - 25) / 75, 1.0);
-    const interval = 800 - ramp * 680;
-    nextShapeY = aheadY + interval * (0.7 + Math.random() * 0.6);
-    spawnSphereAtDepth(nextShapeY);
+  // In-place compaction avoids the allocation + copy of Array#filter
+  let w = 0;
+  for(let i = 0; i < spheres.length; i++){
+    const s = spheres[i];
+    if(s.y > behindY){
+      if(w !== i) spheres[w] = s;
+      w++;
+    }
   }
+  spheres.length = w;
+  // Keep spawning - density increases with depth
+  maybeSpawnNextShape(cameraY + H + 100);
 }
 
 // ── Main loop ────────────────────────────────────────────────────────────
 let lastTime = 0;
+// Cached once; flipped to false by the 'intro-complete' listener below so the
+// hot path does not pay for a document.getElementById() every frame.
+let introActive = !!document.getElementById('intro-sequence');
+window.addEventListener('intro-complete', () => { introActive = false; });
+
 function frame(now){
   requestAnimationFrame(frame);
   try {
@@ -2532,8 +2618,11 @@ function frame(now){
   const rawDt = Math.min((now - lastTime)/1000, 0.033);
   lastTime = now;
 
-  // Detect and recover from blank canvas (context state corruption)
-  if(Math.random() < 0.002) { // ~every 8 seconds at 60fps
+  // Detect and recover from blank canvas (context state corruption).
+  // NOTE: getImageData forces a GPU→CPU readback (measurably costly). The
+  // probability is kept low (~once every 8s at 60fps) so the perf hit is
+  // negligible. Do NOT increase the frequency without re-measuring.
+  if(Math.random() < 0.002) {
     const testPixel = ctx.getImageData(0, 0, 1, 1).data;
     if(testPixel[3] === 0 && cameraY > 100) {
       // Canvas is transparent when it shouldn't be — re-init
@@ -2545,8 +2634,6 @@ function frame(now){
   }
 
   // Freeze physics during intro
-  const introEl = document.getElementById('intro-sequence');
-  const introActive = !!introEl;
   const effectiveTimeScale = introActive ? 0 : targetTimeScale;
 
   // Smoothly interpolate time scale (much faster transition but still eased)
@@ -3093,46 +3180,52 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 
+// Idempotent: this is wired up both synchronously below and on window.load
+// (some browsers fire 'load' before the sync call, others after). The guard
+// prevents re-binding the embark onclick handler and keeps the restart button
+// from being appended twice.
+let _resumeChecked = false;
 function checkResume(){
-  if(window._fe){
-    const saved = window._fe.loadProgress();
-    if(saved && saved.depthMeters >= 5){
-      const thoughtText = document.getElementById('intro-thought-text');
-      if(thoughtText) thoughtText.textContent = "Your journey already began.";
+  if(_resumeChecked) return;
+  if(!window._fe) return;
+  const saved = window._fe.loadProgress();
+  if(!saved || saved.depthMeters < CONFIG.INTRO_RESUME_MIN_M) return;
+  _resumeChecked = true;
 
-      const embarkBtn = document.getElementById('intro-embark');
-      if(embarkBtn) {
-        embarkBtn.textContent = "Resume journey";
-        embarkBtn.dataset.resume = "true";
-        embarkBtn.onclick = (e) => {
-          e.preventDefault(); e.stopPropagation();
-          window._fe.restoreFromSave(saved);
-          if(window._startBirth) window._startBirth();
-        };
-      }
-      const promptArea = document.getElementById('intro-prompt');
-      if(promptArea && !document.getElementById('intro-restart')) {
-        const embarkEl = document.getElementById('intro-embark');
-        const restartBtn = document.createElement('button');
-        restartBtn.id = 'intro-restart';
-        restartBtn.textContent = "Embark again";
-        // Copy all CSS properties from embark button to ensure visual match
-        if(embarkEl){
-          const cs = getComputedStyle(embarkEl);
-          for(const prop of cs){
-            try { restartBtn.style.setProperty(prop, cs.getPropertyValue(prop)); } catch(e){}
-          }
-        }
-        restartBtn.onclick = (e) => {
-          e.preventDefault(); e.stopPropagation();
-          window._fe.clearSave();
-          // Silently start the birth sequence immediately
-          if(window._startBirth) window._startBirth();
-          else if(typeof setPhase === 'function') setPhase('born');
-        };
-        promptArea.appendChild(restartBtn);
+  const thoughtText = document.getElementById('intro-thought-text');
+  if(thoughtText) thoughtText.textContent = "Your journey already began.";
+
+  const embarkBtn = document.getElementById('intro-embark');
+  if(embarkBtn) {
+    embarkBtn.textContent = "Resume journey";
+    embarkBtn.dataset.resume = "true";
+    embarkBtn.onclick = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      window._fe.restoreFromSave(saved);
+      if(window._startBirth) window._startBirth();
+    };
+  }
+  const promptArea = document.getElementById('intro-prompt');
+  if(promptArea && !document.getElementById('intro-restart')) {
+    const embarkEl = document.getElementById('intro-embark');
+    const restartBtn = document.createElement('button');
+    restartBtn.id = 'intro-restart';
+    restartBtn.textContent = "Embark again";
+    // Copy all CSS properties from embark button to ensure visual match
+    if(embarkEl){
+      const cs = getComputedStyle(embarkEl);
+      for(const prop of cs){
+        try { restartBtn.style.setProperty(prop, cs.getPropertyValue(prop)); } catch(e){}
       }
     }
+    restartBtn.onclick = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      window._fe.clearSave();
+      // Silently start the birth sequence immediately
+      if(window._startBirth) window._startBirth();
+      else if(typeof setPhase === 'function') setPhase('born');
+    };
+    promptArea.appendChild(restartBtn);
   }
 }
 
@@ -3144,7 +3237,12 @@ checkResume();
 const introEl = document.getElementById('intro-sequence');
 if(introEl){
   const ui=[document.querySelector('.top-controls'),document.querySelector('.bottom-left'),document.querySelector('.back-link')];
-  ui.forEach(e=>{if(e)e.style.opacity='0'; e.style.transition='opacity 1.5s ease';});
+  // Guard the whole body - a missing UI node would otherwise NPE on .style.transition.
+  ui.forEach(e => {
+    if(!e) return;
+    e.style.opacity = '0';
+    e.style.transition = 'opacity 1.5s ease';
+  });
 
   // Custom click handler for embark to support resume
   const embarkBtn = document.getElementById('intro-embark');
@@ -3167,12 +3265,12 @@ if(introEl){
 }
 
 function updateSoundHint() {
-  const hint = document.getElementById('sound-hint');
+  const hint = soundHintEl; // cached in §10 Buttons
   if(!hint) return;
   const depthM = Math.max(0, cameraY / 100);
 
-  if(depthM < 50) {
-    // FORCE visibility until 50m
+  if(depthM < CONFIG.SOUND_HINT_FADE_M) {
+    // FORCE visibility until fade threshold
     hint.style.setProperty('display', 'block', 'important');
     hint.style.setProperty('opacity', '1', 'important');
 
