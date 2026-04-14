@@ -381,6 +381,8 @@ class Sphere {
       this.challengeVariant = Math.floor(Math.random() * 5); // 5 distinct threat shapes
     } else if(type === 'heart'){
       this.r = 25 + Math.random()*15;
+    } else if(type === 'setback'){
+      this.r = 30 + Math.random()*18;
     } else if(type === 'chakra'){
       this.r = 28 + Math.random()*20;
     } else {
@@ -705,6 +707,29 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     if(delayNode) panner.connect(delayNode);
     osc1.start(now); osc1.stop(now + duration * 1.2 + 0.1);
     osc2.start(now); osc2.stop(now + duration * 1.2 + 0.1);
+  } else if (type === 'setback') {
+    // Dissonant "boing" — spring-like upward bounce sound
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc1.type = 'sine';
+    osc2.type = 'triangle';
+    // Pitch drops rapidly then rises (spring effect)
+    osc1.frequency.setValueAtTime(freq * 1.5, now);
+    osc1.frequency.exponentialRampToValueAtTime(freq * 0.5, now + 0.15);
+    osc1.frequency.exponentialRampToValueAtTime(freq * 1.2, now + 0.5);
+    osc2.frequency.setValueAtTime(freq * 1.5, now);
+    osc2.frequency.exponentialRampToValueAtTime(freq * 0.3, now + 0.12);
+    osc2.frequency.exponentialRampToValueAtTime(freq * 0.8, now + 0.4);
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(vol * 0.6, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration * 1.5);
+    osc1.connect(gain); osc2.connect(gain);
+    gain.connect(panner);
+    panner.connect(masterGain);
+    if(delayNode) panner.connect(delayNode);
+    osc1.start(now); osc1.stop(now + duration * 1.5 + 0.1);
+    osc2.start(now); osc2.stop(now + duration * 1.5 + 0.1);
   } else if (type === 'chakra') {
     // Singing bowl resonance
     const osc1 = audioCtx.createOscillator();
@@ -971,13 +996,22 @@ function collideRagdollSphere(ragdoll, sphere, dt){
       hOsc.start(hNow); hOsc.stop(hNow + 1.1);
     }
 
+    // ── Setback Trampoline: launch ragdoll upward ──
+    if(sphere.type === 'setback'){
+      const bounceStrength = 350 + Math.random() * 150; // 350-500 units/sec upward
+      for(const p of ragdoll.particles){
+        // Set old position above current to create upward velocity
+        p.oy = p.y + bounceStrength * 0.016 * 3; // ~3 frames worth of upward velocity
+      }
+    }
+
     // ── Power-Up Activation ──
     if(sphere.type === 'wave') activeEffects.wave = 4;
     else if(sphere.type === 'trail') activeEffects.trail = 7;
     else if(sphere.type === 'pulse') activeEffects.pulse = 3;
     else if(sphere.type === 'magnet') activeEffects.magnet = 5;
 
-    const basePoints = sphere.type === 'challenge' ? 50 : (sphere.type === 'heart' ? 25 : (['wave','trail','pulse','magnet'].includes(sphere.type) ? 30 : 15));
+    const basePoints = sphere.type === 'challenge' ? 50 : (sphere.type === 'heart' ? 25 : (sphere.type === 'setback' ? 0 : (['wave','trail','pulse','magnet'].includes(sphere.type) ? 30 : 15)));
     const multiplier = Math.min(comboCount, 10);
     const pts = basePoints * multiplier;
     score += pts;
@@ -1391,11 +1425,12 @@ function spawnSphereAtDepth(yWorld, forceType=null){
   } else {
     // Reduced frequency of special obstacles (approx 1.5% each)
     const r = Math.random();
-    if (r < 0.015) type = 'heart';
-    else if (r < 0.030) type = 'yinyang';
-    else if (r < 0.045) type = 'vesica';
-    else if (r < 0.060) type = 'chakra';
-    else if (r < 0.080) type = 'wave';
+    if (r < 0.012) type = 'setback';
+    else if (r < 0.027) type = 'heart';
+    else if (r < 0.042) type = 'yinyang';
+    else if (r < 0.057) type = 'vesica';
+    else if (r < 0.072) type = 'chakra';
+    else if (r < 0.092) type = 'wave';
     else if (r < 0.100) type = 'trail';
     else if (r < 0.120) type = 'pulse';
     else if (r < 0.140) type = 'magnet';
@@ -1933,6 +1968,78 @@ function drawSphere(s){
     ctx.fillStyle = `hsla(${hue},90%,80%,0.8)`;
     ctx.beginPath(); ctx.arc(0,0,2.5,0,TAU); ctx.fill();
 
+  } else if (s.type === 'setback') {
+    // Penrose Triangle — impossible geometry (setback: defies progress)
+    const hue = (45 + time*12 + s.hue) % 360; // amber/gold — warning color
+    ctx.rotate(s.rotation * 0.3 + time * 0.15);
+    const sr = s.r;
+    // Outer glow
+    const grad = ctx.createRadialGradient(0,0,0, 0,0,sr*1.8);
+    grad.addColorStop(0, `hsla(${hue},90%,60%,0.2)`);
+    grad.addColorStop(1, `hsla(${hue},90%,60%,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0,0,sr*1.8,0,TAU); ctx.fill();
+    // Penrose triangle (3D impossible triangle)
+    ctx.strokeStyle = `hsla(${hue},85%,65%,0.9)`;
+    ctx.fillStyle = `hsla(${hue},70%,50%,0.12)`;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    const outerR = sr * 0.85;
+    const innerR = sr * 0.42;
+    const thickness = sr * 0.18;
+    // Three outer vertices (equilateral triangle)
+    const v1 = [0, -outerR];
+    const v2 = [outerR * Math.sin(TAU/3), -outerR * Math.cos(TAU/3)];
+    const v3 = [-outerR * Math.sin(TAU/3), -outerR * Math.cos(TAU/3)];
+    // Three inner vertices (smaller, rotated 180°)
+    const iv1 = [0, innerR];
+    const iv2 = [-innerR * Math.sin(TAU/3), innerR * Math.cos(TAU/3)];
+    const iv3 = [innerR * Math.sin(TAU/3), innerR * Math.cos(TAU/3)];
+    // Draw the impossible triangle as three beams
+    // Beam 1: v1 → v2 (outer-left edge)
+    const b1a = 0.0; // direction along beam
+    const b1nx = (v2[0]-v1[0]), b1ny = (v2[1]-v1[1]);
+    const b1len = Math.sqrt(b1nx*b1nx+b1ny*b1ny);
+    const b1ux = b1nx/b1len, b1uy = b1ny/b1len;
+    const b1px = -b1uy, b1py = b1ux; // perpendicular
+    // Beam 2: v2 → v3
+    const b2nx = (v3[0]-v2[0]), b2ny = (v3[1]-v2[1]);
+    const b2len = Math.sqrt(b2nx*b2nx+b2ny*b2ny);
+    const b2ux = b2nx/b2len, b2uy = b2ny/b2len;
+    const b2px = -b2uy, b2py = b2ux;
+    // Beam 3: v3 → v1
+    const b3nx = (v1[0]-v3[0]), b3ny = (v1[1]-v3[1]);
+    const b3len = Math.sqrt(b3nx*b3nx+b3ny*b3ny);
+    const b3ux = b3nx/b3len, b3uy = b3ny/b3len;
+    const b3px = -b3uy, b3py = b3ux;
+    // Draw each beam as a parallelogram (outer edge on one side, inner on other)
+    ctx.beginPath();
+    // Beam 1 (v1→v2): outer-left side
+    ctx.moveTo(v1[0]+b1px*thickness, v1[1]+b1py*thickness);
+    ctx.lineTo(v2[0]+b1px*thickness, v2[1]+b1py*thickness);
+    ctx.lineTo(iv2[0]+b1px*thickness*0.3, iv2[1]+b1py*thickness*0.3);
+    ctx.lineTo(iv1[0]+b1px*thickness*0.3, iv1[1]+b1py*thickness*0.3);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // Beam 2 (v2→v3): outer-right side
+    ctx.beginPath();
+    ctx.moveTo(v2[0]+b2px*thickness, v2[1]+b2py*thickness);
+    ctx.lineTo(v3[0]+b2px*thickness, v3[1]+b2py*thickness);
+    ctx.lineTo(iv3[0]+b2px*thickness*0.3, iv3[1]+b2py*thickness*0.3);
+    ctx.lineTo(iv2[0]+b2px*thickness*0.3, iv2[1]+b2py*thickness*0.3);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // Beam 3 (v3→v1): crosses over — this creates the impossibility
+    ctx.beginPath();
+    ctx.moveTo(v3[0]-b3px*thickness, v3[1]-b3py*thickness);
+    ctx.lineTo(v1[0]-b3px*thickness, v1[1]-b3py*thickness);
+    ctx.lineTo(iv1[0]-b3px*thickness*0.3, iv1[1]-b3py*thickness*0.3);
+    ctx.lineTo(iv3[0]-b3px*thickness*0.3, iv3[1]-b3py*thickness*0.3);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // Inner glow at center
+    const cg = ctx.createRadialGradient(0,0,0, 0,0,sr*0.3);
+    cg.addColorStop(0, `hsla(${hue},90%,80%,0.15)`);
+    cg.addColorStop(1, `hsla(${hue},90%,60%,0)`);
+    ctx.fillStyle = cg;
+    ctx.beginPath(); ctx.arc(0,0,sr*0.3,0,TAU); ctx.fill();
   } else if (s.type === 'vesica') {
     const hue = (280 + time*10 + s.hue) % 360;
     ctx.rotate(s.rotation + time*0.2);
