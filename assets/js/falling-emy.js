@@ -242,6 +242,18 @@ window._fe = { loadProgress, restoreFromSave, clearSave, formatDepth, formatTime
     const ni = document.getElementById('emy-name');
     if(ni) ni.value = nm;
     saveProgress();
+  },
+  // Set muted state programmatically (used by the sound-preference modal).
+  // Safe to call before muteBtn/soundHintEl are declared — this is only
+  // ever invoked from a user-action callback, by which time the full IIFE
+  // has already run and all const bindings are live.
+  setMuted: (muted) => {
+    isMuted = muted;
+    const mb = document.getElementById('mute-btn');
+    const sh = document.getElementById('sound-hint');
+    if(mb) { mb.textContent = isMuted ? '🔇' : '🔊'; mb.classList.toggle('is-on', !isMuted); mb.style.animation = 'none'; }
+    if(sh) sh.style.display = 'none'; // hide "tap for sound" hint — user already chose
+    if(!isMuted) initAudio();
   }
 };
 
@@ -4438,10 +4450,11 @@ requestAnimationFrame(frame);
 
 // ── Soul Name Modal ─────────────────────────────────────────────────────────
 
-// Draws a Flower-of-Life mandala on #soul-mandala-canvas.
+// Draws a Flower-of-Life mandala on the given canvas element.
+// canvasId defaults to 'soul-mandala-canvas'.
 // Returns a stop() function that cancels the RAF loop.
-function _runMandala() {
-  const canvas = document.getElementById('soul-mandala-canvas');
+function _runMandala(canvasId) {
+  const canvas = document.getElementById(canvasId || 'soul-mandala-canvas');
   if(!canvas) return () => {};
   const ctx2 = canvas.getContext('2d');
   let raf2, t2 = 0;
@@ -4547,8 +4560,8 @@ function _showSoulModal(onConfirm, defaultName) {
     input.removeEventListener('input', onType);
     [prompt, input, confirmBtn].forEach(el => el?.classList.remove('revealed'));
     modal.classList.remove('visible');
-    // Let the modal finish fading before handing back control
-    setTimeout(() => { stopMandala(); onConfirm(nm); }, 560);
+    // onConfirm first so the next modal can start its own mandala before we stop ours
+    setTimeout(() => { onConfirm(nm); stopMandala(); }, 560);
   }
 
   confirmBtn.onclick = (e) => { e.preventDefault(); commit(); };
@@ -4560,6 +4573,39 @@ function _showSoulModal(onConfirm, defaultName) {
       commit();
     }
   });
+}
+
+// Shows the sound-preference modal for first-time players.
+// Calls onDone() once the player makes a choice.
+function _showSoundModal(onDone) {
+  const modal = document.getElementById('sound-modal');
+  const icon  = document.getElementById('sound-modal-icon');
+  const title = document.getElementById('sound-modal-title');
+  const hint  = document.getElementById('sound-modal-hint');
+  const btns  = document.getElementById('sound-modal-btns');
+  if(!modal) { onDone(); return; }
+
+  [icon, title, hint, btns].forEach(el => el?.classList.remove('revealed'));
+
+  const stopMandala = _runMandala('sound-mandala-canvas');
+  modal.classList.add('visible');
+
+  // Sequential reveal: icon+title → hint → buttons
+  setTimeout(() => { icon?.classList.add('revealed'); title?.classList.add('revealed'); }, 450);
+  setTimeout(() => hint?.classList.add('revealed'),  900);
+  setTimeout(() => btns?.classList.add('revealed'), 1200);
+
+  function choose(withSound) {
+    window._fe.setMuted(!withSound);
+    [icon, title, hint, btns].forEach(el => el?.classList.remove('revealed'));
+    modal.classList.remove('visible');
+    setTimeout(() => { onDone(); stopMandala(); }, 560);
+  }
+
+  const yesBtn = document.getElementById('sound-modal-yes');
+  const noBtn  = document.getElementById('sound-modal-no');
+  if(yesBtn) yesBtn.onclick = (e) => { e.preventDefault(); choose(true); };
+  if(noBtn)  noBtn.onclick  = (e) => { e.preventDefault(); choose(false); };
 }
 
 // Idempotent: this is wired up both synchronously below and on window.load
@@ -4633,13 +4679,15 @@ if(introEl){
     // Note: onclick is already set in the window.load handler if resuming
     // This is the fallback for new journeys
     if(!embarkBtn.onclick) {
-      // New journey: intercept the embark button to ask for a soul name first
+      // New journey: name modal → sound modal → birth
       window._soulModalMode = true;
       embarkBtn.onclick = (e) => {
         e.preventDefault(); e.stopPropagation();
         _showSoulModal((nm) => {
           window._fe.setName(nm);
-          if(window._startBirth) window._startBirth();
+          _showSoundModal(() => {
+            if(window._startBirth) window._startBirth();
+          });
         }, 'emy');
       };
     }
@@ -4649,6 +4697,16 @@ if(introEl){
     ui.forEach(e=>{ if(e) e.style.opacity='1'; });
   });
 }
+
+// ── Fade from black on page load ─────────────────────────────────────────
+// Double-rAF ensures at least one browser paint in the black state so the
+// CSS transition actually runs (transitions require the initial state to be
+// painted before the target state is set).
+(function() {
+  const sf = document.getElementById('screen-fade');
+  if(!sf) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => sf.classList.add('done')));
+})();
 
 function updateSoundHint() {
   const hint = soundHintEl; // cached in §10 Buttons

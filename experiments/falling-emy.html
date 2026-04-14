@@ -61,6 +61,8 @@
   </style>
 </head>
 <body class="experiment-view">
+  <!-- Black overlay — fades to transparent revealing the intro from darkness -->
+  <div id="screen-fade"></div>
   <div id="page-transition" class="page-transition"></div>
   <div id="intro-sequence">
     <canvas id="intro-canvas"></canvas>
@@ -78,6 +80,19 @@
       <p id="soul-modal-prompt">you call yourself</p>
       <input id="soul-modal-input" type="text" maxlength="20" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="emy">
       <button id="soul-modal-confirm">begin your journey</button>
+    </div>
+  </div>
+  <!-- Sound preference modal — shown for new players only -->
+  <div id="sound-modal" role="dialog" aria-modal="true" aria-label="Sound preference">
+    <canvas id="sound-mandala-canvas" aria-hidden="true"></canvas>
+    <div id="sound-modal-card">
+      <div id="sound-modal-icon">🎧</div>
+      <p id="sound-modal-title">sound & music</p>
+      <p id="sound-modal-hint">headphones make the journey deeper</p>
+      <div id="sound-modal-btns">
+        <button id="sound-modal-yes">yes, with sound</button>
+        <button id="sound-modal-no">begin in silence</button>
+      </div>
     </div>
   </div>
   <canvas id="c"></canvas>
