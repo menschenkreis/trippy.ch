@@ -3125,7 +3125,6 @@ function updateCamera(){
   }
 
   maybeSpawnNextShape(aheadY);
-  maybeSpawnBreathRing(aheadY);
 }
 
 function recycleObjects(){
@@ -3142,7 +3141,6 @@ function recycleObjects(){
   spheres.length = w;
   // Keep spawning - density increases with depth
   maybeSpawnNextShape(cameraY + H + 100);
-  maybeSpawnBreathRing(cameraY + H + 100);
 }
 
 // ── Draw: Braids ─────────────────────────────────────────────────────────
@@ -3285,7 +3283,6 @@ function frame(now){
   updateParticles(rawDt);
   updateScoreElements(rawDt);
   updateBraids(rawDt);
-  updateBreathRings(rawDt);
   // Chord bloom timers
   if(chordBloomCooldown > 0) chordBloomCooldown -= rawDt;
   if(chordBloomFlash > 0) chordBloomFlash -= rawDt * 0.8;
@@ -3329,7 +3326,6 @@ function frame(now){
   ctx.translate(0, -cameraY); // camera transform
 
   drawBackground();
-  drawBreathRings(); // behind spheres so they don't occlude important obstacles
   // Frustum-cull spheres. Use 2× sphere radius to account for glow halo —
   // draws that spill a little past the visible band. Physics still runs on
   // culled spheres (that happens elsewhere in the frame), this only affects
