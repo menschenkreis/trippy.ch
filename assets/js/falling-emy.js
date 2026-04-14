@@ -19,7 +19,11 @@
 (function(){
 'use strict';
 const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
+// `ctx` is mutable so the sacred-geometry offscreen cache can swap in its
+// own context during refresh without propagating a ctx argument through
+// every draw helper. renderSgLayer saves the previous binding and restores
+// it immediately after.
+let ctx = canvas.getContext('2d');
 const PI = Math.PI, TAU = PI*2;
 
 // ── § 1. Tiny utilities ─────────────────────────────────────────────────
@@ -209,12 +213,17 @@ window._fe = { loadProgress, restoreFromSave, clearSave, formatDepth, formatTime
 
 // ── Resize ───────────────────────────────────────────────────────────────
 let W, H, dpr;
+// Cache-invalidation counters: bumped when viewport size or theme changes so
+// offscreen render caches know to redraw.
+let _viewportVersion = 0;
+let _themeVersion = 0;
 function resize(){
   dpr = Math.min(devicePixelRatio, 2);
   W = window.innerWidth; H = window.innerHeight;
   canvas.width = W*dpr; canvas.height = H*dpr;
   canvas.style.width = W+'px'; canvas.style.height = H+'px';
   ctx.setTransform(dpr,0,0,dpr,0,0);
+  _viewportVersion++;
 }
 window.addEventListener('resize', resize); resize();
 
@@ -244,6 +253,7 @@ let theme = themes[0];
 function setTheme(i){
   themeIdx = i % themes.length;
   theme = themes[themeIdx];
+  _themeVersion++;
   // Shift all ragdoll colors toward new theme
   const newHue = themeIdx * (360 / themes.length);
   for(const r of ragdolls){
@@ -1437,7 +1447,6 @@ function drawScoreElements(){
       }
     }
   }
-  ctx.shadowBlur = 0;
 }
 
 function drawParticles(){
@@ -1871,45 +1880,113 @@ function drawStarfield(parallax){
   }
 }
 
-function drawBackground(){
-  // Gradient background - screen-space
-  const grad = ctx.createRadialGradient(W/2,H/2,0, W/2,H/2,Math.max(W,H)*0.7);
-  grad.addColorStop(0, '#0e0e18');
-  grad.addColorStop(1, theme.bg);
-  ctx.save();
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0,0,W,H);
-  ctx.restore();
+// Background radial gradient — static per (viewport, theme). Rebuilt only when
+// either version counter changes. Saves one gradient allocation per frame.
+let _bgGrad = null;
+let _bgGradViewportV = -1;
+let _bgGradThemeV = -1;
+function getBgGradient(){
+  if(_bgGrad && _bgGradViewportV === _viewportVersion && _bgGradThemeV === _themeVersion){
+    return _bgGrad;
+  }
+  _bgGrad = ctx.createRadialGradient(W/2,H/2,0, W/2,H/2,Math.max(W,H)*0.7);
+  _bgGrad.addColorStop(0, '#0e0e18');
+  _bgGrad.addColorStop(1, theme.bg);
+  _bgGradViewportV = _viewportVersion;
+  _bgGradThemeV = _themeVersion;
+  return _bgGrad;
+}
 
-  // Stars (screen space - must reset transform since we're inside camera transform)
+// ── Sacred-geometry offscreen cache ──────────────────────────────────────
+// Flower of Life + Metatron + Golden Spiral + 4 polygons run hundreds of path
+// ops per frame (Metatron alone draws N(N-1)/2 ≈ 171 line segments). All of
+// these animate very slowly (pulse at time*0.3, spiral at time*0.1), so we
+// render them to an offscreen and refresh every _SG_CACHE_EVERY frames.
+// The per-refresh animation jump is <1% — imperceptible.
+let _sgLayer = null;
+let _sgLayerCtx = null;
+let _sgLayerViewportV = -1;
+let _sgLayerThemeV = -1;
+let _sgLayerAge = 0;
+const _SG_CACHE_EVERY = 4;
+
+function ensureSgLayer(){
+  if(_sgLayer &&
+     _sgLayerViewportV === _viewportVersion &&
+     _sgLayerThemeV === _themeVersion) return;
+  _sgLayer = document.createElement('canvas');
+  _sgLayer.width = Math.floor(W * dpr);
+  _sgLayer.height = Math.floor(H * dpr);
+  _sgLayerCtx = _sgLayer.getContext('2d');
+  _sgLayerCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  _sgLayerViewportV = _viewportVersion;
+  _sgLayerThemeV = _themeVersion;
+  _sgLayerAge = _SG_CACHE_EVERY; // force first-frame render
+}
+
+function renderSgLayer(){
+  // Swap the active ctx so the existing draw* helpers can be reused.
+  const saved = ctx;
+  ctx = _sgLayerCtx;
+  ctx.clearRect(0, 0, W, H);
+  const scx = W/2, scy = H*0.5;
+  const pulse = 0.7 + 0.3*Math.sin(time*0.3);
+  drawFlowerOfLife(scx, scy, 120*pulse, 0.035);
+  drawMetatronsCube(scx, scy, 180*pulse, 0.02);
+  drawGoldenSpiral(scx, scy, 250, time*0.1, 0.03);
+  for(let i=0;i<4;i++){
+    drawPolygon(scx, scy, 100+i*60, 3+i, time*0.05*(i%2===0?1:-1), 0.015+i*0.004);
+  }
+  ctx = saved;
+}
+
+// Early-out helper: kaleidoscopes are drawn under the camera (-cameraY)
+// transform, so their effective screen y is (cy - cameraY). After a few
+// meters of depth they scroll past the top of the viewport; skipping them
+// saves ~7 gradient allocs + ~60 path ops per call.
+function kaleidoscopeVisible(cy, radius){
+  const sy = cy - cameraY;
+  return sy + radius*2 >= 0 && sy - radius*2 <= H;
+}
+
+function drawBackground(){
+  // Gradient background — screen-space, cached gradient.
   ctx.save();
   ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle = getBgGradient();
+  ctx.fillRect(0,0,W,H);
+
+  // Stars — screen space
   drawStarfield(0.12); // distant tiny stars
   drawStarfield(0.15); // closer stars
   ctx.restore();
 
-  // ── Parallax kaleidoscope layers (screen-space, different scroll speeds) ──
-  // Layer 1: far background - slowest parallax
+  // ── Parallax kaleidoscope layers (drawn under world transform, as before) ──
+  // Wrapped in visibility checks — after the early fall these all scroll off
+  // and become zero-cost.
   const px1 = cameraY * 0.1;
-  drawKaleidoscope(W/2, H*0.5 - px1, 350, 6, time*0.03, 0, 0.03, px1);
-  drawKaleidoscope(W*0.2, H*0.3 - px1*0.8, 200, 8, -time*0.02, 120, 0.025, px1*0.8);
-  drawKaleidoscope(W*0.8, H*0.7 - px1*1.2, 250, 5, time*0.025, 240, 0.025, px1*1.2);
+  if(kaleidoscopeVisible(H*0.5 - px1, 350))
+    drawKaleidoscope(W/2, H*0.5 - px1, 350, 6, time*0.03, 0, 0.03, px1);
+  if(kaleidoscopeVisible(H*0.3 - px1*0.8, 200))
+    drawKaleidoscope(W*0.2, H*0.3 - px1*0.8, 200, 8, -time*0.02, 120, 0.025, px1*0.8);
+  if(kaleidoscopeVisible(H*0.7 - px1*1.2, 250))
+    drawKaleidoscope(W*0.8, H*0.7 - px1*1.2, 250, 5, time*0.025, 240, 0.025, px1*1.2);
 
-  // Layer 2: mid - medium parallax
   const px2 = cameraY * 0.3;
-  drawKaleidoscope(W*0.3, H*0.4 - px2, 180, 7, -time*0.04, 60, 0.04, px2);
-  drawKaleidoscope(W*0.7, H*0.6 - px2*0.7, 220, 6, time*0.035, 180, 0.035, px2*0.7);
-  drawKaleidoscope(W*0.5, H*0.2 - px2*1.3, 160, 9, -time*0.03, 300, 0.03, px2*1.3);
+  if(kaleidoscopeVisible(H*0.4 - px2, 180))
+    drawKaleidoscope(W*0.3, H*0.4 - px2, 180, 7, -time*0.04, 60, 0.04, px2);
+  if(kaleidoscopeVisible(H*0.6 - px2*0.7, 220))
+    drawKaleidoscope(W*0.7, H*0.6 - px2*0.7, 220, 6, time*0.035, 180, 0.035, px2*0.7);
+  if(kaleidoscopeVisible(H*0.2 - px2*1.3, 160))
+    drawKaleidoscope(W*0.5, H*0.2 - px2*1.3, 160, 9, -time*0.03, 300, 0.03, px2*1.3);
 
-  // Layer 3: near - fastest parallax (but still behind gameplay)
   const px3 = cameraY * 0.5;
-  drawKaleidoscope(W*0.15, H*0.6 - px3, 140, 5, time*0.05, 90, 0.045, px3);
-  drawKaleidoscope(W*0.85, H*0.35 - px3*0.6, 170, 8, -time*0.045, 210, 0.04, px3*0.6);
+  if(kaleidoscopeVisible(H*0.6 - px3, 140))
+    drawKaleidoscope(W*0.15, H*0.6 - px3, 140, 5, time*0.05, 90, 0.045, px3);
+  if(kaleidoscopeVisible(H*0.35 - px3*0.6, 170))
+    drawKaleidoscope(W*0.85, H*0.35 - px3*0.6, 170, 8, -time*0.045, 210, 0.04, px3*0.6);
 
-  // Stars drawn outside camera transform - see frame()
-
-  // Subtle grid - world space
+  // Subtle grid — world space
   const a = theme.accent;
   ctx.strokeStyle = `rgba(${a[0]},${a[1]},${a[2]},0.025)`;
   ctx.lineWidth = 0.5;
@@ -1922,15 +1999,19 @@ function drawBackground(){
     ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
   }
 
-  // Sacred geometry - world space, scrolls with gameplay
-  const cx = W/2, cy = cameraY + H*0.5;
-  const pulse = 0.7 + 0.3*Math.sin(time*0.3);
-  drawFlowerOfLife(cx, cy, 120*pulse, 0.035);
-  drawMetatronsCube(cx, cy, 180*pulse, 0.02);
-  drawGoldenSpiral(cx, cy, 250, time*0.1, 0.03);
-  for(let i=0;i<4;i++){
-    drawPolygon(cx, cy, 100+i*60, 3+i, time*0.05*(i%2===0?1:-1), 0.015+i*0.004);
+  // Sacred geometry — cached offscreen (screen-space; source coords happen
+  // to be camera-centered in world space, which after the -cameraY transform
+  // lands at screen center, so the cache can live in screen space).
+  ensureSgLayer();
+  _sgLayerAge++;
+  if(_sgLayerAge >= _SG_CACHE_EVERY){
+    _sgLayerAge = 0;
+    renderSgLayer();
   }
+  ctx.save();
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.drawImage(_sgLayer, 0, 0, W, H);
+  ctx.restore();
 }
 
 function drawSphere(s){
@@ -2198,10 +2279,14 @@ function drawSphere(s){
   } else if(s.type === 'wave'){
     // Cyan triangle
     ctx.rotate(s.rotation);
-    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(180,90%,65%,0.35)`);
-    grad.addColorStop(1, `hsla(180,90%,65%,0)`);
-    ctx.fillStyle = grad;
+    // Static-hue glow — cached per sphere (key: just radius)
+    if(!s._glow || s._glowR !== r*1.8){
+      const g = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+      g.addColorStop(0, `hsla(180,90%,65%,0.35)`);
+      g.addColorStop(1, `hsla(180,90%,65%,0)`);
+      s._glow = g; s._glowR = r*1.8;
+    }
+    ctx.fillStyle = s._glow;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
     ctx.strokeStyle = `hsla(180,90%,70%,1.0)`;
     ctx.fillStyle = `hsla(180,80%,55%,0.3)`,
@@ -2216,10 +2301,14 @@ function drawSphere(s){
   } else if(s.type === 'trail'){
     // Magenta diamond
     ctx.rotate(s.rotation * 1.5);
-    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(300,90%,65%,0.35)`);
-    grad.addColorStop(1, `hsla(300,90%,65%,0)`);
-    ctx.fillStyle = grad;
+    // Static-hue glow — cached per sphere
+    if(!s._glow || s._glowR !== r*1.8){
+      const g = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+      g.addColorStop(0, `hsla(300,90%,65%,0.35)`);
+      g.addColorStop(1, `hsla(300,90%,65%,0)`);
+      s._glow = g; s._glowR = r*1.8;
+    }
+    ctx.fillStyle = s._glow;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
     ctx.strokeStyle = `hsla(300,90%,70%,1.0)`;
     ctx.fillStyle = `hsla(300,80%,55%,0.3)`,
@@ -2230,10 +2319,14 @@ function drawSphere(s){
   } else if(s.type === 'pulse'){
     // Gold star
     ctx.rotate(s.rotation * 2);
-    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(45,95%,65%,0.35)`);
-    grad.addColorStop(1, `hsla(45,95%,65%,0)`);
-    ctx.fillStyle = grad;
+    // Static-hue glow — cached per sphere
+    if(!s._glow || s._glowR !== r*1.8){
+      const g = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+      g.addColorStop(0, `hsla(45,95%,65%,0.35)`);
+      g.addColorStop(1, `hsla(45,95%,65%,0)`);
+      s._glow = g; s._glowR = r*1.8;
+    }
+    ctx.fillStyle = s._glow;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
     ctx.strokeStyle = `hsla(45,95%,65%,1.0)`;
     ctx.fillStyle = `hsla(45,85%,55%,0.3)`,
@@ -2409,12 +2502,16 @@ function drawSphere(s){
     ctx.beginPath(); ctx.arc(0,0,r*1.5,0,TAU); ctx.stroke();
 
   } else {
-    // Normal sacred geometry sphere
+    // Normal sacred geometry sphere — outer glow cached per sphere,
+    // invalidated when theme changes (accent2 shifts).
     const a2 = theme.accent2;
-    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.5);
-    grad.addColorStop(0, `rgba(${a2[0]},${a2[1]},${a2[2]},0.18)`);
-    grad.addColorStop(1, `rgba(${a2[0]},${a2[1]},${a2[2]},0)`);
-    ctx.fillStyle = grad;
+    if(!s._glow || s._glowR !== r*1.5 || s._glowThemeV !== _themeVersion){
+      const g = ctx.createRadialGradient(0,0,0, 0,0,r*1.5);
+      g.addColorStop(0, `rgba(${a2[0]},${a2[1]},${a2[2]},0.18)`);
+      g.addColorStop(1, `rgba(${a2[0]},${a2[1]},${a2[2]},0)`);
+      s._glow = g; s._glowR = r*1.5; s._glowThemeV = _themeVersion;
+    }
+    ctx.fillStyle = s._glow;
     ctx.beginPath(); ctx.arc(0,0,r*1.5,0,TAU); ctx.fill();
 
     const hue = (s.hue + time*15) % 360;
@@ -2996,6 +3093,7 @@ function frame(now){
         window.manualThemeSet = true;
         theme.accent = portal.targetAccent;
         theme.accent2 = portal.targetAccent2;
+        _themeVersion++;
       }
       if(portal.progress >= 1){ portal.phase = 'emerging'; portal.progress = 0; }
     } else if(portal.phase === 'emerging'){
@@ -3010,7 +3108,18 @@ function frame(now){
 
   drawBackground();
   drawBreathRings(); // behind spheres so they don't occlude important obstacles
-  for(const s of spheres) drawSphere(s);
+  // Frustum-cull spheres. Use 2× sphere radius to account for glow halo —
+  // draws that spill a little past the visible band. Physics still runs on
+  // culled spheres (that happens elsewhere in the frame), this only affects
+  // rendering cost.
+  const _viewTop = cameraY - 50;
+  const _viewBot = cameraY + H + 50;
+  for(let si = 0; si < spheres.length; si++){
+    const s = spheres[si];
+    const margin = s.r * 2;
+    if(s.y + margin < _viewTop || s.y - margin > _viewBot) continue;
+    drawSphere(s);
+  }
   for(const r of ragdolls) drawRagdoll(r);
   drawBraids();      // over ragdolls so the thread reads clearly
   // ── Active Power-Up Effects (world space) ──
@@ -3268,18 +3377,23 @@ function frame(now){
   ctx.textAlign = 'right';
   ctx.fillText(`${depthMeters.toFixed(1)} m`, W - 20, H - 20);
 
-  // Score HUD (below depth meter)
+  // Score HUD (below depth meter) — no shadowBlur (expensive on mobile);
+  // animated state uses a cheap 4-offset glow draw instead.
   const a3 = theme.accent2;
   const isAnim = displayScore < score;
-  ctx.fillStyle = `rgba(${a3[0]},${a3[1]},${a3[2]},${isAnim ? 0.8 : 0.35})`;
   ctx.font = `${isAnim ? '300' : '200'} 0.8rem monospace`;
   ctx.textAlign = 'right';
+  const scoreStr = displayScore.toLocaleString();
   if(isAnim){
-    ctx.shadowColor = `rgba(${a3[0]},${a3[1]},${a3[2]},0.5)`;
-    ctx.shadowBlur = 10 + Math.sin(time * 12) * 4;
+    const glow = (0.18 + 0.12 * (0.5 + 0.5 * Math.sin(time * 12)));
+    ctx.fillStyle = `rgba(${a3[0]},${a3[1]},${a3[2]},${glow})`;
+    ctx.fillText(scoreStr, W - 19, H - 38);
+    ctx.fillText(scoreStr, W - 21, H - 38);
+    ctx.fillText(scoreStr, W - 20, H - 37);
+    ctx.fillText(scoreStr, W - 20, H - 39);
   }
-  ctx.fillText(displayScore.toLocaleString(), W - 20, H - 38);
-  ctx.shadowBlur = 0;
+  ctx.fillStyle = `rgba(${a3[0]},${a3[1]},${a3[2]},${isAnim ? 0.9 : 0.35})`;
+  ctx.fillText(scoreStr, W - 20, H - 38);
 
   // Combo next to score
   if(comboCount > 1){
