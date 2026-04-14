@@ -4436,25 +4436,124 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 
-// Show the soul-name modal, then call onConfirm(name) when the player commits.
+// ── Soul Name Modal ─────────────────────────────────────────────────────────
+
+// Draws a Flower-of-Life mandala on #soul-mandala-canvas.
+// Returns a stop() function that cancels the RAF loop.
+function _runMandala() {
+  const canvas = document.getElementById('soul-mandala-canvas');
+  if(!canvas) return () => {};
+  const ctx2 = canvas.getContext('2d');
+  let raf2, t2 = 0;
+  const TAU = Math.PI * 2;
+
+  function resize2() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize2();
+  window.addEventListener('resize', resize2);
+
+  function circ(x, y, r) { ctx2.beginPath(); ctx2.arc(x, y, r, 0, TAU); ctx2.stroke(); }
+
+  function tick2() {
+    raf2 = requestAnimationFrame(tick2);
+    t2 += 0.004;
+    const W = canvas.width, H = canvas.height;
+    const cx = W * 0.5, cy = H * 0.5;
+    ctx2.clearRect(0, 0, W, H);
+    ctx2.strokeStyle = '#a07eff';
+    ctx2.lineWidth = 0.8;
+
+    const breathe = 1 + 0.03 * Math.sin(t2 * 0.7);
+    const R  = Math.min(W, H) * 0.1 * breathe;
+    const sp  = t2 * 0.05;      // inner — clockwise
+    const sp2 = -t2 * 0.032;    // outer — counter-clockwise
+
+    // Center circle
+    ctx2.globalAlpha = 0.16;
+    circ(cx, cy, R);
+
+    // Seed of Life — 6 petals, slowly rotating
+    ctx2.globalAlpha = 0.11;
+    for(let i = 0; i < 6; i++) {
+      const a = sp + i * TAU / 6;
+      circ(cx + Math.cos(a) * R, cy + Math.sin(a) * R, R);
+    }
+
+    // Second petal ring — counter-rotating
+    ctx2.globalAlpha = 0.06;
+    for(let i = 0; i < 6; i++) {
+      const a = sp2 + Math.PI / 6 + i * TAU / 6;
+      circ(cx + Math.cos(a) * R * 1.732, cy + Math.sin(a) * R * 1.732, R);
+    }
+
+    // Concentric boundary rings
+    ctx2.globalAlpha = 0.09;  circ(cx, cy, R * 2.0);
+    ctx2.globalAlpha = 0.06;  circ(cx, cy, R * 3.46);
+    ctx2.globalAlpha = 0.038; circ(cx, cy, R * 5.0);
+    ctx2.globalAlpha = 0.022; circ(cx, cy, R * 7.2);
+
+    // 12-fold radial spokes, very faint
+    ctx2.globalAlpha = 0.032;
+    for(let i = 0; i < 12; i++) {
+      const a = sp * 0.35 + i * TAU / 12;
+      ctx2.beginPath();
+      ctx2.moveTo(cx + Math.cos(a) * R,       cy + Math.sin(a) * R);
+      ctx2.lineTo(cx + Math.cos(a) * R * 7.5, cy + Math.sin(a) * R * 7.5);
+      ctx2.stroke();
+    }
+  }
+
+  tick2();
+  return function stop() {
+    cancelAnimationFrame(raf2);
+    window.removeEventListener('resize', resize2);
+  };
+}
+
+// Shows the soul-name modal, then calls onConfirm(name) once the player commits.
+// Elements materialize sequentially: prompt → input → confirm button.
 function _showSoulModal(onConfirm, defaultName) {
   const modal      = document.getElementById('soul-modal');
+  const prompt     = document.getElementById('soul-modal-prompt');
   const input      = document.getElementById('soul-modal-input');
   const confirmBtn = document.getElementById('soul-modal-confirm');
   if(!modal || !input || !confirmBtn) { onConfirm(defaultName || 'emy'); return; }
 
+  // Reset any previous reveal state
+  [prompt, input, confirmBtn].forEach(el => el?.classList.remove('revealed'));
+  confirmBtn.textContent = 'begin your journey';
   input.value = defaultName || '';
+
+  // Start mandala + show backdrop
+  const stopMandala = _runMandala();
   modal.classList.add('visible');
-  setTimeout(() => { input.focus(); input.select(); }, 90);
+
+  // Sequential materialization: text → input → button
+  setTimeout(() => prompt?.classList.add('revealed'),    500);
+  setTimeout(() => input.classList.add('revealed'),     1100);
+  setTimeout(() => confirmBtn.classList.add('revealed'), 1500);
+
+  // Live confirm label: "begin as alice"
+  function onType() {
+    const n = input.value.trim();
+    confirmBtn.textContent = n ? `begin as ${n}` : 'begin your journey';
+  }
+  input.addEventListener('input', onType);
 
   function commit() {
     const nm = (input.value || '').trim() || 'emy';
+    input.removeEventListener('input', onType);
+    [prompt, input, confirmBtn].forEach(el => el?.classList.remove('revealed'));
     modal.classList.remove('visible');
-    onConfirm(nm);
+    // Let the modal finish fading before handing back control
+    setTimeout(() => { stopMandala(); onConfirm(nm); }, 560);
   }
+
   confirmBtn.onclick = (e) => { e.preventDefault(); commit(); };
   input.addEventListener('keydown', function onKey(ke) {
-    ke.stopPropagation(); // prevent intro-sequence's window keydown from firing
+    ke.stopPropagation(); // prevent intro-sequence's window keydown from triggering birth
     if(ke.key === 'Enter' || ke.key === 'Escape') {
       ke.preventDefault();
       input.removeEventListener('keydown', onKey);
