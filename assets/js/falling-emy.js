@@ -738,6 +738,22 @@ function initAudio(){
   const Ctx = window.AudioContext || window.webkitAudioContext;
   if(!Ctx) return;
   audioCtx = new Ctx();
+
+  // iOS AVAudioSession fix: Web Audio defaults to the 'ambient' category which
+  // is silent on the built-in speaker (but audible on Bluetooth because BT uses
+  // its own 'playback' session). Playing a silent HTML <audio> element on the
+  // same user gesture upgrades the session to 'playback', making Web Audio
+  // audible through the phone speaker as well.
+  try {
+    const _iosFix = new Audio(
+      'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
+    );
+    _iosFix.play().catch(()=>{});
+  } catch(e){}
+
+  // Ensure context is running (browsers may create it suspended under autoplay policy)
+  audioCtx.resume().catch(()=>{});
+
   masterGain = audioCtx.createGain();
   masterGain.gain.value = 0.8;
   masterGain.connect(audioCtx.destination);
