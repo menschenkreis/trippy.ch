@@ -616,6 +616,10 @@ let masterGain;
 let delayNode;
 let lastImpactTime = 0;
 let isMuted = true;
+// Stereo flanger nodes — created in initAudio, activated by wave power-up
+let flangerDelayL = null, flangerDelayR = null;
+let flangerFbL = null,    flangerFbR = null;
+let flangerWetL = null,   flangerWetR = null;
 // Count of currently playing oscillators (maintained by the createOscillator
 // wrapper installed in initAudio). Used to early-return from playImpactSound
 // on extreme combo pile-ups so we don't clip/crackle on mobile.
@@ -647,6 +651,43 @@ function initAudio(){
 
   // Send echo output to master
   delayNode.connect(masterGain);
+
+  // ── Stereo Flanger ────────────────────────────────────────────────────
+  // Two short delay lines (L/R) tapped from masterGain. A single LFO drives
+  // both at opposite sign (180° phase), creating a sweeping stereo spread.
+  // Wet gains start at 0 so there is no effect until the wave power-up fires.
+  // Feedback stays at 0 when inactive to prevent buffer saturation.
+  flangerDelayL = audioCtx.createDelay(0.02); flangerDelayL.delayTime.value = 0.004;
+  flangerDelayR = audioCtx.createDelay(0.02); flangerDelayR.delayTime.value = 0.004;
+
+  flangerFbL = audioCtx.createGain(); flangerFbL.gain.value = 0;
+  flangerFbR = audioCtx.createGain(); flangerFbR.gain.value = 0;
+  flangerDelayL.connect(flangerFbL); flangerFbL.connect(flangerDelayL);
+  flangerDelayR.connect(flangerFbR); flangerFbR.connect(flangerDelayR);
+
+  flangerWetL = audioCtx.createGain(); flangerWetL.gain.value = 0;
+  flangerWetR = audioCtx.createGain(); flangerWetR.gain.value = 0;
+
+  const flangerPanL = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : audioCtx.createGain();
+  const flangerPanR = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : audioCtx.createGain();
+  if(flangerPanL.pan) flangerPanL.pan.value = -0.8;
+  if(flangerPanR.pan) flangerPanR.pan.value =  0.8;
+  flangerDelayL.connect(flangerWetL); flangerWetL.connect(flangerPanL); flangerPanL.connect(audioCtx.destination);
+  flangerDelayR.connect(flangerWetR); flangerWetR.connect(flangerPanR); flangerPanR.connect(audioCtx.destination);
+
+  // LFO — same oscillator drives both channels at opposite polarity
+  const flangerLfo = audioCtx.createOscillator();
+  flangerLfo.type = 'sine';
+  flangerLfo.frequency.value = 0.28; // ~0.28 Hz = very slow cosmic sweep
+  const flangerDepthL = audioCtx.createGain(); flangerDepthL.gain.value =  0.0025;
+  const flangerDepthR = audioCtx.createGain(); flangerDepthR.gain.value = -0.0025; // 180° phase
+  flangerLfo.connect(flangerDepthL); flangerDepthL.connect(flangerDelayL.delayTime);
+  flangerLfo.connect(flangerDepthR); flangerDepthR.connect(flangerDelayR.delayTime);
+  flangerLfo.start();
+
+  // Tap the master mix into both flanger delays
+  masterGain.connect(flangerDelayL);
+  masterGain.connect(flangerDelayR);
 
   // Wrap createOscillator so every osc made via this ctx participates in the
   // activeOscCount without touching each individual synth branch below.
@@ -1134,7 +1175,7 @@ function collideRagdollSphere(ragdoll, sphere, dt){
     }
 
     // ── Power-Up Activation ──
-    if(sphere.type === 'wave') activeEffects.wave = 4;
+    if(sphere.type === 'wave'){ activeEffects.wave = 4; activateFlanger(4.5); }
     else if(sphere.type === 'trail') activeEffects.trail = 7;
     else if(sphere.type === 'pulse') activeEffects.pulse = 3;
     else if(sphere.type === 'magnet') activeEffects.magnet = 5;
@@ -2114,33 +2155,31 @@ function drawSphere(s){
     if(s.impactFlash < 0) s.impactFlash = 0;
   }
 
-  // ── Multi-ring breathing aura ──
-  // Two extra concentric rings that breathe at different speeds, giving each
-  // sphere a living, hypnotic halo. Double-stroke for cheap glow (no shadowBlur).
+  // ── Rotating star sparkle ──
+  // Four short light-rays rotate slowly around each sphere, like starlight
+  // glinting off sacred crystal. Much lighter than concentric rings.
   {
-    const ac = (s.type === 'heart' || s.type === 'chakra' || s.type === 'setback' || s.type === 'yinyang')
-      ? null : theme.accent; // typed spheres use their own hue below
-    const auraHue = s.type === 'heart' ? (330 + time*10 + s.hue) % 360
+    const auraHue = s.type === 'heart'    ? (330 + time*10 + s.hue) % 360
       : s.type === 'chakra'   ? [0,30,60,120,240,275,300][s.chakraLevel]
       : s.type === 'setback'  ? (45 + time*12 + s.hue) % 360
       : s.type === 'yinyang'  ? (200 + s.hue) % 360
       : (s.hue + time*15) % 360;
-    const rA = r * (2.05 + 0.28 * Math.sin(time * 0.85 + s.hue));
-    const rB = r * (3.3  + 0.45 * Math.sin(time * 0.48 + s.hue + 1.6));
-    // Ring A
-    ctx.lineWidth = 3.5;
-    ctx.strokeStyle = `hsla(${auraHue},70%,60%,0.07)`;
-    ctx.beginPath(); ctx.arc(0,0,rA,0,TAU); ctx.stroke();
-    ctx.lineWidth = 0.8;
-    ctx.strokeStyle = `hsla(${auraHue},80%,70%,0.13)`;
-    ctx.beginPath(); ctx.arc(0,0,rA,0,TAU); ctx.stroke();
-    // Ring B (outer, fainter)
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = `hsla(${auraHue},65%,55%,0.04)`;
-    ctx.beginPath(); ctx.arc(0,0,rB,0,TAU); ctx.stroke();
-    ctx.lineWidth = 0.6;
-    ctx.strokeStyle = `hsla(${auraHue},75%,65%,0.07)`;
-    ctx.beginPath(); ctx.arc(0,0,rB,0,TAU); ctx.stroke();
+    ctx.save();
+    ctx.rotate(time * 0.18 + s.hue * 0.017); // gentle rotation, unique per sphere
+    const sparkR   = r * 1.3;                 // ray origin (just outside main glow)
+    const sparkLen = r * 0.55;                // ray length
+    ctx.lineWidth = 0.7;
+    ctx.lineCap   = 'round';
+    ctx.strokeStyle = `hsla(${auraHue},85%,78%,0.16)`;
+    for(let si = 0; si < 4; si++){
+      const sa = si * TAU / 4;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(sa) * sparkR,             Math.sin(sa) * sparkR);
+      ctx.lineTo(Math.cos(sa) * (sparkR + sparkLen), Math.sin(sa) * (sparkR + sparkLen));
+      ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+    ctx.restore();
   }
 
   if(s.type === 'heart'){
@@ -3004,7 +3043,7 @@ function playChordBloom(gain){
   const freqs = [root, root * 1.2599, root * 1.4983, root * 2]; // root, maj3, 5, oct
   const g = audioCtx.createGain();
   g.gain.setValueAtTime(0, now);
-  g.gain.linearRampToValueAtTime(Math.min(gain, 1) * 0.35, now + 0.25);
+  g.gain.linearRampToValueAtTime(Math.min(gain, 1) * 0.16, now + 0.25);
   g.gain.exponentialRampToValueAtTime(0.001, now + 3.2);
   g.connect(masterGain);
   if(delayNode) g.connect(delayNode);
@@ -3016,6 +3055,33 @@ function playChordBloom(gain){
     osc.start(now);
     osc.stop(now + 3.3);
   }
+}
+
+// ── Stereo Flanger Activation ──────────────────────────────────────────────
+// Fades in the two wet delay lines over `duration` seconds, creating a
+// sweeping stereo flanger wash over the existing sounds. Feedback is ramped
+// to zero at the end to prevent the delay buffers from accumulating.
+function activateFlanger(duration){
+  if(!flangerWetL || isMuted || !audioCtx) return;
+  const now  = audioCtx.currentTime;
+  const peak = 0.42;  // wet level at full effect
+  const fb   = 0.62;  // feedback resonance
+  const fadeIn  = 0.7;
+  const fadeOut = 1.4;
+
+  [flangerWetL, flangerWetR].forEach(node => {
+    node.gain.cancelScheduledValues(now);
+    node.gain.setValueAtTime(0,    now);
+    node.gain.linearRampToValueAtTime(peak, now + fadeIn);
+    node.gain.setValueAtTime(peak, now + duration - fadeOut);
+    node.gain.exponentialRampToValueAtTime(0.001, now + duration);
+  });
+  [flangerFbL, flangerFbR].forEach(node => {
+    node.gain.cancelScheduledValues(now);
+    node.gain.setValueAtTime(fb, now);
+    node.gain.setValueAtTime(fb, now + duration - fadeOut);
+    node.gain.linearRampToValueAtTime(0, now + duration);
+  });
 }
 
 function updateCamera(){
@@ -3534,40 +3600,6 @@ function frame(now){
       bloomGrad.addColorStop(1, `hsla(${bHue},80%,60%,0)`);
       ctx.fillStyle = bloomGrad;
       ctx.beginPath(); ctx.arc(cx, cy, 80, 0, TAU); ctx.fill();
-    }
-  }
-
-  // ── Slow-Mo Dreamstate (screen space) ─────────────────────────────────
-  // When the user holds to slow time, crystalline rings form around the head.
-  {
-    const dream = clamp((0.25 - timeScale) / 0.22, 0, 1);
-    if(dream > 0){
-      const dhx = head ? headX : W / 2;
-      const dhy = head ? headY - cameraY : H / 2;
-      // Three slowly pulsing rings at different phases
-      const dreamRings = [
-        { r: 28 + 9  * Math.sin(time * 3.8), lw: 2.5 },
-        { r: 50 + 14 * Math.sin(time * 2.9 + 1.2), lw: 1.8 },
-        { r: 76 + 20 * Math.sin(time * 2.1 + 2.4), lw: 1.2 },
-      ];
-      const a2 = theme.accent2;
-      const dHue = (Math.round(Math.atan2(a2[2]-a2[1], a2[0]-a2[1]) * 180/Math.PI) + 360) % 360;
-      for(let di = 0; di < dreamRings.length; di++){
-        const dr = dreamRings[di];
-        const ringAlpha = dream * (0.28 - di * 0.07);
-        ctx.lineWidth = dr.lw * 3;
-        ctx.strokeStyle = `hsla(${(dHue + di*30)%360},80%,70%,${ringAlpha * 0.25})`;
-        ctx.beginPath(); ctx.arc(dhx, dhy, dr.r, 0, TAU); ctx.stroke();
-        ctx.lineWidth = dr.lw * 0.6;
-        ctx.strokeStyle = `hsla(${(dHue + di*30)%360},90%,80%,${ringAlpha})`;
-        ctx.beginPath(); ctx.arc(dhx, dhy, dr.r, 0, TAU); ctx.stroke();
-      }
-      // Subtle central bloom
-      const dg = ctx.createRadialGradient(dhx, dhy, 0, dhx, dhy, 90);
-      dg.addColorStop(0, `hsla(${dHue},75%,65%,${dream * 0.06})`);
-      dg.addColorStop(1, `hsla(${dHue},75%,65%,0)`);
-      ctx.fillStyle = dg;
-      ctx.beginPath(); ctx.arc(dhx, dhy, 90, 0, TAU); ctx.fill();
     }
   }
 
