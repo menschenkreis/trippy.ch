@@ -197,7 +197,7 @@ function restoreFromSave(data){
   comboCount = 0; lastHitTime = 0;
   scorePopups = []; scoreFlies = [];
   harmonyIndex = 0; harmonicCooldown = 0;
-  activeEffects = { wave: 0, trail: 0, pulse: 0, magnet: 0 };
+  activeEffects = { wave: 0, trail: 0, pulse: 0, magnet: 0, aura: 0, nova: 0 };
   waveRings = [];
   portal = null;
   chapterDisplay = null; chapterSlowMo = 0;
@@ -379,7 +379,7 @@ let harmonicCooldown = 0; // dynamic cooldown - increases when stuck
 const pentatonicScale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21]; // C D E G A c d e g a
 
 // ── Power-Up Effects ──
-let activeEffects = { wave: 0, trail: 0, pulse: 0, magnet: 0 };
+let activeEffects = { wave: 0, trail: 0, pulse: 0, magnet: 0, aura: 0, nova: 0 };
 let waveRings = []; // {x, y, radius, life}
 
 // ── Braided Ragdolls ─────────────────────────────────────────────────────
@@ -558,9 +558,15 @@ class Sphere {
     } else if(type === 'heart'){
       this.r = (25 + Math.random()*15) * ss;
     } else if(type === 'setback'){
-      this.r = (30 + Math.random()*18) * ss;
+      this.r = (32 + Math.random()*20) * ss; // slightly larger — hexagram reads better
     } else if(type === 'chakra'){
       this.r = (28 + Math.random()*20) * ss;
+    } else if(type === 'merkaba'){
+      this.r = (28 + Math.random()*18) * ss;
+    } else if(type === 'torus'){
+      this.r = (26 + Math.random()*16) * ss;
+    } else if(type === 'aura' || type === 'nova'){
+      this.r = (22 + Math.random()*12) * ss;
     } else {
       this.r = (r || (15 + Math.random()*35)) * ss;
     }
@@ -1031,6 +1037,89 @@ function playImpactSound(force, hue, xPos, type, sacredType){
     osc1.start(now); osc1.stop(now + duration * 2 + 0.1);
     osc2.start(now); osc2.stop(now + duration * 2 + 0.1);
 
+  } else if(type === 'merkaba') {
+    // Ascending crystal arpeggio — root, fifth, octave in quick succession
+    // Suggests ascension / activation energy
+    const notes = [freq, freq * 1.498, freq * 2.0]; // root, P5, oct
+    notes.forEach((f, i) => {
+      const osc = audioCtx.createOscillator();
+      const g   = audioCtx.createGain();
+      const startT = now + i * 0.13;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, startT);
+      g.gain.setValueAtTime(0, startT);
+      g.gain.linearRampToValueAtTime(vol * (0.65 - i * 0.08), startT + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.001, startT + 0.8 - i * 0.05);
+      osc.connect(g); g.connect(panner);
+      osc.start(startT); osc.stop(startT + 0.9);
+    });
+    panner.connect(masterGain);
+    if(delayNode) panner.connect(delayNode);
+
+  } else if(type === 'torus') {
+    // Low resonant drone with subtle harmonic shimmer — continuity, cycles
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const osc3 = audioCtx.createOscillator();
+    const gain1 = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    osc1.type = 'sine'; osc2.type = 'sine'; osc3.type = 'sine';
+    osc1.frequency.setValueAtTime(freq * 0.5,   now); // low root
+    osc2.frequency.setValueAtTime(freq * 0.748, now); // low fifth (warm)
+    osc3.frequency.setValueAtTime(freq * 0.501, now); // tiny beat frequency
+    filter.type = 'lowpass'; filter.frequency.value = freq * 2.5; filter.Q.value = 2;
+    gain1.gain.setValueAtTime(0, now);
+    gain1.gain.linearRampToValueAtTime(vol * 0.55, now + 0.18);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + duration * 2.5);
+    osc1.connect(filter); osc2.connect(filter); osc3.connect(filter);
+    filter.connect(gain1); gain1.connect(panner);
+    panner.connect(masterGain);
+    if(delayNode) panner.connect(delayNode);
+    osc1.start(now); osc1.stop(now + duration * 2.5 + 0.1);
+    osc2.start(now); osc2.stop(now + duration * 2.5 + 0.1);
+    osc3.start(now); osc3.stop(now + duration * 2.5 + 0.1);
+
+  } else if(type === 'aura') {
+    // Soft pentatonic shimmer — all five notes float upward gently
+    // Ethereal: slow stagger, long sustain, crystal-pure sines
+    const pentatonicRatios = [1.0, 1.2599, 1.4983, 1.6818, 2.0];
+    pentatonicRatios.forEach((ratio, i) => {
+      const osc = audioCtx.createOscillator();
+      const g   = audioCtx.createGain();
+      const startT = now + i * 0.09;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq * ratio, startT);
+      g.gain.setValueAtTime(0, startT);
+      g.gain.linearRampToValueAtTime(vol * 0.35, startT + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.001, startT + 1.8);
+      osc.connect(g); g.connect(panner);
+      osc.start(startT); osc.stop(startT + 2.0);
+    });
+    panner.connect(masterGain);
+    if(delayNode) panner.connect(delayNode);
+
+  } else if(type === 'nova') {
+    // Bright crystalline burst — a sudden full-spectrum chord, then sparkle tail
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const osc3 = audioCtx.createOscillator();
+    const gain1 = audioCtx.createGain();
+    osc1.type = 'sine'; osc2.type = 'sine'; osc3.type = 'sine';
+    osc1.frequency.setValueAtTime(freq * 2,     now);
+    osc2.frequency.setValueAtTime(freq * 2.998, now); // 2× fifth
+    osc3.frequency.setValueAtTime(freq * 4,     now); // 2× octave
+    // Rapid bright attack, short sparkle decay
+    gain1.gain.setValueAtTime(0, now);
+    gain1.gain.linearRampToValueAtTime(vol * 0.55, now + 0.008);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+    osc1.connect(gain1); osc2.connect(gain1); osc3.connect(gain1);
+    gain1.connect(panner);
+    panner.connect(masterGain);
+    if(delayNode) panner.connect(delayNode);
+    osc1.start(now); osc1.stop(now + 0.65);
+    osc2.start(now); osc2.stop(now + 0.65);
+    osc3.start(now); osc3.stop(now + 0.65);
+
   } else {
     // Default sacred geometry - with random harmonic variation
     const osc1 = audioCtx.createOscillator();
@@ -1257,8 +1346,11 @@ function collideRagdollSphere(ragdoll, sphere, dt){
     else if(sphere.type === 'trail') activeEffects.trail = 7;
     else if(sphere.type === 'pulse') activeEffects.pulse = 3;
     else if(sphere.type === 'magnet') activeEffects.magnet = 5;
+    else if(sphere.type === 'aura') activeEffects.aura = 5;
+    else if(sphere.type === 'nova') activeEffects.nova = 3;
 
-    const basePoints = sphere.type === 'challenge' ? 50 : (sphere.type === 'heart' ? 25 : (sphere.type === 'setback' ? 0 : (['wave','trail','pulse','magnet'].includes(sphere.type) ? 30 : 15)));
+    const _powerUpTypes = ['wave','trail','pulse','magnet','aura','nova'];
+    const basePoints = sphere.type === 'challenge' ? 50 : (sphere.type === 'heart' ? 25 : (sphere.type === 'setback' ? 0 : (_powerUpTypes.includes(sphere.type) ? 30 : 15)));
     const multiplier = Math.min(comboCount, 10);
     const pts = basePoints * multiplier;
     score += pts;
@@ -1680,14 +1772,18 @@ function spawnSphereAtDepth(yWorld, forceType=null){
   } else {
     // Reduced frequency of special obstacles (approx 1.5% each)
     const r = Math.random();
-    if (r < 0.012) type = 'setback';
+    if      (r < 0.012) type = 'setback';
     else if (r < 0.027) type = 'heart';
     else if (r < 0.042) type = 'yinyang';
     else if (r < 0.057) type = 'chakra';
-    else if (r < 0.077) type = 'wave';
-    else if (r < 0.085) type = 'trail';
-    else if (r < 0.105) type = 'pulse';
-    else if (r < 0.125) type = 'magnet';
+    else if (r < 0.072) type = 'merkaba';
+    else if (r < 0.087) type = 'torus';
+    else if (r < 0.107) type = 'wave';
+    else if (r < 0.115) type = 'trail';
+    else if (r < 0.130) type = 'pulse';
+    else if (r < 0.145) type = 'magnet';
+    else if (r < 0.158) type = 'aura';
+    else if (r < 0.170) type = 'nova';
   }
 
   spheres.push(new Sphere(
@@ -1798,7 +1894,7 @@ document.getElementById('reset-btn').onclick = () => {
   score = 0; displayScore = 0; comboCount = 0; lastHitTime = 0;
   scorePopups = []; scoreFlies = [];
   harmonyIndex = 0; harmonicCooldown = 0;
-  activeEffects = { wave: 0, trail: 0, pulse: 0, magnet: 0 };
+  activeEffects = { wave: 0, trail: 0, pulse: 0, magnet: 0, aura: 0, nova: 0 };
   waveRings = [];
   journeyLog = []; updateJourneyPanel();
   firedChapters = new Set();
@@ -2409,77 +2505,87 @@ function drawSphere(s){
     ctx.beginPath(); ctx.arc(0,0,2.5,0,TAU); ctx.fill();
 
   } else if (s.type === 'setback') {
-    // Penrose Triangle — impossible geometry (setback: defies progress)
-    const hue = (45 + time*12 + s.hue) % 360; // amber/gold — warning color
-    ctx.rotate(s.rotation * 0.3 + time * 0.15);
-    const sr = s.r;
-    // Outer glow
-    const grad = ctx.createRadialGradient(0,0,0, 0,0,sr*1.8);
-    grad.addColorStop(0, `hsla(${hue},90%,60%,0.2)`);
-    grad.addColorStop(1, `hsla(${hue},90%,60%,0)`);
+    // Hexagram Mandala — two counter-rotating equilateral triangles forming the
+    // Star of David / Seal of Solomon. Sacred, deliberate, inescapable.
+    const hue  = (40 + time * 3 + s.hue * 0.15) % 360;  // slow amber drift
+    const hue2 = (hue + 28) % 360;                        // warm split-complement
+    const sr   = s.r;
+    const pulse = 0.92 + 0.08 * Math.sin(time * 1.8 + s.hue);
+    // Outer breathing glow
+    const grad = ctx.createRadialGradient(0,0,0, 0,0,sr*2.0);
+    grad.addColorStop(0,   `hsla(${hue},90%,65%,0.22)`);
+    grad.addColorStop(0.5, `hsla(${hue2},80%,55%,0.08)`);
+    grad.addColorStop(1,   `hsla(${hue},85%,55%,0)`);
     ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(0,0,sr*1.8,0,TAU); ctx.fill();
-    // Penrose triangle (3D impossible triangle)
-    ctx.strokeStyle = `hsla(${hue},90%,70%,1.0)`;
-    ctx.fillStyle = `hsla(${hue},80%,55%,0.25)`;
-    ctx.lineWidth = 2;
-    ctx.lineJoin = 'round';
-    const outerR = sr * 0.85;
-    const innerR = sr * 0.42;
-    const thickness = sr * 0.18;
-    // Three outer vertices (equilateral triangle)
-    const v1 = [0, -outerR];
-    const v2 = [outerR * Math.sin(TAU/3), -outerR * Math.cos(TAU/3)];
-    const v3 = [-outerR * Math.sin(TAU/3), -outerR * Math.cos(TAU/3)];
-    // Three inner vertices (smaller, rotated 180°)
-    const iv1 = [0, innerR];
-    const iv2 = [-innerR * Math.sin(TAU/3), innerR * Math.cos(TAU/3)];
-    const iv3 = [innerR * Math.sin(TAU/3), innerR * Math.cos(TAU/3)];
-    // Draw the impossible triangle as three beams
-    // Beam 1: v1 → v2 (outer-left edge)
-    const b1a = 0.0; // direction along beam
-    const b1nx = (v2[0]-v1[0]), b1ny = (v2[1]-v1[1]);
-    const b1len = Math.sqrt(b1nx*b1nx+b1ny*b1ny);
-    const b1ux = b1nx/b1len, b1uy = b1ny/b1len;
-    const b1px = -b1uy, b1py = b1ux; // perpendicular
-    // Beam 2: v2 → v3
-    const b2nx = (v3[0]-v2[0]), b2ny = (v3[1]-v2[1]);
-    const b2len = Math.sqrt(b2nx*b2nx+b2ny*b2ny);
-    const b2ux = b2nx/b2len, b2uy = b2ny/b2len;
-    const b2px = -b2uy, b2py = b2ux;
-    // Beam 3: v3 → v1
-    const b3nx = (v1[0]-v3[0]), b3ny = (v1[1]-v3[1]);
-    const b3len = Math.sqrt(b3nx*b3nx+b3ny*b3ny);
-    const b3ux = b3nx/b3len, b3uy = b3ny/b3len;
-    const b3px = -b3uy, b3py = b3ux;
-    // Draw each beam as a parallelogram (outer edge on one side, inner on other)
+    ctx.beginPath(); ctx.arc(0,0,sr*2.0,0,TAU); ctx.fill();
+
+    // Outer inscribed circle
+    ctx.strokeStyle = `hsla(${hue},75%,65%,0.25)`;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.arc(0,0,sr*pulse,0,TAU); ctx.stroke();
+
+    // Counter-rotating angles for each triangle
+    const a1 =  time * 0.08;           // outer triangle CW
+    const a2 = -time * 0.05 + PI/3;    // inner triangle CCW (inverted)
+
+    // Helper: equilateral triangle at radius tr, base angle angle
+    const drawTri = (tr, angle, fillA, strokeA) => {
+      ctx.beginPath();
+      for(let i = 0; i < 3; i++){
+        const a = i * TAU/3 + angle;
+        if(i === 0) ctx.moveTo(Math.cos(a)*tr, Math.sin(a)*tr);
+        else        ctx.lineTo(Math.cos(a)*tr, Math.sin(a)*tr);
+      }
+      ctx.closePath();
+      ctx.fillStyle   = `hsla(${hue},80%,60%,${fillA})`;
+      ctx.strokeStyle = `hsla(${hue},88%,72%,${strokeA})`;
+      ctx.lineWidth   = 1.5;
+      ctx.fill(); ctx.stroke();
+    };
+
+    drawTri(sr * 0.86 * pulse, a1, 0.10, 0.85);
+    drawTri(sr * 0.86 * pulse, a2, 0.08, 0.65);
+
+    // Inner radial spokes from center to hexagram vertices
+    ctx.strokeStyle = `hsla(${hue2},80%,75%,0.22)`;
+    ctx.lineWidth   = 0.7;
+    for(let i = 0; i < 6; i++){
+      const a = i * TAU/6 + a1 * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.lineTo(Math.cos(a)*sr*0.86*pulse, Math.sin(a)*sr*0.86*pulse);
+      ctx.stroke();
+    }
+
+    // Inner hexagon at triangle intersection radius
+    const hr = sr * 0.50 * pulse;
+    ctx.strokeStyle = `hsla(${hue},85%,80%,0.35)`;
+    ctx.lineWidth   = 1.0;
     ctx.beginPath();
-    // Beam 1 (v1→v2): outer-left side
-    ctx.moveTo(v1[0]+b1px*thickness, v1[1]+b1py*thickness);
-    ctx.lineTo(v2[0]+b1px*thickness, v2[1]+b1py*thickness);
-    ctx.lineTo(iv2[0]+b1px*thickness*0.3, iv2[1]+b1py*thickness*0.3);
-    ctx.lineTo(iv1[0]+b1px*thickness*0.3, iv1[1]+b1py*thickness*0.3);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    // Beam 2 (v2→v3): outer-right side
-    ctx.beginPath();
-    ctx.moveTo(v2[0]+b2px*thickness, v2[1]+b2py*thickness);
-    ctx.lineTo(v3[0]+b2px*thickness, v3[1]+b2py*thickness);
-    ctx.lineTo(iv3[0]+b2px*thickness*0.3, iv3[1]+b2py*thickness*0.3);
-    ctx.lineTo(iv2[0]+b2px*thickness*0.3, iv2[1]+b2py*thickness*0.3);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    // Beam 3 (v3→v1): crosses over — this creates the impossibility
-    ctx.beginPath();
-    ctx.moveTo(v3[0]-b3px*thickness, v3[1]-b3py*thickness);
-    ctx.lineTo(v1[0]-b3px*thickness, v1[1]-b3py*thickness);
-    ctx.lineTo(iv1[0]-b3px*thickness*0.3, iv1[1]-b3py*thickness*0.3);
-    ctx.lineTo(iv3[0]-b3px*thickness*0.3, iv3[1]-b3py*thickness*0.3);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    // Inner glow at center
-    const cg = ctx.createRadialGradient(0,0,0, 0,0,sr*0.3);
-    cg.addColorStop(0, `hsla(${hue},90%,80%,0.15)`);
-    cg.addColorStop(1, `hsla(${hue},90%,60%,0)`);
+    for(let i = 0; i < 6; i++){
+      const a = i * TAU/6 + a1 * 0.3;
+      if(i === 0) ctx.moveTo(Math.cos(a)*hr, Math.sin(a)*hr);
+      else        ctx.lineTo(Math.cos(a)*hr, Math.sin(a)*hr);
+    }
+    ctx.closePath(); ctx.stroke();
+
+    // 6 pulsing vertex dots at hexagon corners
+    const dotR = 2.2 + 0.8 * Math.sin(time * 2.5);
+    for(let i = 0; i < 6; i++){
+      const a = i * TAU/6 + a1 * 0.3;
+      const dotAlpha = 0.5 + 0.4 * Math.sin(time * 2.0 + i * PI/3);
+      ctx.fillStyle = `hsla(${hue},90%,85%,${dotAlpha})`;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a)*hr, Math.sin(a)*hr, dotR, 0, TAU);
+      ctx.fill();
+    }
+
+    // Central radiant point
+    const cg = ctx.createRadialGradient(0,0,0, 0,0,sr*0.18);
+    cg.addColorStop(0, `hsla(${hue},95%,92%,0.75)`);
+    cg.addColorStop(1, `hsla(${hue},85%,65%,0)`);
     ctx.fillStyle = cg;
-    ctx.beginPath(); ctx.arc(0,0,sr*0.3,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(0,0,sr*0.18,0,TAU); ctx.fill();
   } else if (s.type === 'vesica') {
     const hue = (280 + time*10 + s.hue) % 360;
     ctx.rotate(s.rotation + time*0.2);
@@ -2510,6 +2616,145 @@ function drawSphere(s){
     // Core dot
     ctx.fillStyle = `hsla(${hue},90%,80%,0.6)`;
     ctx.beginPath(); ctx.arc(0,0,2.5,0,TAU); ctx.fill();
+
+  } else if(s.type === 'merkaba'){
+    // Merkaba — two interlocked tetrahedra projected in 2D. The vehicle of light.
+    // Upper tetrahedron CW, lower tetrahedron CCW, creating a living 3D star.
+    const hue  = (55 + time * 4 + s.hue * 0.12) % 360;  // gold-electric
+    const hue2 = (hue + 180) % 360;                       // deep complement
+    const sr   = s.r;
+    const pulse = 0.88 + 0.12 * Math.sin(time * 2.2 + s.hue);
+    const spin1 =  time * 0.14;   // upper tetra spins CW
+    const spin2 = -time * 0.10;   // lower tetra CCW
+
+    // Outer electric glow
+    const mgGrad = ctx.createRadialGradient(0,0,0, 0,0,sr*1.9);
+    mgGrad.addColorStop(0,   `hsla(${hue},95%,70%,0.28)`);
+    mgGrad.addColorStop(0.6, `hsla(${hue2},80%,55%,0.06)`);
+    mgGrad.addColorStop(1,   `hsla(${hue},85%,55%,0)`);
+    ctx.fillStyle = mgGrad;
+    ctx.beginPath(); ctx.arc(0,0,sr*1.9,0,TAU); ctx.fill();
+
+    // Outer ring
+    ctx.strokeStyle = `hsla(${hue},80%,70%,0.30)`;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.arc(0,0,sr*pulse,0,TAU); ctx.stroke();
+
+    // The two tetrahedra are drawn as equilateral triangles — upper pointing up,
+    // lower pointing down — each with a 3-point star of connecting lines from
+    // their vertices to the opposite triangle's centre, creating depth cues.
+    const drawMerkabaTri = (tr, baseAngle, fillA, strokeA, hueOff) => {
+      const verts = [];
+      for(let i = 0; i < 3; i++){
+        const a = i * TAU/3 + baseAngle;
+        verts.push([Math.cos(a)*tr, Math.sin(a)*tr]);
+      }
+      ctx.beginPath();
+      ctx.moveTo(verts[0][0], verts[0][1]);
+      ctx.lineTo(verts[1][0], verts[1][1]);
+      ctx.lineTo(verts[2][0], verts[2][1]);
+      ctx.closePath();
+      ctx.fillStyle   = `hsla(${(hue+hueOff)%360},85%,65%,${fillA})`;
+      ctx.strokeStyle = `hsla(${(hue+hueOff)%360},90%,78%,${strokeA})`;
+      ctx.lineWidth = 1.6;
+      ctx.fill(); ctx.stroke();
+      return verts;
+    };
+
+    const v1 = drawMerkabaTri(sr*0.82*pulse, -PI/2 + spin1,  0.12, 0.90, 0);
+    const v2 = drawMerkabaTri(sr*0.82*pulse,  PI/2 + spin2,  0.09, 0.70, 160);
+
+    // Depth lines: each vertex of T1 → centre (short spokes for 3D depth illusion)
+    ctx.strokeStyle = `hsla(${hue},80%,80%,0.20)`;
+    ctx.lineWidth = 0.6;
+    for(const v of v1){
+      ctx.beginPath(); ctx.moveTo(v[0]*0.6, v[1]*0.6); ctx.lineTo(0,0); ctx.stroke();
+    }
+    // Inner detail circle
+    const ir = sr * 0.38 * pulse;
+    ctx.strokeStyle = `hsla(${hue2},75%,70%,0.40)`;
+    ctx.lineWidth = 0.9;
+    ctx.beginPath(); ctx.arc(0,0,ir,0,TAU); ctx.stroke();
+
+    // 6 glowing tips at tetrahedra apices (3 per layer, alternating hue)
+    const tipR = 2.0 + 0.6 * Math.sin(time * 3.0);
+    [...v1, ...v2].forEach((v, i) => {
+      const ta = 0.45 + 0.35 * Math.sin(time * 2.5 + i * PI/3);
+      ctx.fillStyle = `hsla(${i<3 ? hue : hue2},90%,85%,${ta})`;
+      ctx.beginPath(); ctx.arc(v[0], v[1], tipR, 0, TAU); ctx.fill();
+    });
+
+    // Bright centre point
+    const mcg = ctx.createRadialGradient(0,0,0, 0,0,sr*0.15);
+    mcg.addColorStop(0, `hsla(${hue},98%,96%,0.90)`);
+    mcg.addColorStop(1, `hsla(${hue},88%,70%,0)`);
+    ctx.fillStyle = mcg;
+    ctx.beginPath(); ctx.arc(0,0,sr*0.15,0,TAU); ctx.fill();
+
+  } else if(s.type === 'torus'){
+    // Torus — concentric rotated ellipses suggesting a spinning donut ring.
+    // Deeply meditative, endlessly looping, a symbol of continuity.
+    const hue  = (260 + time * 2.5 + s.hue * 0.1) % 360;  // indigo-violet
+    const hue2 = (hue + 40) % 360;
+    const sr   = s.r;
+    const spin =  time * 0.06 + s.rotation;
+    const pulse = 0.90 + 0.10 * Math.sin(time * 1.4 + s.hue);
+
+    // Outer glow
+    const tGrad = ctx.createRadialGradient(0,0,0, 0,0,sr*1.8);
+    tGrad.addColorStop(0,   `hsla(${hue},85%,65%,0.24)`);
+    tGrad.addColorStop(0.5, `hsla(${hue2},75%,50%,0.08)`);
+    tGrad.addColorStop(1,   `hsla(${hue},80%,50%,0)`);
+    ctx.fillStyle = tGrad;
+    ctx.beginPath(); ctx.arc(0,0,sr*1.8,0,TAU); ctx.fill();
+
+    // 7 concentric ellipses — each rotated evenly — create the torus illusion.
+    // Closer-to-edge ones are more opaque, inner ones more transparent.
+    const rings = 7;
+    for(let i = 0; i < rings; i++){
+      const t  = i / (rings - 1);          // 0 = innermost, 1 = outermost
+      const rA = sr * (0.35 + t * 0.65) * pulse; // semi-major axis (horizontal)
+      const rB = rA * (0.3 + 0.25 * Math.abs(Math.sin(t * PI))); // semi-minor
+      const ang = spin + i * (PI / rings);  // even angle distribution
+      const alpha = 0.12 + 0.45 * Math.sin(t * PI); // edge rings brightest
+      const hueRing = (hue + i * 8) % 360;
+
+      ctx.save();
+      ctx.rotate(ang);
+      ctx.strokeStyle = `hsla(${hueRing},80%,72%,${alpha})`;
+      ctx.lineWidth   = 0.8 + t * 0.6;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, rA, rB, 0, 0, TAU);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Inner dot that orbits the ring (simulates a point on the torus surface)
+    const orbitR = sr * 0.55 * pulse;
+    const orbitA = time * 1.1 + s.rotation;
+    const orbitX = Math.cos(orbitA) * orbitR;
+    const orbitY = Math.sin(orbitA) * orbitR * 0.35;
+    const orbitAlpha = 0.5 + 0.4 * Math.cos(orbitA); // brighter when "facing" us
+    ctx.fillStyle = `hsla(${hue2},90%,85%,${orbitAlpha})`;
+    ctx.beginPath(); ctx.arc(orbitX, orbitY, 2.5, 0, TAU); ctx.fill();
+
+    // Subtle spoke lines at cardinal points
+    ctx.strokeStyle = `hsla(${hue},70%,65%,0.18)`;
+    ctx.lineWidth = 0.5;
+    for(let i = 0; i < 4; i++){
+      const a = i * TAU/4 + spin * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*sr*0.2, Math.sin(a)*sr*0.2);
+      ctx.lineTo(Math.cos(a)*sr*0.85*pulse, Math.sin(a)*sr*0.85*pulse);
+      ctx.stroke();
+    }
+
+    // Bright center
+    const tcg = ctx.createRadialGradient(0,0,0, 0,0,sr*0.16);
+    tcg.addColorStop(0, `hsla(${hue2},90%,90%,0.70)`);
+    tcg.addColorStop(1, `hsla(${hue},80%,60%,0)`);
+    ctx.fillStyle = tcg;
+    ctx.beginPath(); ctx.arc(0,0,sr*0.16,0,TAU); ctx.fill();
 
   } else if(s.type === 'wave'){
     // Cyan triangle
@@ -2605,6 +2850,119 @@ function drawSphere(s){
       ctx.quadraticCurveTo(0, -r*1.1 + offset, r*0.7, -r*0.3 + offset);
       ctx.stroke();
     }
+
+  } else if(s.type === 'aura'){
+    // Aura — iridescent crown of light. Collect to surround Emy in a glowing halo.
+    const hue  = (time * 40 + s.hue) % 360;  // slowly cycling rainbow
+    const hue2 = (hue + 120) % 360;
+    const hue3 = (hue + 240) % 360;
+    ctx.rotate(s.rotation + time * 0.1);
+    // Outer soft glow
+    if(!s._glow || s._glowR !== r*1.8 || s._glowThemeV !== _themeVersion){
+      const g = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+      g.addColorStop(0,   `hsla(${hue},85%,70%,0.35)`);
+      g.addColorStop(0.5, `hsla(${hue2},75%,60%,0.12)`);
+      g.addColorStop(1,   `hsla(${hue3},70%,55%,0)`);
+      s._glow = g; s._glowR = r*1.8; s._glowThemeV = _themeVersion;
+    }
+    ctx.fillStyle = s._glow;
+    ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
+
+    // Three concentric rings of different sizes, each with a slightly different
+    // hue, forming an iridescent crown shape
+    const rings = [
+      { rf: 0.90, hw: 1.6, hue: hue,  alpha: 0.85, phase: 0 },
+      { rf: 0.68, hw: 1.2, hue: hue2, alpha: 0.65, phase: PI/3 },
+      { rf: 0.48, hw: 0.8, hue: hue3, alpha: 0.50, phase: PI/6 },
+    ];
+    rings.forEach(rg => {
+      const rr   = r * rg.rf * (0.92 + 0.08 * Math.sin(time * 2.2 + rg.phase + s.hue));
+      // Thick soft outer ring
+      ctx.strokeStyle = `hsla(${rg.hue},85%,68%,${rg.alpha * 0.25})`;
+      ctx.lineWidth   = rg.hw * 4.5;
+      ctx.beginPath(); ctx.arc(0,0,rr,0,TAU); ctx.stroke();
+      // Bright thin inner ring
+      ctx.strokeStyle = `hsla(${rg.hue},90%,82%,${rg.alpha})`;
+      ctx.lineWidth   = rg.hw;
+      ctx.beginPath(); ctx.arc(0,0,rr,0,TAU); ctx.stroke();
+    });
+
+    // 8 radial sparkle rays slowly rotating
+    ctx.lineWidth = 0.7; ctx.lineCap = 'round';
+    for(let i = 0; i < 8; i++){
+      const a = i * TAU/8 + time * 0.35;
+      const ra = 0.25 + 0.20 * Math.sin(time * 3 + i * 0.8);
+      ctx.strokeStyle = `hsla(${(hue + i*45)%360},90%,80%,${ra})`;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*r*0.42, Math.sin(a)*r*0.42);
+      ctx.lineTo(Math.cos(a)*r*0.98, Math.sin(a)*r*0.98);
+      ctx.stroke();
+    }
+
+    // Centre glow
+    const acg = ctx.createRadialGradient(0,0,0, 0,0,r*0.20);
+    acg.addColorStop(0, `hsla(${hue},95%,95%,0.85)`);
+    acg.addColorStop(1, `hsla(${hue},85%,70%,0)`);
+    ctx.fillStyle = acg;
+    ctx.beginPath(); ctx.arc(0,0,r*0.20,0,TAU); ctx.fill();
+
+  } else if(s.type === 'nova'){
+    // Nova — a starburst of pure light. Collect to radiate rays of brilliance.
+    const hue  = (200 + time * 5 + s.hue * 0.12) % 360;  // cyan-to-white
+    const hue2 = (hue + 60) % 360;
+    ctx.rotate(s.rotation + time * 0.12);
+    // Outer radial glow
+    if(!s._glow || s._glowR !== r*1.8 || s._glowThemeV !== _themeVersion){
+      const g = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+      g.addColorStop(0,   `hsla(${hue},80%,75%,0.40)`);
+      g.addColorStop(0.4, `hsla(${hue2},70%,60%,0.12)`);
+      g.addColorStop(1,   `hsla(${hue},65%,55%,0)`);
+      s._glow = g; s._glowR = r*1.8; s._glowThemeV = _themeVersion;
+    }
+    ctx.fillStyle = s._glow;
+    ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
+
+    // 8 long primary rays + 8 short secondary rays
+    const rayCount = 8;
+    ctx.lineCap = 'round';
+    for(let i = 0; i < rayCount; i++){
+      const a = i * TAU/rayCount;
+      const pulse = 0.80 + 0.20 * Math.sin(time * 2.8 + i * 0.7);
+      const ra = 0.70 + 0.25 * Math.sin(time * 2.0 + i);
+      // Soft thick outer ray
+      ctx.strokeStyle = `hsla(${(hue+i*20)%360},85%,72%,${ra * 0.20})`;
+      ctx.lineWidth   = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*r*0.22, Math.sin(a)*r*0.22);
+      ctx.lineTo(Math.cos(a)*r*pulse, Math.sin(a)*r*pulse);
+      ctx.stroke();
+      // Bright thin inner ray
+      ctx.strokeStyle = `hsla(${(hue+i*20)%360},90%,88%,${ra * 0.85})`;
+      ctx.lineWidth   = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*r*0.18, Math.sin(a)*r*0.18);
+      ctx.lineTo(Math.cos(a)*r*pulse, Math.sin(a)*r*pulse);
+      ctx.stroke();
+    }
+    // Short secondary rays between primaries
+    ctx.lineWidth = 0.5; ctx.lineCap = 'round';
+    for(let i = 0; i < rayCount; i++){
+      const a = (i + 0.5) * TAU/rayCount;
+      const ra2 = 0.4 + 0.2 * Math.sin(time * 3.5 + i);
+      ctx.strokeStyle = `hsla(${(hue2+i*30)%360},80%,80%,${ra2 * 0.55})`;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*r*0.22, Math.sin(a)*r*0.22);
+      ctx.lineTo(Math.cos(a)*r*0.60, Math.sin(a)*r*0.60);
+      ctx.stroke();
+    }
+    // Core star burst
+    const ncg = ctx.createRadialGradient(0,0,0, 0,0,r*0.22);
+    ncg.addColorStop(0, `hsla(${hue},100%,98%,0.95)`);
+    ncg.addColorStop(0.5, `hsla(${hue},90%,80%,0.45)`);
+    ncg.addColorStop(1,   `hsla(${hue},80%,65%,0)`);
+    ctx.fillStyle = ncg;
+    ctx.beginPath(); ctx.arc(0,0,r*0.22,0,TAU); ctx.fill();
+
   } else if(s.type === 'challenge'){
     const v = s.challengeVariant || 0;
     const hue = (s.hue + time*30) % 360;
@@ -3514,6 +3872,85 @@ function frame(now){
       ctx.stroke();
     }
   }
+
+  // Aura effect: iridescent crown of concentric rings around the ragdoll
+  if(activeEffects.aura > 0){
+    activeEffects.aura -= rawDt;
+    const aFade = Math.min(activeEffects.aura / 0.6, 1.0);
+    const aHue  = (time * 45) % 360;
+    // Draw over the ragdoll — three breathing rings at the head
+    const aRadii = [22, 36, 52];
+    aRadii.forEach((baseR, idx) => {
+      const ar = baseR + 7 * Math.sin(time * 2.2 + idx * TAU/3);
+      const ah = (aHue + idx * 120) % 360;
+      // Soft outer ring
+      ctx.strokeStyle = `hsla(${ah},85%,68%,${aFade * 0.18})`;
+      ctx.lineWidth   = 5;
+      ctx.beginPath(); ctx.arc(headX, headY, ar, 0, TAU); ctx.stroke();
+      // Bright inner ring
+      ctx.strokeStyle = `hsla(${ah},90%,82%,${aFade * 0.70})`;
+      ctx.lineWidth   = 1.1;
+      ctx.beginPath(); ctx.arc(headX, headY, ar, 0, TAU); ctx.stroke();
+    });
+    // 8 tiny sparkle sparks orbiting the head
+    ctx.lineCap = 'round';
+    for(let i = 0; i < 8; i++){
+      const sa = i * TAU/8 + time * 1.2;
+      const sr2 = 28 + 10 * Math.sin(time * 1.8 + i);
+      const sh = (aHue + i * 45) % 360;
+      const sAlpha = aFade * (0.4 + 0.3 * Math.sin(time * 3 + i));
+      ctx.fillStyle = `hsla(${sh},90%,85%,${sAlpha})`;
+      ctx.beginPath();
+      ctx.arc(headX + Math.cos(sa)*sr2, headY + Math.sin(sa)*sr2, 1.5, 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  // Nova effect: starburst rays radiating from ragdoll head
+  if(activeEffects.nova > 0){
+    activeEffects.nova -= rawDt;
+    const nFade  = Math.min(activeEffects.nova / 0.5, 1.0);
+    const nHue   = (200 + time * 8) % 360;
+    const rayLen = 55 + 20 * Math.sin(time * 2.5);
+    ctx.lineCap = 'round';
+    for(let i = 0; i < 8; i++){
+      const a = i * TAU/8 + time * 0.4;
+      const nh = (nHue + i * 22) % 360;
+      const nAlpha = nFade * (0.5 + 0.35 * Math.sin(time * 3.2 + i * 0.9));
+      // Soft thick outer ray
+      ctx.strokeStyle = `hsla(${nh},85%,72%,${nAlpha * 0.20})`;
+      ctx.lineWidth   = 4.5;
+      ctx.beginPath();
+      ctx.moveTo(headX + Math.cos(a)*10, headY + Math.sin(a)*10);
+      ctx.lineTo(headX + Math.cos(a)*rayLen, headY + Math.sin(a)*rayLen);
+      ctx.stroke();
+      // Bright thin inner ray
+      ctx.strokeStyle = `hsla(${nh},92%,88%,${nAlpha * 0.85})`;
+      ctx.lineWidth   = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(headX + Math.cos(a)*8, headY + Math.sin(a)*8);
+      ctx.lineTo(headX + Math.cos(a)*rayLen, headY + Math.sin(a)*rayLen);
+      ctx.stroke();
+    }
+    // Short secondary rays between primaries
+    for(let i = 0; i < 8; i++){
+      const a = (i + 0.5) * TAU/8 + time * 0.4;
+      const nAlpha2 = nFade * (0.3 + 0.2 * Math.sin(time * 2.8 + i));
+      ctx.strokeStyle = `hsla(${(nHue+90)%360},80%,80%,${nAlpha2})`;
+      ctx.lineWidth   = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(headX + Math.cos(a)*10, headY + Math.sin(a)*10);
+      ctx.lineTo(headX + Math.cos(a)*(rayLen*0.55), headY + Math.sin(a)*(rayLen*0.55));
+      ctx.stroke();
+    }
+    // Bright core glow
+    const ncg = ctx.createRadialGradient(headX, headY, 0, headX, headY, 18*nFade);
+    ncg.addColorStop(0, `hsla(${nHue},100%,96%,${nFade * 0.65})`);
+    ncg.addColorStop(1, `hsla(${nHue},90%,75%,0)`);
+    ctx.fillStyle = ncg;
+    ctx.beginPath(); ctx.arc(headX, headY, 18*nFade, 0, TAU); ctx.fill();
+  }
+
   drawScoreElements(); // popups in world space
   drawParticles(); // collision effects in world space
 
