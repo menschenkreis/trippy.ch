@@ -82,7 +82,8 @@ function saveProgress(){
     const data = {
       cameraY, score, fallSpeed, time,
       nextChallengeY, nextShapeY, themeIdx,
-      journeyLog, // Save the milestones history
+      journeyLog,
+      isMuted,
       depthMeters: Math.max(0, cameraY / 100),
       savedAt: Date.now(),
     };
@@ -184,6 +185,14 @@ function restoreFromSave(data){
   journeyLog = data.journeyLog || [];
   updateJourneyPanel();
 
+  // Restore audio toggle state (default to muted for old saves without the field)
+  isMuted = data.isMuted ?? true;
+  muteBtn.textContent = isMuted ? '🔇' : '🔊';
+  muteBtn.classList.toggle('is-on', !isMuted);
+  muteBtn.style.animation = 'none';
+  if(soundHintEl) soundHintEl.style.display = 'none';
+  if(!isMuted) initAudio(); // resume is triggered by a user gesture so autoplay is allowed
+
   // Reset transient state
   comboCount = 0; lastHitTime = 0;
   scorePopups = []; scoreFlies = [];
@@ -230,6 +239,10 @@ let W, H, dpr;
 // offscreen render caches know to redraw.
 let _viewportVersion = 0;
 let _themeVersion = 0;
+// Scale factor applied to all sphere radii. Coarse-pointer (touch) devices
+// keep scale = 1.0; fine-pointer (mouse/desktop) devices scale up with width
+// so shapes feel appropriately sized on large screens.
+let sphereSizeScale = 1.0;
 function resize(){
   dpr = Math.min(devicePixelRatio, 2);
   W = window.innerWidth; H = window.innerHeight;
@@ -237,6 +250,8 @@ function resize(){
   canvas.style.width = W+'px'; canvas.style.height = H+'px';
   ctx.setTransform(dpr,0,0,dpr,0,0);
   _viewportVersion++;
+  const isTouch = window.matchMedia('(pointer: coarse)').matches;
+  sphereSizeScale = isTouch ? 1.0 : clamp(W / 700, 1.3, 1.65);
 }
 window.addEventListener('resize', resize); resize();
 
@@ -329,6 +344,11 @@ const GRAVITY = 360;
 const DAMPING = 0.998;
 const ITERATIONS = 8;
 const SUBSTEPS = 2;
+// Maximum downward velocity (px/substep). Natural terminal under gravity+damping
+// is ~11.5 px/substep; this cap prevents post-collision spikes from sending the
+// ragdoll faster than the camera can track. Upward velocity is left uncapped so
+// setback bounces remain dramatic.
+const TERMINAL_VY = 22;
 
 let tiltEnabled = false;
 let gravityX = 0, gravityY = GRAVITY;
@@ -494,10 +514,11 @@ class Particle {
     if(this.pinned) return;
     let vx = (this.x - this.ox) * DAMPING;
     let vy = (this.y - this.oy) * DAMPING;
-    // Clamp velocity to prevent NaN/Infinity cascade from aggressive drag
-    const maxV = 800;
-    vx = clamp(vx || 0, -maxV, maxV);
-    vy = clamp(vy || 0, -maxV, maxV);
+    // Horizontal: safety cap only (prevents NaN cascade from aggressive drag)
+    vx = clamp(vx || 0, -800, 800);
+    // Vertical: safety cap upward, terminal-velocity cap downward so the camera
+    // can always track the ragdoll even after collision impulse spikes.
+    vy = clamp(vy || 0, -800, TERMINAL_VY);
     this.ox = this.x; this.oy = this.y;
     this.x += vx + gravityX * dt * dt;
     this.y += vy + gravityY * dt * dt;
@@ -530,17 +551,18 @@ class Sphere {
   constructor(x, y, r, type='sphere'){
     this.type = type;
     this.x = x; this.y = y;
+    const ss = sphereSizeScale;
     if(type === 'challenge'){
-      this.r = 35 + Math.random()*25;
+      this.r = (35 + Math.random()*25) * ss;
       this.challengeVariant = Math.floor(Math.random() * 5); // 5 distinct threat shapes
     } else if(type === 'heart'){
-      this.r = 25 + Math.random()*15;
+      this.r = (25 + Math.random()*15) * ss;
     } else if(type === 'setback'){
-      this.r = 30 + Math.random()*18;
+      this.r = (30 + Math.random()*18) * ss;
     } else if(type === 'chakra'){
-      this.r = 28 + Math.random()*20;
+      this.r = (28 + Math.random()*20) * ss;
     } else {
-      this.r = r || (15 + Math.random()*35);
+      this.r = (r || (15 + Math.random()*35)) * ss;
     }
     this.vx = 0;
     this.vy = 0;
@@ -1661,12 +1683,11 @@ function spawnSphereAtDepth(yWorld, forceType=null){
     if (r < 0.012) type = 'setback';
     else if (r < 0.027) type = 'heart';
     else if (r < 0.042) type = 'yinyang';
-    else if (r < 0.057) type = 'vesica';
-    else if (r < 0.072) type = 'chakra';
-    else if (r < 0.092) type = 'wave';
-    else if (r < 0.100) type = 'trail';
-    else if (r < 0.120) type = 'pulse';
-    else if (r < 0.140) type = 'magnet';
+    else if (r < 0.057) type = 'chakra';
+    else if (r < 0.077) type = 'wave';
+    else if (r < 0.085) type = 'trail';
+    else if (r < 0.105) type = 'pulse';
+    else if (r < 0.125) type = 'magnet';
   }
 
   spheres.push(new Sphere(
@@ -3169,7 +3190,6 @@ function updateCamera(){
   }
 
   maybeSpawnNextShape(aheadY);
-  maybeSpawnBreathRing(aheadY);
 }
 
 function recycleObjects(){
@@ -3186,7 +3206,6 @@ function recycleObjects(){
   spheres.length = w;
   // Keep spawning - density increases with depth
   maybeSpawnNextShape(cameraY + H + 100);
-  maybeSpawnBreathRing(cameraY + H + 100);
 }
 
 // ── Draw: Braids ─────────────────────────────────────────────────────────
@@ -3332,7 +3351,6 @@ function frame(now){
   updateParticles(rawDt);
   updateScoreElements(rawDt);
   updateBraids(rawDt);
-  updateBreathRings(rawDt);
   // Chord bloom timers
   if(chordBloomCooldown > 0) chordBloomCooldown -= rawDt;
   if(chordBloomFlash > 0) chordBloomFlash -= rawDt * 0.8;
@@ -3379,7 +3397,6 @@ function frame(now){
   ctx.translate(0, -cameraY); // camera transform
 
   drawBackground();
-  drawBreathRings(); // behind spheres so they don't occlude important obstacles
   // Frustum-cull spheres. Use 2× sphere radius to account for glow halo —
   // draws that spill a little past the visible band. Physics still runs on
   // culled spheres (that happens elsewhere in the frame), this only affects
@@ -3944,7 +3961,7 @@ function checkResume(){
   _resumeChecked = true;
 
   const thoughtText = document.getElementById('intro-thought-text');
-  if(thoughtText) thoughtText.textContent = "Your journey already began.";
+  if(thoughtText) thoughtText.textContent = "Your journey has already begun";
 
   const embarkBtn = document.getElementById('intro-embark');
   if(embarkBtn) {
