@@ -3740,6 +3740,20 @@ function frame(now){
   updateSoundHint();
   const dt = (rawDt * timeScale) / SUBSTEPS;
 
+  // Gentle idle sway while the intro is active. Verlet velocity = (x - ox) * DAMPING,
+  // which does NOT use dt, so this works even when timeScale ≈ 0. Each particle gets a
+  // unique phase so the whole ragdoll breathes organically — head tilts, arms drift.
+  if(introActive) {
+    for(const r of ragdolls) {
+      r.particles.forEach((p, i) => {
+        if(p.pinned) return;
+        const amp = 0.18;
+        p.ox = p.x - Math.sin(time * 0.82 + i * 1.07) * amp;
+        p.oy = p.y - Math.cos(time * 0.61 + i * 0.79) * amp * 0.45;
+      });
+    }
+  }
+
   // Physics substeps
   for(let s=0;s<SUBSTEPS;s++){
     for(const r of ragdolls) r.update(dt);
