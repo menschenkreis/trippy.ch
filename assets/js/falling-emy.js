@@ -3890,7 +3890,7 @@ function checkResume(){
   _resumeChecked = true;
 
   const thoughtText = document.getElementById('intro-thought-text');
-  if(thoughtText) thoughtText.textContent = "Your journey already began.";
+  if(thoughtText) thoughtText.textContent = "Your journey has already begun";
 
   const embarkBtn = document.getElementById('intro-embark');
   if(embarkBtn) {
