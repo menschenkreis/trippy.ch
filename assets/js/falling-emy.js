@@ -752,25 +752,26 @@ function initAudio(){
     src.start(0);
   } catch(e){}
 
-  // 3. iOS AVAudioSession fix: playing an HTML <audio> element with 'playsinline'
-  //    upgrades the session from 'ambient' (inaudible on built-in speaker) to
-  //    'playback' (audible on speaker + not muted by the silent switch).
-  //    Using a Blob URL instead of a data URI avoids iOS WAV-parser quirks.
+  // 3. iOS AVAudioSession fix: a *continuously looping* silent audio element
+  //    keeps iOS in the 'playback' AVAudioSession category (loudspeaker +
+  //    ignores mute/silent switch) for the lifetime of the session.
+  //    One-shot audio reverts the category once it ends — looping keeps it.
+  //    Technique proven by swevans/unmute (github.com/swevans/unmute).
+  //    x-webkit-airplay='deny' suppresses the lock-screen media widget.
   try {
-    // Minimal valid 46-byte silent PCM WAV (16-bit, 44100 Hz, 1 ch, 1 sample)
-    const wav = new Uint8Array([
-      82,73,70,70, 38,0,0,0, 87,65,86,69,          // RIFF....WAVE
-      102,109,116,32, 16,0,0,0, 1,0, 1,0,           // fmt ............
-      68,172,0,0, 136,88,1,0, 2,0, 16,0,            // sample-rate/byte-rate/align/bits
-      100,97,116,97, 2,0,0,0, 0,0                   // data....silence
-    ]);
-    const url = URL.createObjectURL(new Blob([wav], {type:'audio/wav'}));
-    const el  = document.createElement('audio');
+    // ~0.5 s stereo silent MP3 (VBR, LAME), loops seamlessly.
+    const silentMp3 = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0VAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV////////////////////////////////////////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQDkAAAAAAAAAGw9wrNaQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+MYxAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV/+MYxDsAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV/+MYxHYAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
+    const el = document.createElement('audio');
     el.setAttribute('playsinline', '');
     el.setAttribute('webkit-playsinline', '');
-    el.src = url;
+    el.setAttribute('x-webkit-airplay', 'deny');
+    el.disableRemotePlayback = true;
+    el.loop = true;
+    el.src = silentMp3;
     document.body.appendChild(el);
-    el.play().finally(() => { URL.revokeObjectURL(url); el.remove(); }).catch(()=>{});
+    el.play().then(() => {
+      window._iosSilentEl = el; // keep element + src alive (loop must not be GC'd)
+    }).catch(() => { el.remove(); });
   } catch(e){}
 
   masterGain = audioCtx.createGain();
