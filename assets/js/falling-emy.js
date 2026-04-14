@@ -19,7 +19,11 @@
 (function(){
 'use strict';
 const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
+// `ctx` is mutable so the sacred-geometry offscreen cache can swap in its
+// own context during refresh without propagating a ctx argument through
+// every draw helper. renderSgLayer saves the previous binding and restores
+// it immediately after.
+let ctx = canvas.getContext('2d');
 const PI = Math.PI, TAU = PI*2;
 
 // ── § 1. Tiny utilities ─────────────────────────────────────────────────
@@ -46,6 +50,19 @@ const CONFIG = {
   FRICTION: 0.05,
   MAX_CONCURRENT_OSC: 40, // cap concurrent Web Audio oscillators to prevent
                           // clipping/crackle on dense multi-ragdoll pile-ups
+  // Braided ragdolls
+  BRAID_RANGE: 45,        // hand-hand distance (px) to form a braid
+  BRAID_LIFE: 4.0,        // seconds a braid lasts before fading
+  BRAID_STIFFNESS: 0.22,  // gentler than structural constraints (=1)
+  BRAID_BREAK_MULT: 3.5,  // break if stretched past dist * this
+  // Perfect chord bloom
+  CHORD_WINDOW_S: 4.0,    // rolling window for collecting pitch classes
+  CHORD_COOLDOWN_S: 12.0, // minimum seconds between blooms
+  // Breath rings
+  BREATH_SPAWN_START_M: 40,
+  BREATH_SPACING_WORLD: 2200,
+  BREATH_BASE_R: 70,
+  BREATH_SLOWMO_S: 1.0,   // slow-mo duration after passing through at peak
 };
 
 // ── § 1. Cookie Save/Resume ─────────────────────────────────────────────
@@ -164,6 +181,12 @@ function restoreFromSave(data){
   chapterDisplay = null; chapterSlowMo = 0;
   particles = []; shockwaves = []; particleCount = 0;
   firedChapters = new Set();
+  // Reset gameplay-additions state as well
+  braids = [];
+  breathRings = []; nextBreathY = Math.max(cameraY + 1500, 4000);
+  breathSlowMo = 0;
+  for(let i = 0; i < harmonyNotes.length; i++) harmonyNotes[i] = HARMONY_UNSET;
+  chordBloomCooldown = 0; chordBloomFlash = 0;
 
   // Re-calculate which chapters have already fired
   const depthMeters = cameraY / 100;
@@ -190,12 +213,17 @@ window._fe = { loadProgress, restoreFromSave, clearSave, formatDepth, formatTime
 
 // ── Resize ───────────────────────────────────────────────────────────────
 let W, H, dpr;
+// Cache-invalidation counters: bumped when viewport size or theme changes so
+// offscreen render caches know to redraw.
+let _viewportVersion = 0;
+let _themeVersion = 0;
 function resize(){
   dpr = Math.min(devicePixelRatio, 2);
   W = window.innerWidth; H = window.innerHeight;
   canvas.width = W*dpr; canvas.height = H*dpr;
   canvas.style.width = W+'px'; canvas.style.height = H+'px';
   ctx.setTransform(dpr,0,0,dpr,0,0);
+  _viewportVersion++;
 }
 window.addEventListener('resize', resize); resize();
 
@@ -225,6 +253,7 @@ let theme = themes[0];
 function setTheme(i){
   themeIdx = i % themes.length;
   theme = themes[themeIdx];
+  _themeVersion++;
   // Shift all ragdoll colors toward new theme
   const newHue = themeIdx * (360 / themes.length);
   for(const r of ragdolls){
@@ -275,6 +304,30 @@ const pentatonicScale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21]; // C D E G A c d e 
 // ── Power-Up Effects ──
 let activeEffects = { wave: 0, trail: 0, pulse: 0, magnet: 0 };
 let waveRings = []; // {x, y, radius, life}
+
+// ── Braided Ragdolls ─────────────────────────────────────────────────────
+// Soft, temporary constraints between nearest hands of two different ragdolls.
+// Form when hands drift within BRAID_RANGE, fade over BRAID_LIFE, break if
+// stretched past dist * BRAID_BREAK_MULT.
+let braids = []; // {pa, pb, dist, life, maxLife}
+
+// ── Breath Rings ─────────────────────────────────────────────────────────
+// Vesica-piscis trigger zones. Drift through world space, pulse slowly; if
+// the falling head passes through at the pulse peak, grants a brief slow-mo
+// and a resolution chord.
+let breathRings = []; // {x, y, phase, baseR, triggered, triggerFade}
+let nextBreathY = 4000; // first ring around 40 m
+let breathSlowMo = 0;   // seconds of active breath-induced slow-mo
+
+// ── Perfect Chord Bloom ──────────────────────────────────────────────────
+// Tracks when each of the five pentatonic pitch classes was last played.
+// When all five fall inside CHORD_WINDOW_S, fire a bloom (chord + visuals).
+// Init sentinel is -Infinity so unset slots always fail the window check
+// (avoids a spurious bloom during the first seconds of audio).
+const HARMONY_UNSET = -1e9;
+const harmonyNotes = [HARMONY_UNSET, HARMONY_UNSET, HARMONY_UNSET, HARMONY_UNSET, HARMONY_UNSET];
+let chordBloomCooldown = 0;            // s until next bloom can fire
+let chordBloomFlash = 0;               // visual flash timer (screen overlay)
 
 // ── Life Chapters (includes milestones) ──
 let journeyLog = []; // {label, text}
@@ -624,6 +677,11 @@ function playImpactSound(force, hue, xPos, type, sacredType){
   const pentatonic = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
   const noteIdx = Math.floor((hue / 360) * pentatonic.length) % pentatonic.length;
   const freq = baseFreq * Math.pow(2, pentatonic[noteIdx]/12);
+
+  // Record the pitch class for the perfect-chord-bloom tracker. Passing the
+  // impact position lets the bloom's visual burst spawn where the last note
+  // landed, which feels more intentional than a fixed centre point.
+  recordHarmonyHit(noteIdx, xPos, cameraY + H * 0.5);
 
   const vol = Math.min(force * 0.025, 0.9);
   const duration = 0.3 + Math.min(force * 0.01, 1.5);
@@ -1389,7 +1447,6 @@ function drawScoreElements(){
       }
     }
   }
-  ctx.shadowBlur = 0;
 }
 
 function drawParticles(){
@@ -1625,6 +1682,11 @@ document.getElementById('reset-btn').onclick = () => {
   journeyLog = []; updateJourneyPanel();
   firedChapters = new Set();
   chapterDisplay = null; chapterSlowMo = 0;
+  braids = [];
+  breathRings = []; nextBreathY = 4000;
+  breathSlowMo = 0;
+  for(let i = 0; i < harmonyNotes.length; i++) harmonyNotes[i] = HARMONY_UNSET;
+  chordBloomCooldown = 0; chordBloomFlash = 0;
   nextShapeY = CONFIG.SHAPE_START_Y;
   nextChallengeY = CONFIG.CHALLENGE_SPACING_WORLD;
   particles = []; particleCount = 0;
@@ -1818,45 +1880,113 @@ function drawStarfield(parallax){
   }
 }
 
-function drawBackground(){
-  // Gradient background - screen-space
-  const grad = ctx.createRadialGradient(W/2,H/2,0, W/2,H/2,Math.max(W,H)*0.7);
-  grad.addColorStop(0, '#0e0e18');
-  grad.addColorStop(1, theme.bg);
-  ctx.save();
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0,0,W,H);
-  ctx.restore();
+// Background radial gradient — static per (viewport, theme). Rebuilt only when
+// either version counter changes. Saves one gradient allocation per frame.
+let _bgGrad = null;
+let _bgGradViewportV = -1;
+let _bgGradThemeV = -1;
+function getBgGradient(){
+  if(_bgGrad && _bgGradViewportV === _viewportVersion && _bgGradThemeV === _themeVersion){
+    return _bgGrad;
+  }
+  _bgGrad = ctx.createRadialGradient(W/2,H/2,0, W/2,H/2,Math.max(W,H)*0.7);
+  _bgGrad.addColorStop(0, '#0e0e18');
+  _bgGrad.addColorStop(1, theme.bg);
+  _bgGradViewportV = _viewportVersion;
+  _bgGradThemeV = _themeVersion;
+  return _bgGrad;
+}
 
-  // Stars (screen space - must reset transform since we're inside camera transform)
+// ── Sacred-geometry offscreen cache ──────────────────────────────────────
+// Flower of Life + Metatron + Golden Spiral + 4 polygons run hundreds of path
+// ops per frame (Metatron alone draws N(N-1)/2 ≈ 171 line segments). All of
+// these animate very slowly (pulse at time*0.3, spiral at time*0.1), so we
+// render them to an offscreen and refresh every _SG_CACHE_EVERY frames.
+// The per-refresh animation jump is <1% — imperceptible.
+let _sgLayer = null;
+let _sgLayerCtx = null;
+let _sgLayerViewportV = -1;
+let _sgLayerThemeV = -1;
+let _sgLayerAge = 0;
+const _SG_CACHE_EVERY = 4;
+
+function ensureSgLayer(){
+  if(_sgLayer &&
+     _sgLayerViewportV === _viewportVersion &&
+     _sgLayerThemeV === _themeVersion) return;
+  _sgLayer = document.createElement('canvas');
+  _sgLayer.width = Math.floor(W * dpr);
+  _sgLayer.height = Math.floor(H * dpr);
+  _sgLayerCtx = _sgLayer.getContext('2d');
+  _sgLayerCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  _sgLayerViewportV = _viewportVersion;
+  _sgLayerThemeV = _themeVersion;
+  _sgLayerAge = _SG_CACHE_EVERY; // force first-frame render
+}
+
+function renderSgLayer(){
+  // Swap the active ctx so the existing draw* helpers can be reused.
+  const saved = ctx;
+  ctx = _sgLayerCtx;
+  ctx.clearRect(0, 0, W, H);
+  const scx = W/2, scy = H*0.5;
+  const pulse = 0.7 + 0.3*Math.sin(time*0.3);
+  drawFlowerOfLife(scx, scy, 120*pulse, 0.035);
+  drawMetatronsCube(scx, scy, 180*pulse, 0.02);
+  drawGoldenSpiral(scx, scy, 250, time*0.1, 0.03);
+  for(let i=0;i<4;i++){
+    drawPolygon(scx, scy, 100+i*60, 3+i, time*0.05*(i%2===0?1:-1), 0.015+i*0.004);
+  }
+  ctx = saved;
+}
+
+// Early-out helper: kaleidoscopes are drawn under the camera (-cameraY)
+// transform, so their effective screen y is (cy - cameraY). After a few
+// meters of depth they scroll past the top of the viewport; skipping them
+// saves ~7 gradient allocs + ~60 path ops per call.
+function kaleidoscopeVisible(cy, radius){
+  const sy = cy - cameraY;
+  return sy + radius*2 >= 0 && sy - radius*2 <= H;
+}
+
+function drawBackground(){
+  // Gradient background — screen-space, cached gradient.
   ctx.save();
   ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle = getBgGradient();
+  ctx.fillRect(0,0,W,H);
+
+  // Stars — screen space
   drawStarfield(0.12); // distant tiny stars
   drawStarfield(0.15); // closer stars
   ctx.restore();
 
-  // ── Parallax kaleidoscope layers (screen-space, different scroll speeds) ──
-  // Layer 1: far background - slowest parallax
+  // ── Parallax kaleidoscope layers (drawn under world transform, as before) ──
+  // Wrapped in visibility checks — after the early fall these all scroll off
+  // and become zero-cost.
   const px1 = cameraY * 0.1;
-  drawKaleidoscope(W/2, H*0.5 - px1, 350, 6, time*0.03, 0, 0.03, px1);
-  drawKaleidoscope(W*0.2, H*0.3 - px1*0.8, 200, 8, -time*0.02, 120, 0.025, px1*0.8);
-  drawKaleidoscope(W*0.8, H*0.7 - px1*1.2, 250, 5, time*0.025, 240, 0.025, px1*1.2);
+  if(kaleidoscopeVisible(H*0.5 - px1, 350))
+    drawKaleidoscope(W/2, H*0.5 - px1, 350, 6, time*0.03, 0, 0.03, px1);
+  if(kaleidoscopeVisible(H*0.3 - px1*0.8, 200))
+    drawKaleidoscope(W*0.2, H*0.3 - px1*0.8, 200, 8, -time*0.02, 120, 0.025, px1*0.8);
+  if(kaleidoscopeVisible(H*0.7 - px1*1.2, 250))
+    drawKaleidoscope(W*0.8, H*0.7 - px1*1.2, 250, 5, time*0.025, 240, 0.025, px1*1.2);
 
-  // Layer 2: mid - medium parallax
   const px2 = cameraY * 0.3;
-  drawKaleidoscope(W*0.3, H*0.4 - px2, 180, 7, -time*0.04, 60, 0.04, px2);
-  drawKaleidoscope(W*0.7, H*0.6 - px2*0.7, 220, 6, time*0.035, 180, 0.035, px2*0.7);
-  drawKaleidoscope(W*0.5, H*0.2 - px2*1.3, 160, 9, -time*0.03, 300, 0.03, px2*1.3);
+  if(kaleidoscopeVisible(H*0.4 - px2, 180))
+    drawKaleidoscope(W*0.3, H*0.4 - px2, 180, 7, -time*0.04, 60, 0.04, px2);
+  if(kaleidoscopeVisible(H*0.6 - px2*0.7, 220))
+    drawKaleidoscope(W*0.7, H*0.6 - px2*0.7, 220, 6, time*0.035, 180, 0.035, px2*0.7);
+  if(kaleidoscopeVisible(H*0.2 - px2*1.3, 160))
+    drawKaleidoscope(W*0.5, H*0.2 - px2*1.3, 160, 9, -time*0.03, 300, 0.03, px2*1.3);
 
-  // Layer 3: near - fastest parallax (but still behind gameplay)
   const px3 = cameraY * 0.5;
-  drawKaleidoscope(W*0.15, H*0.6 - px3, 140, 5, time*0.05, 90, 0.045, px3);
-  drawKaleidoscope(W*0.85, H*0.35 - px3*0.6, 170, 8, -time*0.045, 210, 0.04, px3*0.6);
+  if(kaleidoscopeVisible(H*0.6 - px3, 140))
+    drawKaleidoscope(W*0.15, H*0.6 - px3, 140, 5, time*0.05, 90, 0.045, px3);
+  if(kaleidoscopeVisible(H*0.35 - px3*0.6, 170))
+    drawKaleidoscope(W*0.85, H*0.35 - px3*0.6, 170, 8, -time*0.045, 210, 0.04, px3*0.6);
 
-  // Stars drawn outside camera transform - see frame()
-
-  // Subtle grid - world space
+  // Subtle grid — world space
   const a = theme.accent;
   ctx.strokeStyle = `rgba(${a[0]},${a[1]},${a[2]},0.025)`;
   ctx.lineWidth = 0.5;
@@ -1869,15 +1999,19 @@ function drawBackground(){
     ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
   }
 
-  // Sacred geometry - world space, scrolls with gameplay
-  const cx = W/2, cy = cameraY + H*0.5;
-  const pulse = 0.7 + 0.3*Math.sin(time*0.3);
-  drawFlowerOfLife(cx, cy, 120*pulse, 0.035);
-  drawMetatronsCube(cx, cy, 180*pulse, 0.02);
-  drawGoldenSpiral(cx, cy, 250, time*0.1, 0.03);
-  for(let i=0;i<4;i++){
-    drawPolygon(cx, cy, 100+i*60, 3+i, time*0.05*(i%2===0?1:-1), 0.015+i*0.004);
+  // Sacred geometry — cached offscreen (screen-space; source coords happen
+  // to be camera-centered in world space, which after the -cameraY transform
+  // lands at screen center, so the cache can live in screen space).
+  ensureSgLayer();
+  _sgLayerAge++;
+  if(_sgLayerAge >= _SG_CACHE_EVERY){
+    _sgLayerAge = 0;
+    renderSgLayer();
   }
+  ctx.save();
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.drawImage(_sgLayer, 0, 0, W, H);
+  ctx.restore();
 }
 
 function drawSphere(s){
@@ -2145,10 +2279,14 @@ function drawSphere(s){
   } else if(s.type === 'wave'){
     // Cyan triangle
     ctx.rotate(s.rotation);
-    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(180,90%,65%,0.35)`);
-    grad.addColorStop(1, `hsla(180,90%,65%,0)`);
-    ctx.fillStyle = grad;
+    // Static-hue glow — cached per sphere (key: just radius)
+    if(!s._glow || s._glowR !== r*1.8){
+      const g = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+      g.addColorStop(0, `hsla(180,90%,65%,0.35)`);
+      g.addColorStop(1, `hsla(180,90%,65%,0)`);
+      s._glow = g; s._glowR = r*1.8;
+    }
+    ctx.fillStyle = s._glow;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
     ctx.strokeStyle = `hsla(180,90%,70%,1.0)`;
     ctx.fillStyle = `hsla(180,80%,55%,0.3)`,
@@ -2163,10 +2301,14 @@ function drawSphere(s){
   } else if(s.type === 'trail'){
     // Magenta diamond
     ctx.rotate(s.rotation * 1.5);
-    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(300,90%,65%,0.35)`);
-    grad.addColorStop(1, `hsla(300,90%,65%,0)`);
-    ctx.fillStyle = grad;
+    // Static-hue glow — cached per sphere
+    if(!s._glow || s._glowR !== r*1.8){
+      const g = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+      g.addColorStop(0, `hsla(300,90%,65%,0.35)`);
+      g.addColorStop(1, `hsla(300,90%,65%,0)`);
+      s._glow = g; s._glowR = r*1.8;
+    }
+    ctx.fillStyle = s._glow;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
     ctx.strokeStyle = `hsla(300,90%,70%,1.0)`;
     ctx.fillStyle = `hsla(300,80%,55%,0.3)`,
@@ -2177,10 +2319,14 @@ function drawSphere(s){
   } else if(s.type === 'pulse'){
     // Gold star
     ctx.rotate(s.rotation * 2);
-    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(45,95%,65%,0.35)`);
-    grad.addColorStop(1, `hsla(45,95%,65%,0)`);
-    ctx.fillStyle = grad;
+    // Static-hue glow — cached per sphere
+    if(!s._glow || s._glowR !== r*1.8){
+      const g = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+      g.addColorStop(0, `hsla(45,95%,65%,0.35)`);
+      g.addColorStop(1, `hsla(45,95%,65%,0)`);
+      s._glow = g; s._glowR = r*1.8;
+    }
+    ctx.fillStyle = s._glow;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
     ctx.strokeStyle = `hsla(45,95%,65%,1.0)`;
     ctx.fillStyle = `hsla(45,85%,55%,0.3)`,
@@ -2356,12 +2502,16 @@ function drawSphere(s){
     ctx.beginPath(); ctx.arc(0,0,r*1.5,0,TAU); ctx.stroke();
 
   } else {
-    // Normal sacred geometry sphere
+    // Normal sacred geometry sphere — outer glow cached per sphere,
+    // invalidated when theme changes (accent2 shifts).
     const a2 = theme.accent2;
-    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.5);
-    grad.addColorStop(0, `rgba(${a2[0]},${a2[1]},${a2[2]},0.18)`);
-    grad.addColorStop(1, `rgba(${a2[0]},${a2[1]},${a2[2]},0)`);
-    ctx.fillStyle = grad;
+    if(!s._glow || s._glowR !== r*1.5 || s._glowThemeV !== _themeVersion){
+      const g = ctx.createRadialGradient(0,0,0, 0,0,r*1.5);
+      g.addColorStop(0, `rgba(${a2[0]},${a2[1]},${a2[2]},0.18)`);
+      g.addColorStop(1, `rgba(${a2[0]},${a2[1]},${a2[2]},0)`);
+      s._glow = g; s._glowR = r*1.5; s._glowThemeV = _themeVersion;
+    }
+    ctx.fillStyle = s._glow;
     ctx.beginPath(); ctx.arc(0,0,r*1.5,0,TAU); ctx.fill();
 
     const hue = (s.hue + time*15) % 360;
@@ -2565,6 +2715,174 @@ function maybeSpawnNextShape(aheadY){
   spawnSphereAtDepth(nextShapeY);
 }
 
+// Breath ring spawn — independent of sphere spawning so pacing is predictable.
+function maybeSpawnBreathRing(aheadY){
+  const depthM = Math.max(0, cameraY / 100);
+  if(depthM < CONFIG.BREATH_SPAWN_START_M || aheadY <= nextBreathY) return;
+  breathRings.push({
+    x: 80 + Math.random() * (W - 160),
+    y: nextBreathY,
+    phase: Math.random() * TAU,
+    baseR: CONFIG.BREATH_BASE_R + Math.random() * 20,
+    triggered: false,
+    triggerFade: 0,
+  });
+  nextBreathY += CONFIG.BREATH_SPACING_WORLD * (0.85 + Math.random() * 0.4);
+}
+
+// ── Braided Ragdolls: formation + solving + compaction ───────────────────
+// Hand particle indices inside Ragdoll.particles (see class constructor):
+//   6 = lHand, 7 = rHand
+const BRAID_HAND_IDX = [6, 7];
+
+function alreadyBraided(a, b){
+  for(const br of braids){
+    if((br.pa === a && br.pb === b) || (br.pa === b && br.pb === a)) return true;
+  }
+  return false;
+}
+
+// Called once per frame (not per substep) — formation is a discrete event.
+function updateBraids(dt){
+  // Form new braids when unconnected hands of different ragdolls get close.
+  for(let i = 0; i < ragdolls.length; i++){
+    for(let j = i + 1; j < ragdolls.length; j++){
+      const ra = ragdolls[i], rb = ragdolls[j];
+      for(const ai of BRAID_HAND_IDX){
+        const ha = ra.particles[ai];
+        if(!ha) continue;
+        for(const bi of BRAID_HAND_IDX){
+          const hb = rb.particles[bi];
+          if(!hb || alreadyBraided(ha, hb)) continue;
+          const dx = hb.x - ha.x, dy = hb.y - ha.y;
+          const d = Math.sqrt(dx*dx + dy*dy);
+          if(d < CONFIG.BRAID_RANGE){
+            braids.push({
+              pa: ha, pb: hb,
+              dist: Math.max(d, 18),
+              life: CONFIG.BRAID_LIFE,
+              maxLife: CONFIG.BRAID_LIFE,
+            });
+          }
+        }
+      }
+    }
+  }
+  // Decay + drop broken/expired braids in-place.
+  let w = 0;
+  for(let i = 0; i < braids.length; i++){
+    const b = braids[i];
+    b.life -= dt;
+    const dx = b.pb.x - b.pa.x, dy = b.pb.y - b.pa.y;
+    const d = Math.sqrt(dx*dx + dy*dy);
+    if(b.life > 0 && d < b.dist * CONFIG.BRAID_BREAK_MULT){
+      if(w !== i) braids[w] = b;
+      w++;
+    }
+  }
+  braids.length = w;
+}
+
+// Called inside the physics substep, after each Ragdoll.update(). Gentle
+// stiffness that additionally tapers as the braid ages.
+function solveBraids(){
+  for(const b of braids){
+    const pa = b.pa, pb = b.pb;
+    const dx = pb.x - pa.x, dy = pb.y - pa.y;
+    const d = Math.sqrt(dx*dx + dy*dy) || 0.001;
+    const ageFactor = clamp(b.life / b.maxLife, 0, 1);
+    const diff = clamp(
+      (d - b.dist) / d * CONFIG.BRAID_STIFFNESS * ageFactor,
+      -1, 1
+    );
+    const mx = dx * diff * 0.5, my = dy * diff * 0.5;
+    if(!pa.pinned){ pa.x += mx; pa.y += my; }
+    if(!pb.pinned){ pb.x -= mx; pb.y -= my; }
+  }
+}
+
+// ── Breath Rings: update + trigger detection + compaction ────────────────
+function updateBreathRings(dt){
+  const head = ragdolls.length > 0 ? ragdolls[0].particles[0] : null;
+  let w = 0;
+  for(let i = 0; i < breathRings.length; i++){
+    const br = breathRings[i];
+    br.phase += dt * 0.9;
+    // Cull if far behind camera.
+    if(br.y < cameraY - 400) continue;
+    // Trigger detection (once): head must be inside the current pulse radius
+    // AND the pulse must be near its peak.
+    if(!br.triggered && head){
+      const dx = head.x - br.x, dy = head.y - br.y;
+      const d = Math.sqrt(dx*dx + dy*dy);
+      const pulse = Math.abs(Math.sin(br.phase));
+      const currentR = br.baseR * (0.55 + pulse * 0.65);
+      if(d < currentR && pulse > 0.82){
+        br.triggered = true;
+        br.triggerFade = 1.0;
+        triggerBreath(br);
+      }
+    }
+    if(br.triggered){
+      br.triggerFade -= dt * 0.6;
+      if(br.triggerFade <= 0) continue;
+    }
+    if(w !== i) breathRings[w] = br;
+    w++;
+  }
+  breathRings.length = w;
+}
+
+function triggerBreath(br){
+  breathSlowMo = CONFIG.BREATH_SLOWMO_S;
+  playChordBloom(0.55); // gentler bloom; perfect-chord bloom uses higher gain
+  // Soft sparkle burst at the ring centre. Hue cycles slowly with game time
+  // so successive rings read as a progression rather than a flat tone.
+  spawnImpactParticles(br.x, br.y, (time * 30 + themeIdx * 60) % 360, 5);
+}
+
+// ── Perfect Chord Bloom: record a hit + maybe fire ───────────────────────
+// The first five slots of the `pentatonic` array are the five unique pitch
+// classes (C D E G A). Anything beyond index 4 wraps back via (noteIdx % 5).
+function recordHarmonyHit(noteIdx, xPos, yWorld){
+  if(!audioCtx) return;
+  const now = audioCtx.currentTime;
+  harmonyNotes[noteIdx % 5] = now;
+  if(chordBloomCooldown > 0) return;
+  // All five inside the window?
+  for(let i = 0; i < 5; i++){
+    if(now - harmonyNotes[i] > CONFIG.CHORD_WINDOW_S) return;
+  }
+  chordBloomCooldown = CONFIG.CHORD_COOLDOWN_S;
+  chordBloomFlash = 1.0;
+  playChordBloom(1.0);
+  // Visual burst at the last impact point
+  spawnImpactParticles(xPos, yWorld, (noteIdx * 72) % 360, 8);
+}
+
+// Soft resolving major chord — used by both breath rings and chord bloom.
+function playChordBloom(gain){
+  if(isMuted || !audioCtx) return;
+  if(activeOscCount >= CONFIG.MAX_CONCURRENT_OSC) return;
+  const now = audioCtx.currentTime;
+  const root = 165; // same E3 base as impact sounds
+  const freqs = [root, root * 1.2599, root * 1.4983, root * 2]; // root, maj3, 5, oct
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0, now);
+  g.gain.linearRampToValueAtTime(Math.min(gain, 1) * 0.35, now + 0.25);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 3.2);
+  g.connect(masterGain);
+  if(delayNode) g.connect(delayNode);
+  for(const f of freqs){
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(f, now);
+    osc.connect(g);
+    osc.start(now);
+    osc.stop(now + 3.3);
+  }
+}
+
 function updateCamera(){
   if(ragdolls.length > 0){
     // DISABLE camera follow while dragging to fix the canvas position
@@ -2585,6 +2903,7 @@ function updateCamera(){
   }
 
   maybeSpawnNextShape(aheadY);
+  maybeSpawnBreathRing(aheadY);
 }
 
 function recycleObjects(){
@@ -2601,6 +2920,73 @@ function recycleObjects(){
   spheres.length = w;
   // Keep spawning - density increases with depth
   maybeSpawnNextShape(cameraY + H + 100);
+  maybeSpawnBreathRing(cameraY + H + 100);
+}
+
+// ── Draw: Braids ─────────────────────────────────────────────────────────
+function drawBraids(){
+  for(const b of braids){
+    const lifeT = clamp(b.life / b.maxLife, 0, 1);
+    const ax = b.pa.x, ay = b.pa.y;
+    const bx = b.pb.x, by = b.pb.y;
+    // Midpoint dips slightly, suggesting a held thread
+    const mx = (ax + bx) * 0.5;
+    const my = (ay + by) * 0.5 + 6 * lifeT;
+    const accent = theme.accent;
+    // Soft outer glow (double stroke, no shadowBlur)
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = `rgba(${accent[0]},${accent[1]},${accent[2]},${lifeT * 0.18})`;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.quadraticCurveTo(mx, my, bx, by);
+    ctx.stroke();
+    // Bright inner thread
+    ctx.lineWidth = 1.1;
+    ctx.strokeStyle = `rgba(${accent[0]},${accent[1]},${accent[2]},${lifeT * 0.7})`;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.quadraticCurveTo(mx, my, bx, by);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+  }
+}
+
+// ── Draw: Breath Rings ───────────────────────────────────────────────────
+// Vesica piscis = two overlapping circles whose centres sit on each other's
+// circumferences. We render a pulsating pair sharing a horizontal axis.
+function drawBreathRings(){
+  for(const br of breathRings){
+    const pulse = Math.abs(Math.sin(br.phase));
+    const r = br.baseR * (0.55 + pulse * 0.65);
+    const offset = r * 0.5; // overlap = vesica piscis
+    // Triggered rings fade and expand
+    let alpha = 0.35 + pulse * 0.35;
+    let scale = 1;
+    if(br.triggered){
+      alpha = br.triggerFade * 0.7;
+      scale = 1 + (1 - br.triggerFade) * 0.8;
+    }
+    const rScaled = r * scale;
+    const offsetScaled = offset * scale;
+    const accent = theme.accent2;
+    // Outer soft halo (double stroke, no shadowBlur)
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = `rgba(${accent[0]},${accent[1]},${accent[2]},${alpha * 0.22})`;
+    ctx.beginPath(); ctx.arc(br.x - offsetScaled, br.y, rScaled, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(br.x + offsetScaled, br.y, rScaled, 0, TAU); ctx.stroke();
+    // Inner thin line
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = `rgba(${accent[0]},${accent[1]},${accent[2]},${alpha * 0.85})`;
+    ctx.beginPath(); ctx.arc(br.x - offsetScaled, br.y, rScaled, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(br.x + offsetScaled, br.y, rScaled, 0, TAU); ctx.stroke();
+    // Centre mark at peak pulse
+    if(!br.triggered && pulse > 0.7){
+      const dotA = (pulse - 0.7) / 0.3;
+      ctx.fillStyle = `rgba(${accent[0]},${accent[1]},${accent[2]},${dotA * 0.8})`;
+      ctx.beginPath(); ctx.arc(br.x, br.y, 2.5, 0, TAU); ctx.fill();
+    }
+  }
 }
 
 // ── Main loop ────────────────────────────────────────────────────────────
@@ -2648,6 +3034,8 @@ function frame(now){
   // Physics substeps
   for(let s=0;s<SUBSTEPS;s++){
     for(const r of ragdolls) r.update(dt);
+    // Braid constraints solve alongside ragdoll constraints each substep
+    solveBraids();
     // Magnet repulsion - push spheres away from ragdoll
     if(activeEffects.magnet > 0 && ragdolls.length > 0){
       const head = ragdolls[0].particles[0];
@@ -2674,6 +3062,11 @@ function frame(now){
   // Update impact particles (once per frame, not per substep)
   updateParticles(rawDt);
   updateScoreElements(rawDt);
+  updateBraids(rawDt);
+  updateBreathRings(rawDt);
+  // Chord bloom timers
+  if(chordBloomCooldown > 0) chordBloomCooldown -= rawDt;
+  if(chordBloomFlash > 0) chordBloomFlash -= rawDt * 0.8;
 
   // Clamp ragdoll to screen width
   for(const r of ragdolls){
@@ -2700,6 +3093,7 @@ function frame(now){
         window.manualThemeSet = true;
         theme.accent = portal.targetAccent;
         theme.accent2 = portal.targetAccent2;
+        _themeVersion++;
       }
       if(portal.progress >= 1){ portal.phase = 'emerging'; portal.progress = 0; }
     } else if(portal.phase === 'emerging'){
@@ -2713,8 +3107,21 @@ function frame(now){
   ctx.translate(0, -cameraY); // camera transform
 
   drawBackground();
-  for(const s of spheres) drawSphere(s);
+  drawBreathRings(); // behind spheres so they don't occlude important obstacles
+  // Frustum-cull spheres. Use 2× sphere radius to account for glow halo —
+  // draws that spill a little past the visible band. Physics still runs on
+  // culled spheres (that happens elsewhere in the frame), this only affects
+  // rendering cost.
+  const _viewTop = cameraY - 50;
+  const _viewBot = cameraY + H + 50;
+  for(let si = 0; si < spheres.length; si++){
+    const s = spheres[si];
+    const margin = s.r * 2;
+    if(s.y + margin < _viewTop || s.y - margin > _viewBot) continue;
+    drawSphere(s);
+  }
   for(const r of ragdolls) drawRagdoll(r);
+  drawBraids();      // over ragdolls so the thread reads clearly
   // ── Active Power-Up Effects (world space) ──
   const head = ragdolls.length > 0 ? ragdolls[0].particles[0] : null;
   const headX = head ? head.x : W/2;
@@ -2970,18 +3377,23 @@ function frame(now){
   ctx.textAlign = 'right';
   ctx.fillText(`${depthMeters.toFixed(1)} m`, W - 20, H - 20);
 
-  // Score HUD (below depth meter)
+  // Score HUD (below depth meter) — no shadowBlur (expensive on mobile);
+  // animated state uses a cheap 4-offset glow draw instead.
   const a3 = theme.accent2;
   const isAnim = displayScore < score;
-  ctx.fillStyle = `rgba(${a3[0]},${a3[1]},${a3[2]},${isAnim ? 0.8 : 0.35})`;
   ctx.font = `${isAnim ? '300' : '200'} 0.8rem monospace`;
   ctx.textAlign = 'right';
+  const scoreStr = displayScore.toLocaleString();
   if(isAnim){
-    ctx.shadowColor = `rgba(${a3[0]},${a3[1]},${a3[2]},0.5)`;
-    ctx.shadowBlur = 10 + Math.sin(time * 12) * 4;
+    const glow = (0.18 + 0.12 * (0.5 + 0.5 * Math.sin(time * 12)));
+    ctx.fillStyle = `rgba(${a3[0]},${a3[1]},${a3[2]},${glow})`;
+    ctx.fillText(scoreStr, W - 19, H - 38);
+    ctx.fillText(scoreStr, W - 21, H - 38);
+    ctx.fillText(scoreStr, W - 20, H - 37);
+    ctx.fillText(scoreStr, W - 20, H - 39);
   }
-  ctx.fillText(displayScore.toLocaleString(), W - 20, H - 38);
-  ctx.shadowBlur = 0;
+  ctx.fillStyle = `rgba(${a3[0]},${a3[1]},${a3[2]},${isAnim ? 0.9 : 0.35})`;
+  ctx.fillText(scoreStr, W - 20, H - 38);
 
   // Combo next to score
   if(comboCount > 1){
@@ -3037,6 +3449,12 @@ function frame(now){
   if(chapterSlowMo > 0){
     chapterSlowMo -= rawDt;
     targetTimeScale = 0.2;
+  } else if(breathSlowMo > 0){
+    breathSlowMo -= rawDt;
+    targetTimeScale = 0.45; // softer than chapter slow-mo
+    // Reset the chapter sentinel so the restore branch below will fire
+    // when breath slow-mo finishes.
+    chapterSlowMo = 0;
   } else if(chapterSlowMo !== -1 && !isSlowed){
     targetTimeScale = 1.0;
     chapterSlowMo = -1;
@@ -3169,6 +3587,17 @@ function frame(now){
     ctx.font = '200 0.7rem sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('hold to slow', W/2, H - 30);
+  }
+
+  // Perfect-chord bloom flash — subtle full-screen halo, eases out quickly.
+  if(chordBloomFlash > 0){
+    const t = clamp(chordBloomFlash, 0, 1);
+    const a = theme.accent2;
+    const grad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W, H) * 0.7);
+    grad.addColorStop(0, `rgba(${a[0]},${a[1]},${a[2]},${t * 0.18})`);
+    grad.addColorStop(1, `rgba(${a[0]},${a[1]},${a[2]},0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
   }
   } catch(e) { 
     console.error('[falling-emy] frame error:', e);
