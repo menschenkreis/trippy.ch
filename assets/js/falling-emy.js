@@ -338,11 +338,18 @@ class Particle {
   }
   update(dt){
     if(this.pinned) return;
-    const vx = (this.x - this.ox) * DAMPING;
-    const vy = (this.y - this.oy) * DAMPING;
+    let vx = (this.x - this.ox) * DAMPING;
+    let vy = (this.y - this.oy) * DAMPING;
+    // Clamp velocity to prevent NaN/Infinity cascade from aggressive drag
+    const maxV = 800;
+    vx = Math.max(-maxV, Math.min(maxV, vx || 0));
+    vy = Math.max(-maxV, Math.min(maxV, vy || 0));
     this.ox = this.x; this.oy = this.y;
     this.x += vx + gravityX * dt * dt;
     this.y += vy + gravityY * dt * dt;
+    // NaN guard
+    if(!isFinite(this.x)){ this.x = this.ox; this.ox = this.x; }
+    if(!isFinite(this.y)){ this.y = this.oy; this.oy = this.y; }
   }
 }
 
@@ -357,7 +364,7 @@ class Constraint {
     const dx = this.b.x - this.a.x;
     const dy = this.b.y - this.a.y;
     const d = Math.sqrt(dx*dx+dy*dy) || 0.001;
-    const diff = (d - this.dist) / d * this.stiffness;
+    const diff = Math.max(-2, Math.min(2, (d - this.dist) / d * this.stiffness));
     const mx = dx*diff*0.5, my = dy*diff*0.5;
     if(!this.a.pinned){ this.a.x += mx; this.a.y += my; }
     if(!this.b.pinned){ this.b.x -= mx; this.b.y -= my; }
@@ -887,9 +894,12 @@ function collideParticleSphere(p, s, dt, impactData){
       p.x += nx * overlap * 0.45;
       p.y += ny * overlap * 0.45;
     }
-    const pushForce = overlap * 0.4;
+    const pushForce = Math.min(overlap * 0.4, 5); // cap sphere displacement
     s.x -= nx * pushForce;
     s.y -= ny * pushForce;
+    // Keep spheres in reasonable bounds
+    s.x = Math.max(-100, Math.min(W + 100, s.x));
+    s.y = Math.max(cameraY - 200, s.y);
 
     const vx = p.x - p.ox, vy = p.y - p.oy;
     const dot = vx*nx + vy*ny;
@@ -2451,6 +2461,7 @@ function frame(now){
   // Clamp ragdoll to screen width
   for(const r of ragdolls){
     for(const p of r.particles){
+      if(!isFinite(p.x) || !isFinite(p.y)){ p.x = W/2; p.y = cameraY + H/2; p.ox = p.x; p.oy = p.y; continue; }
       if(p.x < 20){ p.x = 20; p.ox = 20; }
       if(p.x > W-20){ p.x = W-20; p.ox = W-20; }
     }
