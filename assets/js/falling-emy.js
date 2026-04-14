@@ -29,6 +29,11 @@ const PI = Math.PI, TAU = PI*2;
 // ── § 1. Tiny utilities ─────────────────────────────────────────────────
 const clamp = (v, lo, hi) => v < lo ? lo : (v > hi ? hi : v);
 const lerp  = (a, b, t) => a + (b - a) * t;
+// Parse '#rrggbb' → [r,g,b] (0-255)
+function hexToRgb(hex){
+  const n = parseInt(hex.replace('#',''), 16);
+  return [(n>>16)&255, (n>>8)&255, n&255];
+}
 
 // ── § 1. Tuning / magic-number consolidation ────────────────────────────
 // Only values used in more than one place OR clear tuning knobs are hoisted.
@@ -165,7 +170,15 @@ function restoreFromSave(data){
   nextChallengeY = Math.max(data.nextChallengeY || (cameraY + CONFIG.CHALLENGE_SPACING_WORLD), cameraY + 1000);
   nextShapeY = Math.max(data.nextShapeY || (cameraY + 2000), cameraY + 200);
   themeIdx = data.themeIdx || 0;
-  theme = themes[themeIdx];
+  // Snap live values to saved theme instantly (no cross-fade on resume)
+  const _rt = themes[themeIdx];
+  const _rtBg = hexToRgb(_rt.bg);
+  for(let _i=0;_i<3;_i++){
+    _liveAccent[_i]=_tgtAccent[_i]=_rt.accent[_i];
+    _liveAccent2[_i]=_tgtAccent2[_i]=_rt.accent2[_i];
+    _liveBgRgb[_i]=_tgtBgRgb[_i]=_rtBg[_i];
+  }
+  _bgGradThemeV = -1; // force gradient rebuild
 
   // Restore journey log/milestones
   journeyLog = data.journeyLog || [];
@@ -250,10 +263,36 @@ const themes = [
   { accent:[0,255,180],   accent2:[200,80,255],  bg:'#060f0d', name:'aurora' },
 ];
 let themeIdx = 0;
-let theme = themes[0];
+
+// ── Smooth theme interpolation ───────────────────────────────────────────
+// All drawing uses _liveAccent / _liveAccent2 / _liveBgRgb which lerp toward
+// _tgtAccent / _tgtAccent2 / _tgtBgRgb each frame.  `theme` is a persistent
+// mutable object whose .accent / .accent2 properties ARE the live arrays, so
+// all existing draw code picks up transitions automatically.
+const THEME_LERP = 0.022; // ~2 s at 60 fps (1-(1-t)^120 ≈ 0.93)
+const _liveAccent  = [...themes[0].accent];
+const _liveAccent2 = [...themes[0].accent2];
+const _liveBgRgb   = hexToRgb(themes[0].bg);
+const _tgtAccent   = [...themes[0].accent];
+const _tgtAccent2  = [...themes[0].accent2];
+const _tgtBgRgb    = hexToRgb(themes[0].bg);
+
+// theme is a persistent proxy object — its .accent/.accent2 are the live
+// arrays so portal writes go through the same lerp path via _tgtAccent.
+const theme = {
+  accent : _liveAccent,
+  accent2: _liveAccent2,
+  get bg(){ return `rgb(${_liveBgRgb[0]|0},${_liveBgRgb[1]|0},${_liveBgRgb[2]|0})`; },
+  get name(){ return themes[themeIdx].name; },
+};
+
 function setTheme(i){
   themeIdx = i % themes.length;
-  theme = themes[themeIdx];
+  const t = themes[themeIdx];
+  _tgtAccent[0] = t.accent[0]; _tgtAccent[1] = t.accent[1]; _tgtAccent[2] = t.accent[2];
+  _tgtAccent2[0] = t.accent2[0]; _tgtAccent2[1] = t.accent2[1]; _tgtAccent2[2] = t.accent2[2];
+  const bg = hexToRgb(t.bg);
+  _tgtBgRgb[0] = bg[0]; _tgtBgRgb[1] = bg[1]; _tgtBgRgb[2] = bg[2];
   _themeVersion++;
   // Shift all ragdoll colors toward new theme
   const newHue = themeIdx * (360 / themes.length);
@@ -266,6 +305,23 @@ function setTheme(i){
   for(const s of spheres){
     s.hue = (newHue + Math.random() * 80 - 40) % 360;
   }
+}
+
+function updateLiveTheme(){
+  let changed = false;
+  for(let i = 0; i < 3; i++){
+    const da = _tgtAccent[i]  - _liveAccent[i];
+    const db = _tgtAccent2[i] - _liveAccent2[i];
+    const dc = _tgtBgRgb[i]   - _liveBgRgb[i];
+    if(Math.abs(da) > 0.05){ _liveAccent[i]  += da * THEME_LERP; changed = true; }
+    else { _liveAccent[i]  = _tgtAccent[i]; }
+    if(Math.abs(db) > 0.05){ _liveAccent2[i] += db * THEME_LERP; changed = true; }
+    else { _liveAccent2[i] = _tgtAccent2[i]; }
+    if(Math.abs(dc) > 0.05){ _liveBgRgb[i]   += dc * THEME_LERP; changed = true; }
+    else { _liveBgRgb[i]   = _tgtBgRgb[i]; }
+  }
+  // Invalidate gradient cache whenever live values are moving
+  if(changed) _bgGradThemeV = -1;
 }
 
 // ── Physics constants ────────────────────────────────────────────────────
@@ -1998,8 +2054,11 @@ function drawAmbientMotes(){
   }
 }
 
-// Background radial gradient — static per (viewport, theme). Rebuilt only when
-// either version counter changes. Saves one gradient allocation per frame.
+// Background radial gradient — rebuilt when viewport or theme-live-values change.
+// During smooth transitions _bgGradThemeV is reset to -1 each frame by
+// updateLiveTheme(), so the gradient rebuilds with the latest live color.
+// createRadialGradient + two addColorStop calls are cheap (~1 µs), so
+// per-frame rebuilds during a ~2 s transition have negligible perf cost.
 let _bgGrad = null;
 let _bgGradViewportV = -1;
 let _bgGradThemeV = -1;
@@ -2007,9 +2066,15 @@ function getBgGradient(){
   if(_bgGrad && _bgGradViewportV === _viewportVersion && _bgGradThemeV === _themeVersion){
     return _bgGrad;
   }
+  // Derive two very-dark tinted stops from the live bg RGB.
+  // Center is slightly lighter than edge so the void glows faintly.
+  const br = _liveBgRgb[0]|0, bg = _liveBgRgb[1]|0, bb = _liveBgRgb[2]|0;
+  const cr = Math.min(255, br + 8)|0;
+  const cg = Math.min(255, bg + 8)|0;
+  const cb = Math.min(255, bb + 14)|0; // slightly cooler/bluer at centre
   _bgGrad = ctx.createRadialGradient(W/2,H/2,0, W/2,H/2,Math.max(W,H)*0.7);
-  _bgGrad.addColorStop(0, '#0e0e18');
-  _bgGrad.addColorStop(1, theme.bg);
+  _bgGrad.addColorStop(0, `rgb(${cr},${cg},${cb})`);
+  _bgGrad.addColorStop(1, `rgb(${br},${bg},${bb})`);
   _bgGradViewportV = _viewportVersion;
   _bgGradThemeV = _themeVersion;
   return _bgGrad;
@@ -3205,6 +3270,9 @@ function frame(now){
   const rawDt = Math.min((now - lastTime)/1000, 0.033);
   lastTime = now;
 
+  // Advance live theme interpolation (must run before any drawing)
+  updateLiveTheme();
+
   // Detect and recover from blank canvas (context state corruption).
   // NOTE: getImageData forces a GPU→CPU readback (measurably costly). The
   // probability is kept low (~once every 8s at 60fps) so the perf hit is
@@ -3292,8 +3360,11 @@ function frame(now){
       if(portal.progress >= 0.5 && !portal.colorsApplied){
         portal.colorsApplied = true;
         window.manualThemeSet = true;
-        theme.accent = portal.targetAccent;
-        theme.accent2 = portal.targetAccent2;
+        // Route through the lerp targets so the color change fades in smoothly
+        const pa = portal.targetAccent, pb = portal.targetAccent2;
+        _tgtAccent[0]=pa[0]; _tgtAccent[1]=pa[1]; _tgtAccent[2]=pa[2];
+        _tgtAccent2[0]=pb[0]; _tgtAccent2[1]=pb[1]; _tgtAccent2[2]=pb[2];
+        // bg stays at current theme's bg (portal doesn't supply a new sky color)
         _themeVersion++;
       }
       if(portal.progress >= 1){ portal.phase = 'emerging'; portal.progress = 0; }
