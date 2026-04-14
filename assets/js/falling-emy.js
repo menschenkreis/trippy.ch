@@ -1,11 +1,71 @@
 // ── Ragdoll Void - Physics + Sacred Geometry ─────────────────────────────────
+//
+// File map:
+//   § 1. Utilities / CONFIG / Persistence
+//   § 2. Canvas + resize + context-loss recovery
+//   § 3. Theme
+//   § 4. Physics constants, game state, score, power-ups, life chapters
+//   § 5. Accelerometer
+//   § 6. Particle / Constraint / Sphere / Ragdoll classes
+//   § 7. Audio (initAudio, playImpactSound, playMilestoneChord)
+//   § 8. Collision (collideParticleSphere, collideRagdollSphere)
+//   § 9. Impact particles (spawn, update, draw) + score elements
+//   §10. Sphere spawning, input, buttons
+//   §11. Sacred geometry + background + sphere/ragdoll draw
+//   §12. Camera + recycling
+//   §13. Main loop (frame)
+//   §14. Resume bridge + intro gate + sound-hint
+// ─────────────────────────────────────────────────────────────────────────────
 (function(){
 'use strict';
 const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
+// `ctx` is mutable so the sacred-geometry offscreen cache can swap in its
+// own context during refresh without propagating a ctx argument through
+// every draw helper. renderSgLayer saves the previous binding and restores
+// it immediately after.
+let ctx = canvas.getContext('2d');
 const PI = Math.PI, TAU = PI*2;
 
-// ── Cookie Save/Resume ──────────────────────────────────────────────────
+// ── § 1. Tiny utilities ─────────────────────────────────────────────────
+const clamp = (v, lo, hi) => v < lo ? lo : (v > hi ? hi : v);
+const lerp  = (a, b, t) => a + (b - a) * t;
+
+// ── § 1. Tuning / magic-number consolidation ────────────────────────────
+// Only values used in more than one place OR clear tuning knobs are hoisted.
+// Numerical values are UNCHANGED from their former inline occurrences.
+const CONFIG = {
+  CAMERA_FOLLOW: 0.08,
+  CAMERA_TARGET_RATIO: 0.35,
+  SHAPE_SPACING_MIN: 120,
+  SHAPE_SPACING_MAX: 800,
+  SHAPE_RAMP_START_M: 25,
+  SHAPE_RAMP_END_M: 100,
+  SHAPE_START_Y: 2500,             // first shape allowed at 25m
+  CHALLENGE_SPACING_WORLD: 10000,  // one challenge every 100m
+  DRAG_LERP: 0.15,
+  SLOWMO_SCALE: 0.05,
+  SOUND_HINT_FADE_M: 50,
+  INTRO_RESUME_MIN_M: 5,
+  BOUNCE: 0.65,
+  FRICTION: 0.05,
+  MAX_CONCURRENT_OSC: 40, // cap concurrent Web Audio oscillators to prevent
+                          // clipping/crackle on dense multi-ragdoll pile-ups
+  // Braided ragdolls
+  BRAID_RANGE: 45,        // hand-hand distance (px) to form a braid
+  BRAID_LIFE: 4.0,        // seconds a braid lasts before fading
+  BRAID_STIFFNESS: 0.22,  // gentler than structural constraints (=1)
+  BRAID_BREAK_MULT: 3.5,  // break if stretched past dist * this
+  // Perfect chord bloom
+  CHORD_WINDOW_S: 4.0,    // rolling window for collecting pitch classes
+  CHORD_COOLDOWN_S: 12.0, // minimum seconds between blooms
+  // Breath rings
+  BREATH_SPAWN_START_M: 40,
+  BREATH_SPACING_WORLD: 2200,
+  BREATH_BASE_R: 70,
+  BREATH_SLOWMO_S: 1.0,   // slow-mo duration after passing through at peak
+};
+
+// ── § 1. Cookie Save/Resume ─────────────────────────────────────────────
 const SAVE_KEY = 'falling-emy-save';
 const SAVE_INTERVAL = 3000; // auto-save every 3s
 let lastSaveTime = 0;
@@ -70,9 +130,9 @@ function autoSave(now){
 }
 
 // ── Update Journey Panel (IIFE scope - called from restoreFromSave & frame) ──
+const _journeyLogEl = document.getElementById('journey-log');
 function updateJourneyPanel(){
-  const el = document.getElementById('journey-log');
-  if(!el || journeyLog.length === 0) return;
+  if(!_journeyLogEl || journeyLog.length === 0) return;
   let html = '';
   for(let i = journeyLog.length - 1; i >= 0; i--){
     const e = journeyLog[i];
@@ -91,7 +151,7 @@ function updateJourneyPanel(){
     }
     html += `<div class="journey-entry"><div class="journey-icon">${svg}</div><div class="journey-entry-text"><strong>${e.label}</strong> - ${e.text}</div></div>`;
   }
-  el.innerHTML = html;
+  _journeyLogEl.innerHTML = html;
 }
 
 function restoreFromSave(data){
@@ -100,8 +160,10 @@ function restoreFromSave(data){
   displayScore = data.score || 0;
   fallSpeed = data.fallSpeed || 0;
   time = data.time || 0;
-  nextChallengeY = data.nextChallengeY || (cameraY + 10000);
-  nextShapeY = data.nextShapeY || (cameraY + 2000);
+  // Ensure the next challenge/shape is ahead of the restored camera even if
+  // save data is stale (otherwise spawns would be instantly culled).
+  nextChallengeY = Math.max(data.nextChallengeY || (cameraY + CONFIG.CHALLENGE_SPACING_WORLD), cameraY + 1000);
+  nextShapeY = Math.max(data.nextShapeY || (cameraY + 2000), cameraY + 200);
   themeIdx = data.themeIdx || 0;
   theme = themes[themeIdx];
 
@@ -119,6 +181,12 @@ function restoreFromSave(data){
   chapterDisplay = null; chapterSlowMo = 0;
   particles = []; shockwaves = []; particleCount = 0;
   firedChapters = new Set();
+  // Reset gameplay-additions state as well
+  braids = [];
+  breathRings = []; nextBreathY = Math.max(cameraY + 1500, 4000);
+  breathSlowMo = 0;
+  for(let i = 0; i < harmonyNotes.length; i++) harmonyNotes[i] = HARMONY_UNSET;
+  chordBloomCooldown = 0; chordBloomFlash = 0;
 
   // Re-calculate which chapters have already fired
   const depthMeters = cameraY / 100;
@@ -145,12 +213,17 @@ window._fe = { loadProgress, restoreFromSave, clearSave, formatDepth, formatTime
 
 // ── Resize ───────────────────────────────────────────────────────────────
 let W, H, dpr;
+// Cache-invalidation counters: bumped when viewport size or theme changes so
+// offscreen render caches know to redraw.
+let _viewportVersion = 0;
+let _themeVersion = 0;
 function resize(){
   dpr = Math.min(devicePixelRatio, 2);
   W = window.innerWidth; H = window.innerHeight;
   canvas.width = W*dpr; canvas.height = H*dpr;
   canvas.style.width = W+'px'; canvas.style.height = H+'px';
   ctx.setTransform(dpr,0,0,dpr,0,0);
+  _viewportVersion++;
 }
 window.addEventListener('resize', resize); resize();
 
@@ -174,12 +247,14 @@ const themes = [
   { accent:[40,255,140],  accent2:[180,80,255],  bg:'#061208', name:'jade' },
   { accent:[255,60,80],   accent2:[255,220,50],  bg:'#0f0608', name:'crimson' },
   { accent:[255,200,255], accent2:[100,180,255], bg:'#0a0810', name:'frost' },
+  { accent:[0,255,180],   accent2:[200,80,255],  bg:'#060f0d', name:'aurora' },
 ];
 let themeIdx = 0;
 let theme = themes[0];
 function setTheme(i){
   themeIdx = i % themes.length;
   theme = themes[themeIdx];
+  _themeVersion++;
   // Shift all ragdoll colors toward new theme
   const newHue = themeIdx * (360 / themes.length);
   for(const r of ragdolls){
@@ -231,11 +306,34 @@ const pentatonicScale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21]; // C D E G A c d e 
 let activeEffects = { wave: 0, trail: 0, pulse: 0, magnet: 0 };
 let waveRings = []; // {x, y, radius, life}
 
+// ── Braided Ragdolls ─────────────────────────────────────────────────────
+// Soft, temporary constraints between nearest hands of two different ragdolls.
+// Form when hands drift within BRAID_RANGE, fade over BRAID_LIFE, break if
+// stretched past dist * BRAID_BREAK_MULT.
+let braids = []; // {pa, pb, dist, life, maxLife}
+
+// ── Breath Rings ─────────────────────────────────────────────────────────
+// Vesica-piscis trigger zones. Drift through world space, pulse slowly; if
+// the falling head passes through at the pulse peak, grants a brief slow-mo
+// and a resolution chord.
+let breathRings = []; // {x, y, phase, baseR, triggered, triggerFade}
+let nextBreathY = 4000; // first ring around 40 m
+let breathSlowMo = 0;   // seconds of active breath-induced slow-mo
+
+// ── Perfect Chord Bloom ──────────────────────────────────────────────────
+// Tracks when each of the five pentatonic pitch classes was last played.
+// When all five fall inside CHORD_WINDOW_S, fire a bloom (chord + visuals).
+// Init sentinel is -Infinity so unset slots always fail the window check
+// (avoids a spurious bloom during the first seconds of audio).
+const HARMONY_UNSET = -1e9;
+const harmonyNotes = [HARMONY_UNSET, HARMONY_UNSET, HARMONY_UNSET, HARMONY_UNSET, HARMONY_UNSET];
+let chordBloomCooldown = 0;            // s until next bloom can fire
+let chordBloomFlash = 0;               // visual flash timer (screen overlay)
+
 // ── Life Chapters (includes milestones) ──
 let journeyLog = []; // {label, text}
 let chapterDisplay = null; // {text, life, phase}
 let chapterSlowMo = 0;
-let lastChapter = -1;
 let firedChapters = new Set();
 
 const lifeChapters = [
@@ -303,7 +401,7 @@ function initAccel() {
       if (angle === 90) tilt = e.beta;
       else if (angle === -90) tilt = -e.beta;
 
-      let tiltX = Math.max(-45, Math.min(45, tilt)) / 45; // -1 to 1
+      const tiltX = clamp(tilt, -45, 45) / 45; // -1 to 1
       if(tiltEnabled) gravityX = tiltX * GRAVITY * 0.8;
       else gravityX = 0;
     }, {passive: true});
@@ -342,8 +440,8 @@ class Particle {
     let vy = (this.y - this.oy) * DAMPING;
     // Clamp velocity to prevent NaN/Infinity cascade from aggressive drag
     const maxV = 800;
-    vx = Math.max(-maxV, Math.min(maxV, vx || 0));
-    vy = Math.max(-maxV, Math.min(maxV, vy || 0));
+    vx = clamp(vx || 0, -maxV, maxV);
+    vy = clamp(vy || 0, -maxV, maxV);
     this.ox = this.x; this.oy = this.y;
     this.x += vx + gravityX * dt * dt;
     this.y += vy + gravityY * dt * dt;
@@ -364,7 +462,7 @@ class Constraint {
     const dx = this.b.x - this.a.x;
     const dy = this.b.y - this.a.y;
     const d = Math.sqrt(dx*dx+dy*dy) || 0.001;
-    const diff = Math.max(-2, Math.min(2, (d - this.dist) / d * this.stiffness));
+    const diff = clamp((d - this.dist) / d * this.stiffness, -2, 2);
     const mx = dx*diff*0.5, my = dy*diff*0.5;
     if(!this.a.pinned){ this.a.x += mx; this.a.y += my; }
     if(!this.b.pinned){ this.b.x -= mx; this.b.y -= my; }
@@ -470,6 +568,8 @@ class Ragdoll {
     const rFoot = new Particle(x + s*0.9, y + s*3);
 
     this.particles = [head,neck,lShoulder,rShoulder,lElbow,rElbow,lHand,rHand,lHip,rHip,lKnee,rKnee,lFoot,rFoot];
+    this.headTrail = [];
+    this.trailMaxLen = 28;
 
     const C = (a,b,d,stiff)=> this.constraints.push(new Constraint(this.particles[a],this.particles[b],d||s,stiff||1));
     C(0,1,s);       // head-neck
@@ -516,6 +616,14 @@ let masterGain;
 let delayNode;
 let lastImpactTime = 0;
 let isMuted = true;
+// Stereo flanger nodes — created in initAudio, activated by wave power-up
+let flangerDelayL = null, flangerDelayR = null;
+let flangerFbL = null,    flangerFbR = null;
+let flangerWetL = null,   flangerWetR = null;
+// Count of currently playing oscillators (maintained by the createOscillator
+// wrapper installed in initAudio). Used to early-return from playImpactSound
+// on extreme combo pile-ups so we don't clip/crackle on mobile.
+let activeOscCount = 0;
 
 function initAudio(){
   if(audioCtx) return;
@@ -543,11 +651,67 @@ function initAudio(){
 
   // Send echo output to master
   delayNode.connect(masterGain);
+
+  // ── Stereo Flanger ────────────────────────────────────────────────────
+  // Two short delay lines (L/R) tapped from masterGain. A single LFO drives
+  // both at opposite sign (180° phase), creating a sweeping stereo spread.
+  // Wet gains start at 0 so there is no effect until the wave power-up fires.
+  // Feedback stays at 0 when inactive to prevent buffer saturation.
+  flangerDelayL = audioCtx.createDelay(0.02); flangerDelayL.delayTime.value = 0.004;
+  flangerDelayR = audioCtx.createDelay(0.02); flangerDelayR.delayTime.value = 0.004;
+
+  flangerFbL = audioCtx.createGain(); flangerFbL.gain.value = 0;
+  flangerFbR = audioCtx.createGain(); flangerFbR.gain.value = 0;
+  flangerDelayL.connect(flangerFbL); flangerFbL.connect(flangerDelayL);
+  flangerDelayR.connect(flangerFbR); flangerFbR.connect(flangerDelayR);
+
+  flangerWetL = audioCtx.createGain(); flangerWetL.gain.value = 0;
+  flangerWetR = audioCtx.createGain(); flangerWetR.gain.value = 0;
+
+  const flangerPanL = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : audioCtx.createGain();
+  const flangerPanR = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : audioCtx.createGain();
+  if(flangerPanL.pan) flangerPanL.pan.value = -0.8;
+  if(flangerPanR.pan) flangerPanR.pan.value =  0.8;
+  flangerDelayL.connect(flangerWetL); flangerWetL.connect(flangerPanL); flangerPanL.connect(audioCtx.destination);
+  flangerDelayR.connect(flangerWetR); flangerWetR.connect(flangerPanR); flangerPanR.connect(audioCtx.destination);
+
+  // LFO — same oscillator drives both channels at opposite polarity
+  const flangerLfo = audioCtx.createOscillator();
+  flangerLfo.type = 'sine';
+  flangerLfo.frequency.value = 0.28; // ~0.28 Hz = very slow cosmic sweep
+  const flangerDepthL = audioCtx.createGain(); flangerDepthL.gain.value =  0.0025;
+  const flangerDepthR = audioCtx.createGain(); flangerDepthR.gain.value = -0.0025; // 180° phase
+  flangerLfo.connect(flangerDepthL); flangerDepthL.connect(flangerDelayL.delayTime);
+  flangerLfo.connect(flangerDepthR); flangerDepthR.connect(flangerDelayR.delayTime);
+  flangerLfo.start();
+
+  // Tap the master mix into both flanger delays
+  masterGain.connect(flangerDelayL);
+  masterGain.connect(flangerDelayR);
+
+  // Wrap createOscillator so every osc made via this ctx participates in the
+  // activeOscCount without touching each individual synth branch below.
+  const rawCreateOsc = audioCtx.createOscillator.bind(audioCtx);
+  audioCtx.createOscillator = function(){
+    const osc = rawCreateOsc();
+    let started = false, ended = false;
+    const rawStart = osc.start.bind(osc);
+    osc.start = function(when){
+      if(!started){ started = true; activeOscCount++; }
+      return rawStart(when);
+    };
+    osc.addEventListener('ended', () => {
+      if(started && !ended){ ended = true; activeOscCount--; }
+    });
+    return osc;
+  };
 }
 
 function playImpactSound(force, hue, xPos, type, sacredType){
   if(isMuted || !audioCtx) return;
   if(force < 1.5) return; // ignore tiny grazes
+  // Bail if the mix is already saturated with in-flight oscillators.
+  if(activeOscCount >= CONFIG.MAX_CONCURRENT_OSC) return;
   const now = audioCtx.currentTime;
   if(now - lastImpactTime < 0.04) return; // throttle overlapping sounds
   lastImpactTime = now;
@@ -557,6 +721,11 @@ function playImpactSound(force, hue, xPos, type, sacredType){
   const pentatonic = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
   const noteIdx = Math.floor((hue / 360) * pentatonic.length) % pentatonic.length;
   const freq = baseFreq * Math.pow(2, pentatonic[noteIdx]/12);
+
+  // Record the pitch class for the perfect-chord-bloom tracker. Passing the
+  // impact position lets the bloom's visual burst spawn where the last note
+  // landed, which feels more intentional than a fixed centre point.
+  recordHarmonyHit(noteIdx, xPos, cameraY + H * 0.5);
 
   const vol = Math.min(force * 0.025, 0.9);
   const duration = 0.3 + Math.min(force * 0.01, 1.5);
@@ -998,7 +1167,7 @@ function collideRagdollSphere(ragdoll, sphere, dt){
 
     // ── Setback Trampoline: launch ragdoll upward ──
     if(sphere.type === 'setback'){
-      const bounceStrength = 350 + Math.random() * 150; // 350-500 units/sec upward
+      const bounceStrength = 175 + Math.random() * 75; // 175-250 units/sec upward
       for(const p of ragdoll.particles){
         // Set old position above current to create upward velocity
         p.oy = p.y + bounceStrength * 0.016 * 3; // ~3 frames worth of upward velocity
@@ -1006,7 +1175,7 @@ function collideRagdollSphere(ragdoll, sphere, dt){
     }
 
     // ── Power-Up Activation ──
-    if(sphere.type === 'wave') activeEffects.wave = 4;
+    if(sphere.type === 'wave'){ activeEffects.wave = 4; activateFlanger(4.5); }
     else if(sphere.type === 'trail') activeEffects.trail = 7;
     else if(sphere.type === 'pulse') activeEffects.pulse = 3;
     else if(sphere.type === 'magnet') activeEffects.magnet = 5;
@@ -1090,7 +1259,8 @@ function spawnImpactParticles(x, y, hue, force){
       life: 1.0,
       decay: 0.7 + Math.random() * 0.6,
       size: 1.0 + Math.random() * 2.2 * (intensity / 5),
-      hue: [hue, hue2, hue3][i % 3] + Math.random() * 40 - 20,
+      // inline ternary avoids a 3-element array allocation per spark
+      hue: (i % 3 === 0 ? hue : i % 3 === 1 ? hue2 : hue3) + Math.random() * 40 - 20,
       type: 'spark',
     };
   }
@@ -1230,24 +1400,29 @@ function updateScoreElements(dt){
   // Combo decay
   if(time - lastHitTime > COMBO_WINDOW) comboCount = 0;
 
-  // Score popups (world space)
-  for(let i = scorePopups.length-1; i >= 0; i--){
-    const p = scorePopups[i];
-    p.y += p.vy * dt;
-    p.vy *= 0.97;
-    p.life -= dt * 1.2;
-    if(p.life <= 0) scorePopups.splice(i, 1);
+  // Score popups (world space) - in-place compaction to avoid splice GC churn
+  {
+    let w = 0;
+    for(let i = 0; i < scorePopups.length; i++){
+      const p = scorePopups[i];
+      p.y += p.vy * dt;
+      p.vy *= 0.97;
+      p.life -= dt * 1.2;
+      if(p.life > 0){ if(w !== i) scorePopups[w] = p; w++; }
+    }
+    scorePopups.length = w;
   }
 
   // Score flies (world space → screen space transition)
   const counterX = W - 20;
   const counterY = H - 38;
-  for(let i = scoreFlies.length-1; i >= 0; i--){
+  let sfWrite = 0;
+  for(let i = 0; i < scoreFlies.length; i++){
     const f = scoreFlies[i];
     f.life -= dt * 0.8;
-    if(f.life <= 0){ scoreFlies.splice(i, 1); continue; }
+    if(f.life <= 0) continue; // drop (do not advance write index)
 
-    if(f.delay > 0){ f.delay -= dt; continue; }
+    if(f.delay > 0){ f.delay -= dt; if(sfWrite !== i) scoreFlies[sfWrite] = f; sfWrite++; continue; }
 
     if(f.phase === 'burst'){
       // Initial burst outward
@@ -1276,7 +1451,10 @@ function updateScoreElements(dt){
       if(d < 30) f.phase = 'arrived';
     }
     // 'arrived' fades out via life
+    if(sfWrite !== i) scoreFlies[sfWrite] = f;
+    sfWrite++;
   }
+  scoreFlies.length = sfWrite;
 }
 
 function drawScoreElements(){
@@ -1313,7 +1491,6 @@ function drawScoreElements(){
       }
     }
   }
-  ctx.shadowBlur = 0;
 }
 
 function drawParticles(){
@@ -1416,7 +1593,7 @@ let nextChallengeY = 10000;
 ragdolls.push(new Ragdoll(W/2, 0, 'emy'));
 // No initial spheres - intro handles the first moments
 
-let nextShapeY = 2500; // first shape allowed at 25m
+let nextShapeY = CONFIG.SHAPE_START_Y; // first shape allowed at 25m
 
 function spawnSphereAtDepth(yWorld, forceType=null){
   let type = 'sphere';
@@ -1442,10 +1619,6 @@ function spawnSphereAtDepth(yWorld, forceType=null){
     null,
     type
   ));
-}
-
-function spawnSphereNear(x,y){
-  spawnSphereAtDepth(y + (Math.random()-0.5)*100);
 }
 
 // ── Input ────────────────────────────────────────────────────────────────
@@ -1514,6 +1687,7 @@ document.getElementById('theme-btn').onclick = () => {
   setTheme(themeIdx+1);
 };
 const muteBtn = document.getElementById('mute-btn');
+const soundHintEl = document.getElementById('sound-hint');
 muteBtn.onclick = () => {
   isMuted = !isMuted;
   muteBtn.textContent = isMuted ? '🔇' : '🔊';
@@ -1521,18 +1695,16 @@ muteBtn.onclick = () => {
   muteBtn.style.animation = 'none';
   if(!isMuted) initAudio();
   // Hide hint on first unmute
-  const hint = document.getElementById('sound-hint');
-  if(hint) hint.style.display = 'none';
+  if(soundHintEl) soundHintEl.style.display = 'none';
 };
 
-  // Hide sound hint after 8s
-  setTimeout(()=>{
-    const hint = document.getElementById('sound-hint');
-    if(hint && isMuted) hint.style.opacity = '0';
-    const mb = document.getElementById('mute-btn');
-    if(mb && isMuted) mb.style.animation = 'none';
-    setTimeout(()=>{ if(hint) hint.style.display = 'none'; }, 1500);
-  }, 8000);
+// Auto-fade the sound hint if the user hasn't unmuted within 8s of boot.
+function fadeSoundHintIfStillMuted(){
+  if(soundHintEl && isMuted) soundHintEl.style.opacity = '0';
+  if(muteBtn && isMuted) muteBtn.style.animation = 'none';
+  setTimeout(() => { if(soundHintEl) soundHintEl.style.display = 'none'; }, 1500);
+}
+setTimeout(fadeSoundHintIfStillMuted, 8000);
 
 const tiltBtn = document.getElementById('tilt-btn');
 tiltBtn.onclick = () => {
@@ -1554,8 +1726,13 @@ document.getElementById('reset-btn').onclick = () => {
   journeyLog = []; updateJourneyPanel();
   firedChapters = new Set();
   chapterDisplay = null; chapterSlowMo = 0;
-  nextShapeY = 2500;
-  nextChallengeY = 10000;
+  braids = [];
+  breathRings = []; nextBreathY = 4000;
+  breathSlowMo = 0;
+  for(let i = 0; i < harmonyNotes.length; i++) harmonyNotes[i] = HARMONY_UNSET;
+  chordBloomCooldown = 0; chordBloomFlash = 0;
+  nextShapeY = CONFIG.SHAPE_START_Y;
+  nextChallengeY = CONFIG.CHALLENGE_SPACING_WORLD;
   particles = []; particleCount = 0;
   ragdolls = [new Ragdoll(W/2, 0, 'emy')];
   spheres = [];
@@ -1747,45 +1924,191 @@ function drawStarfield(parallax){
   }
 }
 
-function drawBackground(){
-  // Gradient background - screen-space
-  const grad = ctx.createRadialGradient(W/2,H/2,0, W/2,H/2,Math.max(W,H)*0.7);
-  grad.addColorStop(0, '#0e0e18');
-  grad.addColorStop(1, theme.bg);
-  ctx.save();
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0,0,W,H);
-  ctx.restore();
+// ── Ambient nebula clouds ─────────────────────────────────────────────────
+// Five large soft color-cloud blobs drifting very slowly upward, drawn in
+// screen space so they feel independent of the camera scroll.
+const NEBULA_DEFS = [
+  { xFrac:0.25, baseY:0,    parallax:0.07, radius:320, hueOffset:0,   driftSpeed:0.11 },
+  { xFrac:0.75, baseY:0.6,  parallax:0.10, radius:260, hueOffset:110, driftSpeed:0.09 },
+  { xFrac:0.50, baseY:1.2,  parallax:0.05, radius:370, hueOffset:230, driftSpeed:0.08 },
+  { xFrac:0.15, baseY:1.8,  parallax:0.13, radius:220, hueOffset:165, driftSpeed:0.13 },
+  { xFrac:0.85, baseY:0.35, parallax:0.08, radius:290, hueOffset:290, driftSpeed:0.10 },
+];
+function drawNebulae(){
+  // Derive the theme accent hue from the RGB triple so we tint nebulae to match.
+  const ar = theme.accent; const aa = Math.atan2(ar[2]-ar[1], ar[0]-ar[1]);
+  const themeHue = (Math.round(aa * (180/Math.PI)) + 360) % 360;
+  const depthHueShift = (cameraY * 0.0015) % 360;
+  for(let i = 0; i < NEBULA_DEFS.length; i++){
+    const nd = NEBULA_DEFS[i];
+    // Vertical position: repeating screen-height bands drifting upward with parallax
+    const scrolled = cameraY * nd.parallax;
+    const bandH = H * 2;
+    const cy = ((nd.baseY * H - scrolled % bandH) % bandH + bandH) % bandH - H * 0.1;
+    // Gentle horizontal oscillation
+    const cx = W * nd.xFrac + Math.sin(time * nd.driftSpeed + i * 1.3) * W * 0.09;
+    const hue = (themeHue + nd.hueOffset + depthHueShift) % 360;
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, nd.radius);
+    grad.addColorStop(0,   `hsla(${hue},75%,55%,0.09)`);
+    grad.addColorStop(0.5, `hsla(${(hue+30)%360},70%,45%,0.05)`);
+    grad.addColorStop(1,   `hsla(${hue},65%,40%,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(cx, cy, nd.radius, 0, TAU); ctx.fill();
+  }
+}
 
-  // Stars (screen space - must reset transform since we're inside camera transform)
+// ── Ambient light motes ───────────────────────────────────────────────────
+// 60 tiny luminous particles drift upward while the ragdoll falls down —
+// a zen duality of descent and ascent. Fully deterministic (no allocations).
+const MOTE_COUNT = 60;
+function drawAmbientMotes(){
+  const ar = theme.accent;
+  const themeHue = Math.round((Math.atan2(ar[2]-ar[1], ar[0]-ar[1]) * 180/Math.PI + 360)) % 360;
+  for(let i = 0; i < MOTE_COUNT; i++){
+    // Deterministic seed per mote
+    const seed = i * 48271 + 1;
+    const h1 = ((seed * 16807) & 0x7fffffff) / 0x7fffffff;
+    const h2 = ((seed * 2147483647) & 0x7fffffff) / 0x7fffffff;
+    const h3 = ((seed * 48271 + 7) & 0x7fffffff) / 0x7fffffff;
+    const h4 = ((seed * 1103515245) & 0x7fffffff) / 0x7fffffff;
+
+    // Each mote drifts upward at a unique speed; position loops seamlessly
+    const speed = 8 + h4 * 18; // px per second
+    const baseX = h1 * W;
+    const baseY = h2 * H;
+    const mx = baseX + Math.sin(time * (0.2 + h3 * 0.3) + i) * 18;
+    // Upward drift — modulo H for seamless looping
+    const my = ((baseY - time * speed % H) % H + H) % H;
+
+    const size = 0.8 + h3 * 1.8;
+    const alpha = 0.12 + h4 * 0.28;
+    const hue = (themeHue + h2 * 160 + time * 4) % 360;
+
+    ctx.fillStyle = `hsla(${hue},70%,80%,${alpha})`;
+    ctx.beginPath(); ctx.arc(mx, my, size, 0, TAU); ctx.fill();
+
+    // Subtle cross-sparkle on larger motes at peak alpha
+    if(size > 1.8 && alpha > 0.3){
+      const len = size * 2.5;
+      ctx.strokeStyle = `hsla(${hue},70%,90%,${alpha * 0.4})`;
+      ctx.lineWidth = 0.4;
+      ctx.beginPath(); ctx.moveTo(mx-len,my); ctx.lineTo(mx+len,my); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(mx,my-len); ctx.lineTo(mx,my+len); ctx.stroke();
+    }
+  }
+}
+
+// Background radial gradient — static per (viewport, theme). Rebuilt only when
+// either version counter changes. Saves one gradient allocation per frame.
+let _bgGrad = null;
+let _bgGradViewportV = -1;
+let _bgGradThemeV = -1;
+function getBgGradient(){
+  if(_bgGrad && _bgGradViewportV === _viewportVersion && _bgGradThemeV === _themeVersion){
+    return _bgGrad;
+  }
+  _bgGrad = ctx.createRadialGradient(W/2,H/2,0, W/2,H/2,Math.max(W,H)*0.7);
+  _bgGrad.addColorStop(0, '#0e0e18');
+  _bgGrad.addColorStop(1, theme.bg);
+  _bgGradViewportV = _viewportVersion;
+  _bgGradThemeV = _themeVersion;
+  return _bgGrad;
+}
+
+// ── Sacred-geometry offscreen cache ──────────────────────────────────────
+// Flower of Life + Metatron + Golden Spiral + 4 polygons run hundreds of path
+// ops per frame (Metatron alone draws N(N-1)/2 ≈ 171 line segments). All of
+// these animate very slowly (pulse at time*0.3, spiral at time*0.1), so we
+// render them to an offscreen and refresh every _SG_CACHE_EVERY frames.
+// The per-refresh animation jump is <1% — imperceptible.
+let _sgLayer = null;
+let _sgLayerCtx = null;
+let _sgLayerViewportV = -1;
+let _sgLayerThemeV = -1;
+let _sgLayerAge = 0;
+const _SG_CACHE_EVERY = 4;
+
+function ensureSgLayer(){
+  if(_sgLayer &&
+     _sgLayerViewportV === _viewportVersion &&
+     _sgLayerThemeV === _themeVersion) return;
+  _sgLayer = document.createElement('canvas');
+  _sgLayer.width = Math.floor(W * dpr);
+  _sgLayer.height = Math.floor(H * dpr);
+  _sgLayerCtx = _sgLayer.getContext('2d');
+  _sgLayerCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  _sgLayerViewportV = _viewportVersion;
+  _sgLayerThemeV = _themeVersion;
+  _sgLayerAge = _SG_CACHE_EVERY; // force first-frame render
+}
+
+function renderSgLayer(){
+  // Swap the active ctx so the existing draw* helpers can be reused.
+  const saved = ctx;
+  ctx = _sgLayerCtx;
+  ctx.clearRect(0, 0, W, H);
+  const scx = W/2, scy = H*0.5;
+  const pulse = 0.7 + 0.3*Math.sin(time*0.3);
+  drawFlowerOfLife(scx, scy, 120*pulse, 0.035);
+  drawMetatronsCube(scx, scy, 180*pulse, 0.02);
+  drawGoldenSpiral(scx, scy, 250, time*0.1, 0.03);
+  for(let i=0;i<4;i++){
+    drawPolygon(scx, scy, 100+i*60, 3+i, time*0.05*(i%2===0?1:-1), 0.015+i*0.004);
+  }
+  ctx = saved;
+}
+
+// Early-out helper: kaleidoscopes are drawn under the camera (-cameraY)
+// transform, so their effective screen y is (cy - cameraY). After a few
+// meters of depth they scroll past the top of the viewport; skipping them
+// saves ~7 gradient allocs + ~60 path ops per call.
+function kaleidoscopeVisible(cy, radius){
+  const sy = cy - cameraY;
+  return sy + radius*2 >= 0 && sy - radius*2 <= H;
+}
+
+function drawBackground(){
+  // Gradient background — screen-space, cached gradient.
   ctx.save();
   ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle = getBgGradient();
+  ctx.fillRect(0,0,W,H);
+
+  // Nebula clouds — screen space (behind stars)
+  drawNebulae();
+  // Stars — screen space
   drawStarfield(0.12); // distant tiny stars
   drawStarfield(0.15); // closer stars
+  // Ambient motes drifting upward — screen space
+  drawAmbientMotes();
   ctx.restore();
 
-  // ── Parallax kaleidoscope layers (screen-space, different scroll speeds) ──
-  // Layer 1: far background - slowest parallax
+  // ── Parallax kaleidoscope layers (drawn under world transform, as before) ──
+  // Wrapped in visibility checks — after the early fall these all scroll off
+  // and become zero-cost.
   const px1 = cameraY * 0.1;
-  drawKaleidoscope(W/2, H*0.5 - px1, 350, 6, time*0.03, 0, 0.03, px1);
-  drawKaleidoscope(W*0.2, H*0.3 - px1*0.8, 200, 8, -time*0.02, 120, 0.025, px1*0.8);
-  drawKaleidoscope(W*0.8, H*0.7 - px1*1.2, 250, 5, time*0.025, 240, 0.025, px1*1.2);
+  if(kaleidoscopeVisible(H*0.5 - px1, 350))
+    drawKaleidoscope(W/2, H*0.5 - px1, 350, 6, time*0.03, 0, 0.03, px1);
+  if(kaleidoscopeVisible(H*0.3 - px1*0.8, 200))
+    drawKaleidoscope(W*0.2, H*0.3 - px1*0.8, 200, 8, -time*0.02, 120, 0.025, px1*0.8);
+  if(kaleidoscopeVisible(H*0.7 - px1*1.2, 250))
+    drawKaleidoscope(W*0.8, H*0.7 - px1*1.2, 250, 5, time*0.025, 240, 0.025, px1*1.2);
 
-  // Layer 2: mid - medium parallax
   const px2 = cameraY * 0.3;
-  drawKaleidoscope(W*0.3, H*0.4 - px2, 180, 7, -time*0.04, 60, 0.04, px2);
-  drawKaleidoscope(W*0.7, H*0.6 - px2*0.7, 220, 6, time*0.035, 180, 0.035, px2*0.7);
-  drawKaleidoscope(W*0.5, H*0.2 - px2*1.3, 160, 9, -time*0.03, 300, 0.03, px2*1.3);
+  if(kaleidoscopeVisible(H*0.4 - px2, 180))
+    drawKaleidoscope(W*0.3, H*0.4 - px2, 180, 7, -time*0.04, 60, 0.04, px2);
+  if(kaleidoscopeVisible(H*0.6 - px2*0.7, 220))
+    drawKaleidoscope(W*0.7, H*0.6 - px2*0.7, 220, 6, time*0.035, 180, 0.035, px2*0.7);
+  if(kaleidoscopeVisible(H*0.2 - px2*1.3, 160))
+    drawKaleidoscope(W*0.5, H*0.2 - px2*1.3, 160, 9, -time*0.03, 300, 0.03, px2*1.3);
 
-  // Layer 3: near - fastest parallax (but still behind gameplay)
   const px3 = cameraY * 0.5;
-  drawKaleidoscope(W*0.15, H*0.6 - px3, 140, 5, time*0.05, 90, 0.045, px3);
-  drawKaleidoscope(W*0.85, H*0.35 - px3*0.6, 170, 8, -time*0.045, 210, 0.04, px3*0.6);
+  if(kaleidoscopeVisible(H*0.6 - px3, 140))
+    drawKaleidoscope(W*0.15, H*0.6 - px3, 140, 5, time*0.05, 90, 0.045, px3);
+  if(kaleidoscopeVisible(H*0.35 - px3*0.6, 170))
+    drawKaleidoscope(W*0.85, H*0.35 - px3*0.6, 170, 8, -time*0.045, 210, 0.04, px3*0.6);
 
-  // Stars drawn outside camera transform - see frame()
-
-  // Subtle grid - world space
+  // Subtle grid — world space
   const a = theme.accent;
   ctx.strokeStyle = `rgba(${a[0]},${a[1]},${a[2]},0.025)`;
   ctx.lineWidth = 0.5;
@@ -1798,15 +2121,19 @@ function drawBackground(){
     ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
   }
 
-  // Sacred geometry - world space, scrolls with gameplay
-  const cx = W/2, cy = cameraY + H*0.5;
-  const pulse = 0.7 + 0.3*Math.sin(time*0.3);
-  drawFlowerOfLife(cx, cy, 120*pulse, 0.035);
-  drawMetatronsCube(cx, cy, 180*pulse, 0.02);
-  drawGoldenSpiral(cx, cy, 250, time*0.1, 0.03);
-  for(let i=0;i<4;i++){
-    drawPolygon(cx, cy, 100+i*60, 3+i, time*0.05*(i%2===0?1:-1), 0.015+i*0.004);
+  // Sacred geometry — cached offscreen (screen-space; source coords happen
+  // to be camera-centered in world space, which after the -cameraY transform
+  // lands at screen center, so the cache can live in screen space).
+  ensureSgLayer();
+  _sgLayerAge++;
+  if(_sgLayerAge >= _SG_CACHE_EVERY){
+    _sgLayerAge = 0;
+    renderSgLayer();
   }
+  ctx.save();
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.drawImage(_sgLayer, 0, 0, W, H);
+  ctx.restore();
 }
 
 function drawSphere(s){
@@ -1828,20 +2155,47 @@ function drawSphere(s){
     if(s.impactFlash < 0) s.impactFlash = 0;
   }
 
+  // ── Rotating star sparkle ──
+  // Four short light-rays rotate slowly around each sphere, like starlight
+  // glinting off sacred crystal. Much lighter than concentric rings.
+  {
+    const auraHue = s.type === 'heart'    ? (330 + time*10 + s.hue) % 360
+      : s.type === 'chakra'   ? [0,30,60,120,240,275,300][s.chakraLevel]
+      : s.type === 'setback'  ? (45 + time*12 + s.hue) % 360
+      : s.type === 'yinyang'  ? (200 + s.hue) % 360
+      : (s.hue + time*15) % 360;
+    ctx.save();
+    ctx.rotate(time * 0.18 + s.hue * 0.017); // gentle rotation, unique per sphere
+    const sparkR   = r * 1.3;                 // ray origin (just outside main glow)
+    const sparkLen = r * 0.55;                // ray length
+    ctx.lineWidth = 0.7;
+    ctx.lineCap   = 'round';
+    ctx.strokeStyle = `hsla(${auraHue},85%,78%,0.16)`;
+    for(let si = 0; si < 4; si++){
+      const sa = si * TAU / 4;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(sa) * sparkR,             Math.sin(sa) * sparkR);
+      ctx.lineTo(Math.cos(sa) * (sparkR + sparkLen), Math.sin(sa) * (sparkR + sparkLen));
+      ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+    ctx.restore();
+  }
+
   if(s.type === 'heart'){
     // Red/pink glowing heart
     const hue = (330 + time*10 + s.hue) % 360;
 
     // Glow
     const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(${hue},80%,60%,0.2)`);
-    grad.addColorStop(1, `hsla(${hue},80%,60%,0)`);
+    grad.addColorStop(0, `hsla(${hue},90%,65%,0.35)`);
+    grad.addColorStop(1, `hsla(${hue},90%,65%,0)`);
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
 
     ctx.rotate(Math.sin(time + s.hue)*0.1);
-    ctx.strokeStyle = `hsla(${hue},80%,65%,0.9)`;
-    ctx.fillStyle = `hsla(${hue},70%,50%,0.25)`;
+    ctx.strokeStyle = `hsla(${hue},90%,70%,1.0)`;
+    ctx.fillStyle = `hsla(${hue},80%,55%,0.4)`;
     ctx.lineWidth = 1.5;
 
     ctx.beginPath();
@@ -1875,14 +2229,14 @@ function drawSphere(s){
 
     // Glow
     const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.6);
-    grad.addColorStop(0, `hsla(${hue},90%,60%,0.15)`);
-    grad.addColorStop(1, `hsla(${hue},90%,60%,0)`);
+    grad.addColorStop(0, `hsla(${hue},95%,65%,0.3)`);
+    grad.addColorStop(1, `hsla(${hue},95%,65%,0)`);
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(0,0,r*1.6,0,TAU); ctx.fill();
 
     // Yin Yang
     ctx.lineWidth = 1.5;
-    ctx.strokeStyle = `hsla(${hue},90%,70%,0.9)`;
+    ctx.strokeStyle = `hsla(${hue},95%,72%,1.0)`;
 
     // Outer circle
     ctx.beginPath(); ctx.arc(0,0,r,0,TAU); ctx.stroke();
@@ -1906,13 +2260,13 @@ function drawSphere(s){
     ctx.rotate(time * 0.2 + s.rotation);
 
     const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(${hue},80%,60%,0.2)`);
-    grad.addColorStop(1, `hsla(${hue},80%,60%,0)`);
+    grad.addColorStop(0, `hsla(${hue},90%,65%,0.35)`);
+    grad.addColorStop(1, `hsla(${hue},90%,65%,0)`);
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
 
-    ctx.strokeStyle = `hsla(${hue},80%,65%,0.9)`;
-    ctx.fillStyle = `hsla(${hue},80%,65%,0.1)`;
+    ctx.strokeStyle = `hsla(${hue},90%,70%,1.0)`;
+    ctx.fillStyle = `hsla(${hue},85%,65%,0.2)`;
     ctx.lineWidth = 1.0;
 
     const petals = petalsCount[idx];
@@ -1980,8 +2334,8 @@ function drawSphere(s){
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(0,0,sr*1.8,0,TAU); ctx.fill();
     // Penrose triangle (3D impossible triangle)
-    ctx.strokeStyle = `hsla(${hue},85%,65%,0.9)`;
-    ctx.fillStyle = `hsla(${hue},70%,50%,0.12)`;
+    ctx.strokeStyle = `hsla(${hue},90%,70%,1.0)`;
+    ctx.fillStyle = `hsla(${hue},80%,55%,0.25)`;
     ctx.lineWidth = 2;
     ctx.lineJoin = 'round';
     const outerR = sr * 0.85;
@@ -2048,12 +2402,12 @@ function drawSphere(s){
 
     // Deep Indigo/Violet Glow
     const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(${hue},80%,60%,0.2)`);
-    grad.addColorStop(1, `hsla(${hue},80%,60%,0)`);
+    grad.addColorStop(0, `hsla(${hue},90%,65%,0.35)`);
+    grad.addColorStop(1, `hsla(${hue},90%,65%,0)`);
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
 
-    ctx.strokeStyle = `hsla(${hue},80%,65%,0.9)`;
+    ctx.strokeStyle = `hsla(${hue},90%,70%,1.0)`;
     ctx.lineWidth = 1.5;
 
     // Two overlapping circles
@@ -2074,13 +2428,17 @@ function drawSphere(s){
   } else if(s.type === 'wave'){
     // Cyan triangle
     ctx.rotate(s.rotation);
-    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(180,80%,60%,0.2)`);
-    grad.addColorStop(1, `hsla(180,80%,60%,0)`);
-    ctx.fillStyle = grad;
+    // Static-hue glow — cached per sphere (key: just radius)
+    if(!s._glow || s._glowR !== r*1.8){
+      const g = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+      g.addColorStop(0, `hsla(180,90%,65%,0.35)`);
+      g.addColorStop(1, `hsla(180,90%,65%,0)`);
+      s._glow = g; s._glowR = r*1.8;
+    }
+    ctx.fillStyle = s._glow;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
-    ctx.strokeStyle = `hsla(180,80%,65%,0.9)`;
-    ctx.fillStyle = `hsla(180,70%,50%,0.2)`;
+    ctx.strokeStyle = `hsla(180,90%,70%,1.0)`;
+    ctx.fillStyle = `hsla(180,80%,55%,0.3)`,
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     for(let i=0;i<3;i++){
@@ -2092,13 +2450,17 @@ function drawSphere(s){
   } else if(s.type === 'trail'){
     // Magenta diamond
     ctx.rotate(s.rotation * 1.5);
-    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(300,80%,60%,0.2)`);
-    grad.addColorStop(1, `hsla(300,80%,60%,0)`);
-    ctx.fillStyle = grad;
+    // Static-hue glow — cached per sphere
+    if(!s._glow || s._glowR !== r*1.8){
+      const g = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+      g.addColorStop(0, `hsla(300,90%,65%,0.35)`);
+      g.addColorStop(1, `hsla(300,90%,65%,0)`);
+      s._glow = g; s._glowR = r*1.8;
+    }
+    ctx.fillStyle = s._glow;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
-    ctx.strokeStyle = `hsla(300,80%,65%,0.9)`;
-    ctx.fillStyle = `hsla(300,70%,50%,0.2)`;
+    ctx.strokeStyle = `hsla(300,90%,70%,1.0)`;
+    ctx.fillStyle = `hsla(300,80%,55%,0.3)`,
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(0,-r); ctx.lineTo(r*0.7,0); ctx.lineTo(0,r); ctx.lineTo(-r*0.7,0);
@@ -2106,13 +2468,17 @@ function drawSphere(s){
   } else if(s.type === 'pulse'){
     // Gold star
     ctx.rotate(s.rotation * 2);
-    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(45,90%,60%,0.2)`);
-    grad.addColorStop(1, `hsla(45,90%,60%,0)`);
-    ctx.fillStyle = grad;
+    // Static-hue glow — cached per sphere
+    if(!s._glow || s._glowR !== r*1.8){
+      const g = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
+      g.addColorStop(0, `hsla(45,95%,65%,0.35)`);
+      g.addColorStop(1, `hsla(45,95%,65%,0)`);
+      s._glow = g; s._glowR = r*1.8;
+    }
+    ctx.fillStyle = s._glow;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
-    ctx.strokeStyle = `hsla(45,90%,60%,0.9)`;
-    ctx.fillStyle = `hsla(45,80%,50%,0.2)`;
+    ctx.strokeStyle = `hsla(45,95%,65%,1.0)`;
+    ctx.fillStyle = `hsla(45,85%,55%,0.3)`,
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     const pts = 5;
@@ -2285,12 +2651,16 @@ function drawSphere(s){
     ctx.beginPath(); ctx.arc(0,0,r*1.5,0,TAU); ctx.stroke();
 
   } else {
-    // Normal sacred geometry sphere
+    // Normal sacred geometry sphere — outer glow cached per sphere,
+    // invalidated when theme changes (accent2 shifts).
     const a2 = theme.accent2;
-    const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.5);
-    grad.addColorStop(0, `rgba(${a2[0]},${a2[1]},${a2[2]},0.06)`);
-    grad.addColorStop(1, `rgba(${a2[0]},${a2[1]},${a2[2]},0)`);
-    ctx.fillStyle = grad;
+    if(!s._glow || s._glowR !== r*1.5 || s._glowThemeV !== _themeVersion){
+      const g = ctx.createRadialGradient(0,0,0, 0,0,r*1.5);
+      g.addColorStop(0, `rgba(${a2[0]},${a2[1]},${a2[2]},0.18)`);
+      g.addColorStop(1, `rgba(${a2[0]},${a2[1]},${a2[2]},0)`);
+      s._glow = g; s._glowR = r*1.5; s._glowThemeV = _themeVersion;
+    }
+    ctx.fillStyle = s._glow;
     ctx.beginPath(); ctx.arc(0,0,r*1.5,0,TAU); ctx.fill();
 
     const hue = (s.hue + time*15) % 360;
@@ -2298,7 +2668,7 @@ function drawSphere(s){
 
     if(s.sacredType === 0){
       // Polygon with internal lines
-      ctx.strokeStyle = `hsla(${hue},60%,55%,0.25)`;
+      ctx.strokeStyle = `hsla(${hue},75%,65%,0.55)`;
       ctx.lineWidth = 1;
       ctx.beginPath();
       for(let i=0;i<=s.segments;i++){
@@ -2308,7 +2678,7 @@ function drawSphere(s){
       }
       ctx.stroke();
 
-      ctx.strokeStyle = `hsla(${hue},50%,50%,0.12)`;
+      ctx.strokeStyle = `hsla(${hue},65%,55%,0.3)`;
       ctx.lineWidth = 0.5;
       ctx.beginPath();
       for(let i=0;i<=s.segments;i++){
@@ -2319,7 +2689,7 @@ function drawSphere(s){
       ctx.stroke();
 
       if(s.segments >= 5){
-        ctx.strokeStyle = `hsla(${hue},40%,45%,0.08)`;
+        ctx.strokeStyle = `hsla(${hue},55%,50%,0.2)`;
         ctx.beginPath();
         for(let i=0;i<s.segments;i++){
           const a1 = i*TAU/s.segments;
@@ -2332,7 +2702,7 @@ function drawSphere(s){
     }
     else if(s.sacredType === 1){
       // Seed of Life
-      ctx.strokeStyle = `hsla(${hue},60%,55%,0.25)`;
+      ctx.strokeStyle = `hsla(${hue},75%,65%,0.55)`;
       ctx.lineWidth = 1;
       const sr = r * 0.5; // sub radius
       ctx.beginPath(); ctx.arc(0,0,sr,0,TAU); ctx.stroke();
@@ -2341,12 +2711,12 @@ function drawSphere(s){
         ctx.arc(Math.cos(i*PI/3)*sr, Math.sin(i*PI/3)*sr, sr, 0, TAU);
         ctx.stroke();
       }
-      ctx.strokeStyle = `hsla(${hue},60%,55%,0.15)`;
+      ctx.strokeStyle = `hsla(${hue},75%,60%,0.35)`;
       ctx.beginPath(); ctx.arc(0,0,r,0,TAU); ctx.stroke();
     }
     else if(s.sacredType === 2){
       // Simplified Metatron / Cube
-      ctx.strokeStyle = `hsla(${hue},60%,55%,0.25)`;
+      ctx.strokeStyle = `hsla(${hue},75%,65%,0.5)`;
       ctx.lineWidth = 1;
       const pts = [];
       const mR = r * 0.8;
@@ -2363,7 +2733,7 @@ function drawSphere(s){
       }
       ctx.stroke();
 
-      ctx.fillStyle = `hsla(${hue},60%,60%,0.2)`;
+      ctx.fillStyle = `hsla(${hue},70%,60%,0.35)`;
       for(const pt of pts){
         ctx.beginPath(); ctx.arc(pt[0], pt[1], r*0.15, 0, TAU); ctx.fill();
         ctx.beginPath(); ctx.arc(pt[0], pt[1], r*0.15, 0, TAU); ctx.stroke();
@@ -2371,11 +2741,11 @@ function drawSphere(s){
     }
 
     // Inner circle
-    ctx.strokeStyle = `hsla(${hue},45%,50%,0.15)`;
+    ctx.strokeStyle = `hsla(${hue},65%,55%,0.35)`;
     ctx.beginPath(); ctx.arc(0,0,r*0.35,0,TAU); ctx.stroke();
 
     // Center dot
-    ctx.fillStyle = `hsla(${hue},60%,60%,0.3)`;
+    ctx.fillStyle = `hsla(${hue},75%,65%,0.55)`;
     ctx.beginPath(); ctx.arc(0,0,2,0,TAU); ctx.fill();
   }
 
@@ -2396,6 +2766,31 @@ function drawRagdoll(ragdoll){
   const ps = ragdoll.particles;
   const a = ragdoll.accent;
   const a2 = ragdoll.accent2;
+
+  // ── Comet head trail ──
+  const head0 = ps[0];
+  ragdoll.headTrail.push({ x: head0.x, y: head0.y });
+  if(ragdoll.headTrail.length > ragdoll.trailMaxLen) ragdoll.headTrail.shift();
+  if(ragdoll.headTrail.length >= 3){
+    const tlen = ragdoll.headTrail.length;
+    for(let ti = 1; ti < tlen; ti++){
+      const t = ti / tlen; // 0 (oldest) → 1 (newest)
+      const prev = ragdoll.headTrail[ti - 1];
+      const curr = ragdoll.headTrail[ti];
+      const trailAlpha = t * t * 0.45; // quadratic fade — near-invisible at tail
+      const trailWidth = 0.5 + t * 2.5;
+      // Hue shifts along the trail for an iridescent ribbon feel
+      const trailHue = (ragdoll.hue + 40 + t * 60 + time * 15) % 360;
+      ctx.strokeStyle = `hsla(${trailHue},90%,75%,${trailAlpha})`;
+      ctx.lineWidth = trailWidth;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(prev.x, prev.y);
+      ctx.lineTo(curr.x, curr.y);
+      ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+  }
 
   // Glow on joints
   for(const p of ps){
@@ -2476,6 +2871,219 @@ function drawRagdoll(ragdoll){
 }
 
 // ── Camera follows ragdoll + spawn spheres ahead ──────────────────────
+// Shape density: no shapes before SHAPE_RAMP_START_M (25 m). Density then
+// ramps from one shape per SHAPE_SPACING_MAX (800 px) to one per
+// SHAPE_SPACING_MIN (120 px) by SHAPE_RAMP_END_M (100 m) and beyond.
+// Shared between updateCamera() and recycleObjects() so the two call sites
+// cannot drift out of sync.
+function maybeSpawnNextShape(aheadY){
+  const depthM = Math.max(0, cameraY / 100);
+  if(depthM < CONFIG.SHAPE_RAMP_START_M || aheadY <= nextShapeY) return;
+  const ramp = clamp(
+    (depthM - CONFIG.SHAPE_RAMP_START_M) /
+      (CONFIG.SHAPE_RAMP_END_M - CONFIG.SHAPE_RAMP_START_M),
+    0, 1
+  );
+  const interval = lerp(CONFIG.SHAPE_SPACING_MAX, CONFIG.SHAPE_SPACING_MIN, ramp);
+  nextShapeY = aheadY + interval * (0.7 + Math.random() * 0.6);
+  spawnSphereAtDepth(nextShapeY);
+}
+
+// Breath ring spawn — independent of sphere spawning so pacing is predictable.
+function maybeSpawnBreathRing(aheadY){
+  const depthM = Math.max(0, cameraY / 100);
+  if(depthM < CONFIG.BREATH_SPAWN_START_M || aheadY <= nextBreathY) return;
+  breathRings.push({
+    x: 80 + Math.random() * (W - 160),
+    y: nextBreathY,
+    phase: Math.random() * TAU,
+    baseR: CONFIG.BREATH_BASE_R + Math.random() * 20,
+    triggered: false,
+    triggerFade: 0,
+  });
+  nextBreathY += CONFIG.BREATH_SPACING_WORLD * (0.85 + Math.random() * 0.4);
+}
+
+// ── Braided Ragdolls: formation + solving + compaction ───────────────────
+// Hand particle indices inside Ragdoll.particles (see class constructor):
+//   6 = lHand, 7 = rHand
+const BRAID_HAND_IDX = [6, 7];
+
+function alreadyBraided(a, b){
+  for(const br of braids){
+    if((br.pa === a && br.pb === b) || (br.pa === b && br.pb === a)) return true;
+  }
+  return false;
+}
+
+// Called once per frame (not per substep) — formation is a discrete event.
+function updateBraids(dt){
+  // Form new braids when unconnected hands of different ragdolls get close.
+  for(let i = 0; i < ragdolls.length; i++){
+    for(let j = i + 1; j < ragdolls.length; j++){
+      const ra = ragdolls[i], rb = ragdolls[j];
+      for(const ai of BRAID_HAND_IDX){
+        const ha = ra.particles[ai];
+        if(!ha) continue;
+        for(const bi of BRAID_HAND_IDX){
+          const hb = rb.particles[bi];
+          if(!hb || alreadyBraided(ha, hb)) continue;
+          const dx = hb.x - ha.x, dy = hb.y - ha.y;
+          const d = Math.sqrt(dx*dx + dy*dy);
+          if(d < CONFIG.BRAID_RANGE){
+            braids.push({
+              pa: ha, pb: hb,
+              dist: Math.max(d, 18),
+              life: CONFIG.BRAID_LIFE,
+              maxLife: CONFIG.BRAID_LIFE,
+            });
+          }
+        }
+      }
+    }
+  }
+  // Decay + drop broken/expired braids in-place.
+  let w = 0;
+  for(let i = 0; i < braids.length; i++){
+    const b = braids[i];
+    b.life -= dt;
+    const dx = b.pb.x - b.pa.x, dy = b.pb.y - b.pa.y;
+    const d = Math.sqrt(dx*dx + dy*dy);
+    if(b.life > 0 && d < b.dist * CONFIG.BRAID_BREAK_MULT){
+      if(w !== i) braids[w] = b;
+      w++;
+    }
+  }
+  braids.length = w;
+}
+
+// Called inside the physics substep, after each Ragdoll.update(). Gentle
+// stiffness that additionally tapers as the braid ages.
+function solveBraids(){
+  for(const b of braids){
+    const pa = b.pa, pb = b.pb;
+    const dx = pb.x - pa.x, dy = pb.y - pa.y;
+    const d = Math.sqrt(dx*dx + dy*dy) || 0.001;
+    const ageFactor = clamp(b.life / b.maxLife, 0, 1);
+    const diff = clamp(
+      (d - b.dist) / d * CONFIG.BRAID_STIFFNESS * ageFactor,
+      -1, 1
+    );
+    const mx = dx * diff * 0.5, my = dy * diff * 0.5;
+    if(!pa.pinned){ pa.x += mx; pa.y += my; }
+    if(!pb.pinned){ pb.x -= mx; pb.y -= my; }
+  }
+}
+
+// ── Breath Rings: update + trigger detection + compaction ────────────────
+function updateBreathRings(dt){
+  const head = ragdolls.length > 0 ? ragdolls[0].particles[0] : null;
+  let w = 0;
+  for(let i = 0; i < breathRings.length; i++){
+    const br = breathRings[i];
+    br.phase += dt * 0.9;
+    // Cull if far behind camera.
+    if(br.y < cameraY - 400) continue;
+    // Trigger detection (once): head must be inside the current pulse radius
+    // AND the pulse must be near its peak.
+    if(!br.triggered && head){
+      const dx = head.x - br.x, dy = head.y - br.y;
+      const d = Math.sqrt(dx*dx + dy*dy);
+      const pulse = Math.abs(Math.sin(br.phase));
+      const currentR = br.baseR * (0.55 + pulse * 0.65);
+      if(d < currentR && pulse > 0.82){
+        br.triggered = true;
+        br.triggerFade = 1.0;
+        triggerBreath(br);
+      }
+    }
+    if(br.triggered){
+      br.triggerFade -= dt * 0.6;
+      if(br.triggerFade <= 0) continue;
+    }
+    if(w !== i) breathRings[w] = br;
+    w++;
+  }
+  breathRings.length = w;
+}
+
+function triggerBreath(br){
+  breathSlowMo = CONFIG.BREATH_SLOWMO_S;
+  playChordBloom(0.55); // gentler bloom; perfect-chord bloom uses higher gain
+  // Soft sparkle burst at the ring centre. Hue cycles slowly with game time
+  // so successive rings read as a progression rather than a flat tone.
+  spawnImpactParticles(br.x, br.y, (time * 30 + themeIdx * 60) % 360, 5);
+}
+
+// ── Perfect Chord Bloom: record a hit + maybe fire ───────────────────────
+// The first five slots of the `pentatonic` array are the five unique pitch
+// classes (C D E G A). Anything beyond index 4 wraps back via (noteIdx % 5).
+function recordHarmonyHit(noteIdx, xPos, yWorld){
+  if(!audioCtx) return;
+  const now = audioCtx.currentTime;
+  harmonyNotes[noteIdx % 5] = now;
+  if(chordBloomCooldown > 0) return;
+  // All five inside the window?
+  for(let i = 0; i < 5; i++){
+    if(now - harmonyNotes[i] > CONFIG.CHORD_WINDOW_S) return;
+  }
+  chordBloomCooldown = CONFIG.CHORD_COOLDOWN_S;
+  chordBloomFlash = 1.0;
+  playChordBloom(1.0);
+  // Visual burst at the last impact point
+  spawnImpactParticles(xPos, yWorld, (noteIdx * 72) % 360, 8);
+}
+
+// Soft resolving major chord — used by both breath rings and chord bloom.
+function playChordBloom(gain){
+  if(isMuted || !audioCtx) return;
+  if(activeOscCount >= CONFIG.MAX_CONCURRENT_OSC) return;
+  const now = audioCtx.currentTime;
+  const root = 165; // same E3 base as impact sounds
+  const freqs = [root, root * 1.2599, root * 1.4983, root * 2]; // root, maj3, 5, oct
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0, now);
+  g.gain.linearRampToValueAtTime(Math.min(gain, 1) * 0.16, now + 0.25);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 3.2);
+  g.connect(masterGain);
+  if(delayNode) g.connect(delayNode);
+  for(const f of freqs){
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(f, now);
+    osc.connect(g);
+    osc.start(now);
+    osc.stop(now + 3.3);
+  }
+}
+
+// ── Stereo Flanger Activation ──────────────────────────────────────────────
+// Fades in the two wet delay lines over `duration` seconds, creating a
+// sweeping stereo flanger wash over the existing sounds. Feedback is ramped
+// to zero at the end to prevent the delay buffers from accumulating.
+function activateFlanger(duration){
+  if(!flangerWetL || isMuted || !audioCtx) return;
+  const now  = audioCtx.currentTime;
+  const peak = 0.42;  // wet level at full effect
+  const fb   = 0.62;  // feedback resonance
+  const fadeIn  = 0.7;
+  const fadeOut = 1.4;
+
+  [flangerWetL, flangerWetR].forEach(node => {
+    node.gain.cancelScheduledValues(now);
+    node.gain.setValueAtTime(0,    now);
+    node.gain.linearRampToValueAtTime(peak, now + fadeIn);
+    node.gain.setValueAtTime(peak, now + duration - fadeOut);
+    node.gain.exponentialRampToValueAtTime(0.001, now + duration);
+  });
+  [flangerFbL, flangerFbR].forEach(node => {
+    node.gain.cancelScheduledValues(now);
+    node.gain.setValueAtTime(fb, now);
+    node.gain.setValueAtTime(fb, now + duration - fadeOut);
+    node.gain.linearRampToValueAtTime(0, now + duration);
+  });
+}
+
 function updateCamera(){
   if(ragdolls.length > 0){
     // DISABLE camera follow while dragging to fix the canvas position
@@ -2483,8 +3091,8 @@ function updateCamera(){
 
     const head = ragdolls[0].particles[0];
     // Smoothly follow the ragdoll's head, keeping it at ~35% from top
-    const targetCam = head.y - H * 0.35;
-    cameraY += (targetCam - cameraY) * 0.08;
+    const targetCam = head.y - H * CONFIG.CAMERA_TARGET_RATIO;
+    cameraY += (targetCam - cameraY) * CONFIG.CAMERA_FOLLOW;
   }
   // Spawn new spheres ahead of the camera
   const aheadY = cameraY + H + 200;
@@ -2492,38 +3100,103 @@ function updateCamera(){
   // Every 100m (10000px), spawn a challenge
   if(aheadY > nextChallengeY){
     spawnSphereAtDepth(nextChallengeY, 'challenge');
-    nextChallengeY += 10000;
+    nextChallengeY += CONFIG.CHALLENGE_SPACING_WORLD;
   }
 
-  // ── Shape Density ──
-  // No shapes before 25m (2500px). Density ramps from 1 shape per 800px at 25m
-  // down to 1 shape per 120px at 100m and beyond.
-  const depthM = Math.max(0, cameraY / 100);
-  if(depthM >= 25 && aheadY > nextShapeY){
-    const ramp = Math.min((depthM - 25) / 75, 1.0);
-    const interval = 800 - ramp * 680; // 800px → 120px
-    nextShapeY = aheadY + interval * (0.7 + Math.random() * 0.6);
-    spawnSphereAtDepth(nextShapeY);
-  }
+  maybeSpawnNextShape(aheadY);
+  maybeSpawnBreathRing(aheadY);
 }
 
 function recycleObjects(){
   const behindY = cameraY - 300;
-  spheres = spheres.filter(s => s.y > behindY);
-  // Keep spawning
-  const aheadY = cameraY + H + 100;
+  // In-place compaction avoids the allocation + copy of Array#filter
+  let w = 0;
+  for(let i = 0; i < spheres.length; i++){
+    const s = spheres[i];
+    if(s.y > behindY){
+      if(w !== i) spheres[w] = s;
+      w++;
+    }
+  }
+  spheres.length = w;
   // Keep spawning - density increases with depth
-  const depthM2 = Math.max(0, cameraY / 100);
-  if(depthM2 >= 25 && aheadY > nextShapeY){
-    const ramp = Math.min((depthM2 - 25) / 75, 1.0);
-    const interval = 800 - ramp * 680;
-    nextShapeY = aheadY + interval * (0.7 + Math.random() * 0.6);
-    spawnSphereAtDepth(nextShapeY);
+  maybeSpawnNextShape(cameraY + H + 100);
+  maybeSpawnBreathRing(cameraY + H + 100);
+}
+
+// ── Draw: Braids ─────────────────────────────────────────────────────────
+function drawBraids(){
+  for(const b of braids){
+    const lifeT = clamp(b.life / b.maxLife, 0, 1);
+    const ax = b.pa.x, ay = b.pa.y;
+    const bx = b.pb.x, by = b.pb.y;
+    // Midpoint dips slightly, suggesting a held thread
+    const mx = (ax + bx) * 0.5;
+    const my = (ay + by) * 0.5 + 6 * lifeT;
+    const accent = theme.accent;
+    // Soft outer glow (double stroke, no shadowBlur)
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = `rgba(${accent[0]},${accent[1]},${accent[2]},${lifeT * 0.18})`;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.quadraticCurveTo(mx, my, bx, by);
+    ctx.stroke();
+    // Bright inner thread
+    ctx.lineWidth = 1.1;
+    ctx.strokeStyle = `rgba(${accent[0]},${accent[1]},${accent[2]},${lifeT * 0.7})`;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.quadraticCurveTo(mx, my, bx, by);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+  }
+}
+
+// ── Draw: Breath Rings ───────────────────────────────────────────────────
+// Vesica piscis = two overlapping circles whose centres sit on each other's
+// circumferences. We render a pulsating pair sharing a horizontal axis.
+function drawBreathRings(){
+  for(const br of breathRings){
+    const pulse = Math.abs(Math.sin(br.phase));
+    const r = br.baseR * (0.55 + pulse * 0.65);
+    const offset = r * 0.5; // overlap = vesica piscis
+    // Triggered rings fade and expand
+    let alpha = 0.35 + pulse * 0.35;
+    let scale = 1;
+    if(br.triggered){
+      alpha = br.triggerFade * 0.7;
+      scale = 1 + (1 - br.triggerFade) * 0.8;
+    }
+    const rScaled = r * scale;
+    const offsetScaled = offset * scale;
+    const accent = theme.accent2;
+    // Outer soft halo (double stroke, no shadowBlur)
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = `rgba(${accent[0]},${accent[1]},${accent[2]},${alpha * 0.22})`;
+    ctx.beginPath(); ctx.arc(br.x - offsetScaled, br.y, rScaled, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(br.x + offsetScaled, br.y, rScaled, 0, TAU); ctx.stroke();
+    // Inner thin line
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = `rgba(${accent[0]},${accent[1]},${accent[2]},${alpha * 0.85})`;
+    ctx.beginPath(); ctx.arc(br.x - offsetScaled, br.y, rScaled, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(br.x + offsetScaled, br.y, rScaled, 0, TAU); ctx.stroke();
+    // Centre mark at peak pulse
+    if(!br.triggered && pulse > 0.7){
+      const dotA = (pulse - 0.7) / 0.3;
+      ctx.fillStyle = `rgba(${accent[0]},${accent[1]},${accent[2]},${dotA * 0.8})`;
+      ctx.beginPath(); ctx.arc(br.x, br.y, 2.5, 0, TAU); ctx.fill();
+    }
   }
 }
 
 // ── Main loop ────────────────────────────────────────────────────────────
 let lastTime = 0;
+// Cached once; flipped to false by the 'intro-complete' listener below so the
+// hot path does not pay for a document.getElementById() every frame.
+let introActive = !!document.getElementById('intro-sequence');
+window.addEventListener('intro-complete', () => { introActive = false; });
+
 function frame(now){
   requestAnimationFrame(frame);
   try {
@@ -2532,8 +3205,11 @@ function frame(now){
   const rawDt = Math.min((now - lastTime)/1000, 0.033);
   lastTime = now;
 
-  // Detect and recover from blank canvas (context state corruption)
-  if(Math.random() < 0.002) { // ~every 8 seconds at 60fps
+  // Detect and recover from blank canvas (context state corruption).
+  // NOTE: getImageData forces a GPU→CPU readback (measurably costly). The
+  // probability is kept low (~once every 8s at 60fps) so the perf hit is
+  // negligible. Do NOT increase the frequency without re-measuring.
+  if(Math.random() < 0.002) {
     const testPixel = ctx.getImageData(0, 0, 1, 1).data;
     if(testPixel[3] === 0 && cameraY > 100) {
       // Canvas is transparent when it shouldn't be — re-init
@@ -2545,8 +3221,6 @@ function frame(now){
   }
 
   // Freeze physics during intro
-  const introEl = document.getElementById('intro-sequence');
-  const introActive = !!introEl;
   const effectiveTimeScale = introActive ? 0 : targetTimeScale;
 
   // Smoothly interpolate time scale (much faster transition but still eased)
@@ -2561,6 +3235,8 @@ function frame(now){
   // Physics substeps
   for(let s=0;s<SUBSTEPS;s++){
     for(const r of ragdolls) r.update(dt);
+    // Braid constraints solve alongside ragdoll constraints each substep
+    solveBraids();
     // Magnet repulsion - push spheres away from ragdoll
     if(activeEffects.magnet > 0 && ragdolls.length > 0){
       const head = ragdolls[0].particles[0];
@@ -2587,6 +3263,11 @@ function frame(now){
   // Update impact particles (once per frame, not per substep)
   updateParticles(rawDt);
   updateScoreElements(rawDt);
+  updateBraids(rawDt);
+  updateBreathRings(rawDt);
+  // Chord bloom timers
+  if(chordBloomCooldown > 0) chordBloomCooldown -= rawDt;
+  if(chordBloomFlash > 0) chordBloomFlash -= rawDt * 0.8;
 
   // Clamp ragdoll to screen width
   for(const r of ragdolls){
@@ -2613,6 +3294,7 @@ function frame(now){
         window.manualThemeSet = true;
         theme.accent = portal.targetAccent;
         theme.accent2 = portal.targetAccent2;
+        _themeVersion++;
       }
       if(portal.progress >= 1){ portal.phase = 'emerging'; portal.progress = 0; }
     } else if(portal.phase === 'emerging'){
@@ -2626,8 +3308,21 @@ function frame(now){
   ctx.translate(0, -cameraY); // camera transform
 
   drawBackground();
-  for(const s of spheres) drawSphere(s);
+  drawBreathRings(); // behind spheres so they don't occlude important obstacles
+  // Frustum-cull spheres. Use 2× sphere radius to account for glow halo —
+  // draws that spill a little past the visible band. Physics still runs on
+  // culled spheres (that happens elsewhere in the frame), this only affects
+  // rendering cost.
+  const _viewTop = cameraY - 50;
+  const _viewBot = cameraY + H + 50;
+  for(let si = 0; si < spheres.length; si++){
+    const s = spheres[si];
+    const margin = s.r * 2;
+    if(s.y + margin < _viewTop || s.y - margin > _viewBot) continue;
+    drawSphere(s);
+  }
   for(const r of ragdolls) drawRagdoll(r);
+  drawBraids();      // over ragdolls so the thread reads clearly
   // ── Active Power-Up Effects (world space) ──
   const head = ragdolls.length > 0 ? ragdolls[0].particles[0] : null;
   const headX = head ? head.x : W/2;
@@ -2858,6 +3553,56 @@ function frame(now){
     ctx.restore();
   }
 
+  // ── Chord Bloom Sacred Mandala (screen space) ──────────────────────────
+  // When all 5 pentatonic pitch classes hit within the window, a set of
+  // expanding sacred-geometry polygon rings radiates from the screen centre.
+  if(chordBloomFlash > 0){
+    const cf = chordBloomFlash; // 1→0 over ~1.25s
+    const expand = 1 - cf;     // 0→1 as flash fades
+    // Envelope: bell curve so rings fade in AND out
+    const env = cf * Math.sin(expand * PI);
+    const cx = W / 2, cy = H / 2;
+    // 5 rings, one per pentatonic pitch class, polygon sides 3–7
+    const pentatonicHues = [0, 72, 144, 216, 288]; // evenly spaced around hue wheel
+    for(let ri = 0; ri < 5; ri++){
+      const sides = ri + 3; // triangle (3) through heptagon (7)
+      const phase = (ri / 5) * TAU * 0.25; // stagger so rings don't overlap at start
+      const radius = expand * Math.min(W, H) * (0.3 + ri * 0.12) + phase * 8;
+      const hue = (pentatonicHues[ri] + time * 18) % 360;
+      const alpha = env * (0.22 - ri * 0.03);
+      if(alpha <= 0 || radius <= 0) continue;
+      ctx.lineWidth = 3.5 - ri * 0.4;
+      ctx.strokeStyle = `hsla(${hue},90%,70%,${alpha * 0.35})`;
+      ctx.beginPath();
+      for(let vi = 0; vi <= sides; vi++){
+        const angle = vi * TAU / sides - PI / 2;
+        const px = cx + Math.cos(angle) * radius;
+        const py = cy + Math.sin(angle) * radius;
+        if(vi === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.lineWidth = 0.8;
+      ctx.strokeStyle = `hsla(${hue},95%,80%,${alpha})`;
+      ctx.beginPath();
+      for(let vi = 0; vi <= sides; vi++){
+        const angle = vi * TAU / sides - PI / 2;
+        const px = cx + Math.cos(angle) * radius;
+        const py = cy + Math.sin(angle) * radius;
+        if(vi === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    // Soft radial glow at centre during peak
+    if(env > 0.1){
+      const bloomGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 80);
+      const bHue = (time * 40) % 360;
+      bloomGrad.addColorStop(0, `hsla(${bHue},80%,70%,${env * 0.15})`);
+      bloomGrad.addColorStop(1, `hsla(${bHue},80%,60%,0)`);
+      ctx.fillStyle = bloomGrad;
+      ctx.beginPath(); ctx.arc(cx, cy, 80, 0, TAU); ctx.fill();
+    }
+  }
+
   // ── Depth Meter & Sunrise Overlay ──
   const depthMeters = Math.max(0, cameraY / 100);
 
@@ -2883,18 +3628,23 @@ function frame(now){
   ctx.textAlign = 'right';
   ctx.fillText(`${depthMeters.toFixed(1)} m`, W - 20, H - 20);
 
-  // Score HUD (below depth meter)
+  // Score HUD (below depth meter) — no shadowBlur (expensive on mobile);
+  // animated state uses a cheap 4-offset glow draw instead.
   const a3 = theme.accent2;
   const isAnim = displayScore < score;
-  ctx.fillStyle = `rgba(${a3[0]},${a3[1]},${a3[2]},${isAnim ? 0.8 : 0.35})`;
   ctx.font = `${isAnim ? '300' : '200'} 0.8rem monospace`;
   ctx.textAlign = 'right';
+  const scoreStr = displayScore.toLocaleString();
   if(isAnim){
-    ctx.shadowColor = `rgba(${a3[0]},${a3[1]},${a3[2]},0.5)`;
-    ctx.shadowBlur = 10 + Math.sin(time * 12) * 4;
+    const glow = (0.18 + 0.12 * (0.5 + 0.5 * Math.sin(time * 12)));
+    ctx.fillStyle = `rgba(${a3[0]},${a3[1]},${a3[2]},${glow})`;
+    ctx.fillText(scoreStr, W - 19, H - 38);
+    ctx.fillText(scoreStr, W - 21, H - 38);
+    ctx.fillText(scoreStr, W - 20, H - 37);
+    ctx.fillText(scoreStr, W - 20, H - 39);
   }
-  ctx.fillText(displayScore.toLocaleString(), W - 20, H - 38);
-  ctx.shadowBlur = 0;
+  ctx.fillStyle = `rgba(${a3[0]},${a3[1]},${a3[2]},${isAnim ? 0.9 : 0.35})`;
+  ctx.fillText(scoreStr, W - 20, H - 38);
 
   // Combo next to score
   if(comboCount > 1){
@@ -2950,6 +3700,12 @@ function frame(now){
   if(chapterSlowMo > 0){
     chapterSlowMo -= rawDt;
     targetTimeScale = 0.2;
+  } else if(breathSlowMo > 0){
+    breathSlowMo -= rawDt;
+    targetTimeScale = 0.45; // softer than chapter slow-mo
+    // Reset the chapter sentinel so the restore branch below will fire
+    // when breath slow-mo finishes.
+    chapterSlowMo = 0;
   } else if(chapterSlowMo !== -1 && !isSlowed){
     targetTimeScale = 1.0;
     chapterSlowMo = -1;
@@ -3083,6 +3839,17 @@ function frame(now){
     ctx.textAlign = 'center';
     ctx.fillText('hold to slow', W/2, H - 30);
   }
+
+  // Perfect-chord bloom flash — subtle full-screen halo, eases out quickly.
+  if(chordBloomFlash > 0){
+    const t = clamp(chordBloomFlash, 0, 1);
+    const a = theme.accent2;
+    const grad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W, H) * 0.7);
+    grad.addColorStop(0, `rgba(${a[0]},${a[1]},${a[2]},${t * 0.18})`);
+    grad.addColorStop(1, `rgba(${a[0]},${a[1]},${a[2]},0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  }
   } catch(e) { 
     console.error('[falling-emy] frame error:', e);
     // Reset canvas state on error to prevent corrupted transform
@@ -3093,46 +3860,52 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 
+// Idempotent: this is wired up both synchronously below and on window.load
+// (some browsers fire 'load' before the sync call, others after). The guard
+// prevents re-binding the embark onclick handler and keeps the restart button
+// from being appended twice.
+let _resumeChecked = false;
 function checkResume(){
-  if(window._fe){
-    const saved = window._fe.loadProgress();
-    if(saved && saved.depthMeters >= 5){
-      const thoughtText = document.getElementById('intro-thought-text');
-      if(thoughtText) thoughtText.textContent = "Your journey already began.";
+  if(_resumeChecked) return;
+  if(!window._fe) return;
+  const saved = window._fe.loadProgress();
+  if(!saved || saved.depthMeters < CONFIG.INTRO_RESUME_MIN_M) return;
+  _resumeChecked = true;
 
-      const embarkBtn = document.getElementById('intro-embark');
-      if(embarkBtn) {
-        embarkBtn.textContent = "Resume journey";
-        embarkBtn.dataset.resume = "true";
-        embarkBtn.onclick = (e) => {
-          e.preventDefault(); e.stopPropagation();
-          window._fe.restoreFromSave(saved);
-          if(window._startBirth) window._startBirth();
-        };
-      }
-      const promptArea = document.getElementById('intro-prompt');
-      if(promptArea && !document.getElementById('intro-restart')) {
-        const embarkEl = document.getElementById('intro-embark');
-        const restartBtn = document.createElement('button');
-        restartBtn.id = 'intro-restart';
-        restartBtn.textContent = "Embark again";
-        // Copy all CSS properties from embark button to ensure visual match
-        if(embarkEl){
-          const cs = getComputedStyle(embarkEl);
-          for(const prop of cs){
-            try { restartBtn.style.setProperty(prop, cs.getPropertyValue(prop)); } catch(e){}
-          }
-        }
-        restartBtn.onclick = (e) => {
-          e.preventDefault(); e.stopPropagation();
-          window._fe.clearSave();
-          // Silently start the birth sequence immediately
-          if(window._startBirth) window._startBirth();
-          else if(typeof setPhase === 'function') setPhase('born');
-        };
-        promptArea.appendChild(restartBtn);
+  const thoughtText = document.getElementById('intro-thought-text');
+  if(thoughtText) thoughtText.textContent = "Your journey already began.";
+
+  const embarkBtn = document.getElementById('intro-embark');
+  if(embarkBtn) {
+    embarkBtn.textContent = "Resume journey";
+    embarkBtn.dataset.resume = "true";
+    embarkBtn.onclick = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      window._fe.restoreFromSave(saved);
+      if(window._startBirth) window._startBirth();
+    };
+  }
+  const promptArea = document.getElementById('intro-prompt');
+  if(promptArea && !document.getElementById('intro-restart')) {
+    const embarkEl = document.getElementById('intro-embark');
+    const restartBtn = document.createElement('button');
+    restartBtn.id = 'intro-restart';
+    restartBtn.textContent = "Embark again";
+    // Copy all CSS properties from embark button to ensure visual match
+    if(embarkEl){
+      const cs = getComputedStyle(embarkEl);
+      for(const prop of cs){
+        try { restartBtn.style.setProperty(prop, cs.getPropertyValue(prop)); } catch(e){}
       }
     }
+    restartBtn.onclick = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      window._fe.clearSave();
+      // Silently start the birth sequence immediately
+      if(window._startBirth) window._startBirth();
+      else if(typeof setPhase === 'function') setPhase('born');
+    };
+    promptArea.appendChild(restartBtn);
   }
 }
 
@@ -3144,7 +3917,12 @@ checkResume();
 const introEl = document.getElementById('intro-sequence');
 if(introEl){
   const ui=[document.querySelector('.top-controls'),document.querySelector('.bottom-left'),document.querySelector('.back-link')];
-  ui.forEach(e=>{if(e)e.style.opacity='0'; e.style.transition='opacity 1.5s ease';});
+  // Guard the whole body - a missing UI node would otherwise NPE on .style.transition.
+  ui.forEach(e => {
+    if(!e) return;
+    e.style.opacity = '0';
+    e.style.transition = 'opacity 1.5s ease';
+  });
 
   // Custom click handler for embark to support resume
   const embarkBtn = document.getElementById('intro-embark');
@@ -3167,12 +3945,12 @@ if(introEl){
 }
 
 function updateSoundHint() {
-  const hint = document.getElementById('sound-hint');
+  const hint = soundHintEl; // cached in §10 Buttons
   if(!hint) return;
   const depthM = Math.max(0, cameraY / 100);
 
-  if(depthM < 50) {
-    // FORCE visibility until 50m
+  if(depthM < CONFIG.SOUND_HINT_FADE_M) {
+    // FORCE visibility until fade threshold
     hint.style.setProperty('display', 'block', 'important');
     hint.style.setProperty('opacity', '1', 'important');
 
