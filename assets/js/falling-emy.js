@@ -752,26 +752,36 @@ function initAudio(){
     src.start(0);
   } catch(e){}
 
-  // 3. iOS AVAudioSession fix: a *continuously looping* silent audio element
-  //    keeps iOS in the 'playback' AVAudioSession category (loudspeaker +
-  //    ignores mute/silent switch) for the lifetime of the session.
-  //    One-shot audio reverts the category once it ends — looping keeps it.
-  //    Technique proven by swevans/unmute (github.com/swevans/unmute).
-  //    x-webkit-airplay='deny' suppresses the lock-screen media widget.
+  // 3. iOS AVAudioSession fix — belt-and-suspenders:
+  //
+  //  (A) Looping silent WAV keeps iOS in 'playback' AVAudioSession category
+  //      (loudspeaker, ignores mute/silent switch) for the page lifetime.
+  //      WAV is built programmatically — avoids data URI decoding rejections.
+  //      Technique from swevans/unmute (github.com/swevans/unmute).
+  //
+  //  (B) MediaStreamDestination routes ALL game audio through a real <audio>
+  //      element, bypassing audioCtx.destination's 'ambient' routing entirely.
+  //      flangerPanL/R captured by closure; swap fires once play() resolves.
+
+  // (A) Silent WAV loop — claims loudspeaker session immediately
   try {
-    // ~0.5 s stereo silent MP3 (VBR, LAME), loops seamlessly.
-    const silentMp3 = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0VAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV////////////////////////////////////////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQDkAAAAAAAAAGw9wrNaQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+MYxAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV/+MYxDsAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV/+MYxHYAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
-    const el = document.createElement('audio');
-    el.setAttribute('playsinline', '');
-    el.setAttribute('webkit-playsinline', '');
-    el.setAttribute('x-webkit-airplay', 'deny');
-    el.disableRemotePlayback = true;
-    el.loop = true;
-    el.src = silentMp3;
-    document.body.appendChild(el);
-    el.play().then(() => {
-      window._iosSilentEl = el; // keep element + src alive (loop must not be GC'd)
-    }).catch(() => { el.remove(); });
+    const sr = 8000, n = sr; // 1 s × 8 kHz mono = 8000 samples
+    const ab = new ArrayBuffer(44 + n);
+    const dv = new DataView(ab);
+    const ws = (o, s) => { for(let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+    ws(0,'RIFF'); dv.setUint32(4, 36 + n, true); ws(8,'WAVE');
+    ws(12,'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, sr, true); dv.setUint32(28, sr, true); dv.setUint16(32, 1, true); dv.setUint16(34, 8, true);
+    ws(36,'data'); dv.setUint32(40, n, true);
+    new Uint8Array(ab, 44).fill(128); // 128 = silence in unsigned 8-bit PCM
+    const sUrl = URL.createObjectURL(new Blob([ab], { type: 'audio/wav' }));
+    const sEl = document.createElement('audio');
+    sEl.setAttribute('playsinline', ''); sEl.setAttribute('webkit-playsinline', '');
+    sEl.setAttribute('x-webkit-airplay', 'deny'); sEl.disableRemotePlayback = true;
+    sEl.loop = true; sEl.src = sUrl;
+    document.body.appendChild(sEl);
+    sEl.play().then(() => { window._iosSilentEl = sEl; })
+              .catch(() => { URL.revokeObjectURL(sUrl); sEl.remove(); });
   } catch(e){}
 
   masterGain = audioCtx.createGain();
@@ -832,6 +842,25 @@ function initAudio(){
   // Tap the master mix into both flanger delays
   masterGain.connect(flangerDelayL);
   masterGain.connect(flangerDelayR);
+
+  // (B) Route game audio via MediaStreamDestination → <audio> element.
+  // This bypasses audioCtx.destination's ambient routing on iOS entirely —
+  // HTML <audio> elements always use the playback session (loudspeaker).
+  try {
+    const gDest = audioCtx.createMediaStreamDestination();
+    const gEl = document.createElement('audio');
+    gEl.setAttribute('playsinline', ''); gEl.setAttribute('webkit-playsinline', '');
+    gEl.setAttribute('x-webkit-airplay', 'deny'); gEl.disableRemotePlayback = true;
+    gEl.srcObject = gDest.stream;
+    document.body.appendChild(gEl);
+    gEl.play().then(() => {
+      // Swap all terminal nodes from audioCtx.destination → gDest
+      try { masterGain.disconnect(audioCtx.destination); masterGain.connect(gDest); } catch(e){}
+      try { flangerPanL.disconnect(audioCtx.destination); flangerPanL.connect(gDest); } catch(e){}
+      try { flangerPanR.disconnect(audioCtx.destination); flangerPanR.connect(gDest); } catch(e){}
+      window._iosGameEl = gEl;
+    }).catch(() => { gEl.remove(); });
+  } catch(e){}
 
   // Wrap createOscillator so every osc made via this ctx participates in the
   // activeOscCount without touching each individual synth branch below.
