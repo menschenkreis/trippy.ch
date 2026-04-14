@@ -739,20 +739,39 @@ function initAudio(){
   if(!Ctx) return;
   audioCtx = new Ctx();
 
-  // iOS AVAudioSession fix: Web Audio defaults to the 'ambient' category which
-  // is silent on the built-in speaker (but audible on Bluetooth because BT uses
-  // its own 'playback' session). Playing a silent HTML <audio> element on the
-  // same user gesture upgrades the session to 'playback', making Web Audio
-  // audible through the phone speaker as well.
+  // 1. Resume immediately — iOS may create the context in 'suspended' state
+  audioCtx.resume().catch(()=>{});
+
+  // 2. Classic iOS Web Audio unlock: play a 1-frame silent buffer through the
+  //    graph. Must happen synchronously within the user-gesture call stack.
   try {
-    const _iosFix = new Audio(
-      'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
-    );
-    _iosFix.play().catch(()=>{});
+    const buf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(audioCtx.destination);
+    src.start(0);
   } catch(e){}
 
-  // Ensure context is running (browsers may create it suspended under autoplay policy)
-  audioCtx.resume().catch(()=>{});
+  // 3. iOS AVAudioSession fix: playing an HTML <audio> element with 'playsinline'
+  //    upgrades the session from 'ambient' (inaudible on built-in speaker) to
+  //    'playback' (audible on speaker + not muted by the silent switch).
+  //    Using a Blob URL instead of a data URI avoids iOS WAV-parser quirks.
+  try {
+    // Minimal valid 46-byte silent PCM WAV (16-bit, 44100 Hz, 1 ch, 1 sample)
+    const wav = new Uint8Array([
+      82,73,70,70, 38,0,0,0, 87,65,86,69,          // RIFF....WAVE
+      102,109,116,32, 16,0,0,0, 1,0, 1,0,           // fmt ............
+      68,172,0,0, 136,88,1,0, 2,0, 16,0,            // sample-rate/byte-rate/align/bits
+      100,97,116,97, 2,0,0,0, 0,0                   // data....silence
+    ]);
+    const url = URL.createObjectURL(new Blob([wav], {type:'audio/wav'}));
+    const el  = document.createElement('audio');
+    el.setAttribute('playsinline', '');
+    el.setAttribute('webkit-playsinline', '');
+    el.src = url;
+    document.body.appendChild(el);
+    el.play().finally(() => { URL.revokeObjectURL(url); el.remove(); }).catch(()=>{});
+  } catch(e){}
 
   masterGain = audioCtx.createGain();
   masterGain.gain.value = 0.8;
@@ -1837,6 +1856,7 @@ function spawnSphereAtDepth(yWorld, forceType=null){
 // ── Input ────────────────────────────────────────────────────────────────
 canvas.addEventListener('pointerdown', e => {
   initAudio();
+  if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
   initAccel();
   const x = e.clientX, y = e.clientY;
   touchX = x; touchY = y;
@@ -1907,6 +1927,7 @@ muteBtn.onclick = () => {
   muteBtn.classList.toggle('is-on', !isMuted);
   muteBtn.style.animation = 'none';
   if(!isMuted) initAudio();
+  if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
   // Hide hint on first unmute
   if(soundHintEl) soundHintEl.style.display = 'none';
 };
