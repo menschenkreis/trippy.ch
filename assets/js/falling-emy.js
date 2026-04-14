@@ -1834,14 +1834,14 @@ function drawSphere(s){
 
     // Glow
     const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(${hue},80%,60%,0.2)`);
-    grad.addColorStop(1, `hsla(${hue},80%,60%,0)`);
+    grad.addColorStop(0, `hsla(${hue},90%,65%,0.35)`);
+    grad.addColorStop(1, `hsla(${hue},90%,65%,0)`);
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
 
     ctx.rotate(Math.sin(time + s.hue)*0.1);
-    ctx.strokeStyle = `hsla(${hue},80%,65%,0.9)`;
-    ctx.fillStyle = `hsla(${hue},70%,50%,0.25)`;
+    ctx.strokeStyle = `hsla(${hue},90%,70%,1.0)`;
+    ctx.fillStyle = `hsla(${hue},80%,55%,0.4)`;
     ctx.lineWidth = 1.5;
 
     ctx.beginPath();
@@ -1875,14 +1875,14 @@ function drawSphere(s){
 
     // Glow
     const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.6);
-    grad.addColorStop(0, `hsla(${hue},90%,60%,0.15)`);
-    grad.addColorStop(1, `hsla(${hue},90%,60%,0)`);
+    grad.addColorStop(0, `hsla(${hue},95%,65%,0.3)`);
+    grad.addColorStop(1, `hsla(${hue},95%,65%,0)`);
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(0,0,r*1.6,0,TAU); ctx.fill();
 
     // Yin Yang
     ctx.lineWidth = 1.5;
-    ctx.strokeStyle = `hsla(${hue},90%,70%,0.9)`;
+    ctx.strokeStyle = `hsla(${hue},95%,72%,1.0)`;
 
     // Outer circle
     ctx.beginPath(); ctx.arc(0,0,r,0,TAU); ctx.stroke();
@@ -1906,13 +1906,13 @@ function drawSphere(s){
     ctx.rotate(time * 0.2 + s.rotation);
 
     const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(${hue},80%,60%,0.2)`);
-    grad.addColorStop(1, `hsla(${hue},80%,60%,0)`);
+    grad.addColorStop(0, `hsla(${hue},90%,65%,0.35)`);
+    grad.addColorStop(1, `hsla(${hue},90%,65%,0)`);
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
 
-    ctx.strokeStyle = `hsla(${hue},80%,65%,0.9)`;
-    ctx.fillStyle = `hsla(${hue},80%,65%,0.1)`;
+    ctx.strokeStyle = `hsla(${hue},90%,70%,1.0)`;
+    ctx.fillStyle = `hsla(${hue},85%,65%,0.2)`;
     ctx.lineWidth = 1.0;
 
     const petals = petalsCount[idx];
@@ -1980,8 +1980,8 @@ function drawSphere(s){
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(0,0,sr*1.8,0,TAU); ctx.fill();
     // Penrose triangle (3D impossible triangle)
-    ctx.strokeStyle = `hsla(${hue},85%,65%,0.9)`;
-    ctx.fillStyle = `hsla(${hue},70%,50%,0.12)`;
+    ctx.strokeStyle = `hsla(${hue},90%,70%,1.0)`;
+    ctx.fillStyle = `hsla(${hue},80%,55%,0.25)`;
     ctx.lineWidth = 2;
     ctx.lineJoin = 'round';
     const outerR = sr * 0.85;
@@ -2048,12 +2048,12 @@ function drawSphere(s){
 
     // Deep Indigo/Violet Glow
     const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(${hue},80%,60%,0.2)`);
-    grad.addColorStop(1, `hsla(${hue},80%,60%,0)`);
+    grad.addColorStop(0, `hsla(${hue},90%,65%,0.35)`);
+    grad.addColorStop(1, `hsla(${hue},90%,65%,0)`);
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
 
-    ctx.strokeStyle = `hsla(${hue},80%,65%,0.9)`;
+    ctx.strokeStyle = `hsla(${hue},90%,70%,1.0)`;
     ctx.lineWidth = 1.5;
 
     // Two overlapping circles
@@ -2075,12 +2075,12 @@ function drawSphere(s){
     // Cyan triangle
     ctx.rotate(s.rotation);
     const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(180,80%,60%,0.2)`);
-    grad.addColorStop(1, `hsla(180,80%,60%,0)`);
+    grad.addColorStop(0, `hsla(180,90%,65%,0.35)`);
+    grad.addColorStop(1, `hsla(180,90%,65%,0)`);
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
-    ctx.strokeStyle = `hsla(180,80%,65%,0.9)`;
-    ctx.fillStyle = `hsla(180,70%,50%,0.2)`;
+    ctx.strokeStyle = `hsla(180,90%,70%,1.0)`;
+    ctx.fillStyle = `hsla(180,80%,55%,0.3)`,
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     for(let i=0;i<3;i++){
@@ -2093,12 +2093,12 @@ function drawSphere(s){
     // Magenta diamond
     ctx.rotate(s.rotation * 1.5);
     const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(300,80%,60%,0.2)`);
-    grad.addColorStop(1, `hsla(300,80%,60%,0)`);
+    grad.addColorStop(0, `hsla(300,90%,65%,0.35)`);
+    grad.addColorStop(1, `hsla(300,90%,65%,0)`);
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
-    ctx.strokeStyle = `hsla(300,80%,65%,0.9)`;
-    ctx.fillStyle = `hsla(300,70%,50%,0.2)`;
+    ctx.strokeStyle = `hsla(300,90%,70%,1.0)`;
+    ctx.fillStyle = `hsla(300,80%,55%,0.3)`,
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(0,-r); ctx.lineTo(r*0.7,0); ctx.lineTo(0,r); ctx.lineTo(-r*0.7,0);
@@ -2107,12 +2107,12 @@ function drawSphere(s){
     // Gold star
     ctx.rotate(s.rotation * 2);
     const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.8);
-    grad.addColorStop(0, `hsla(45,90%,60%,0.2)`);
-    grad.addColorStop(1, `hsla(45,90%,60%,0)`);
+    grad.addColorStop(0, `hsla(45,95%,65%,0.35)`);
+    grad.addColorStop(1, `hsla(45,95%,65%,0)`);
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(0,0,r*1.8,0,TAU); ctx.fill();
-    ctx.strokeStyle = `hsla(45,90%,60%,0.9)`;
-    ctx.fillStyle = `hsla(45,80%,50%,0.2)`;
+    ctx.strokeStyle = `hsla(45,95%,65%,1.0)`;
+    ctx.fillStyle = `hsla(45,85%,55%,0.3)`,
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     const pts = 5;
@@ -2288,7 +2288,7 @@ function drawSphere(s){
     // Normal sacred geometry sphere
     const a2 = theme.accent2;
     const grad = ctx.createRadialGradient(0,0,0, 0,0,r*1.5);
-    grad.addColorStop(0, `rgba(${a2[0]},${a2[1]},${a2[2]},0.06)`);
+    grad.addColorStop(0, `rgba(${a2[0]},${a2[1]},${a2[2]},0.18)`);
     grad.addColorStop(1, `rgba(${a2[0]},${a2[1]},${a2[2]},0)`);
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(0,0,r*1.5,0,TAU); ctx.fill();
@@ -2298,7 +2298,7 @@ function drawSphere(s){
 
     if(s.sacredType === 0){
       // Polygon with internal lines
-      ctx.strokeStyle = `hsla(${hue},60%,55%,0.25)`;
+      ctx.strokeStyle = `hsla(${hue},75%,65%,0.55)`;
       ctx.lineWidth = 1;
       ctx.beginPath();
       for(let i=0;i<=s.segments;i++){
@@ -2308,7 +2308,7 @@ function drawSphere(s){
       }
       ctx.stroke();
 
-      ctx.strokeStyle = `hsla(${hue},50%,50%,0.12)`;
+      ctx.strokeStyle = `hsla(${hue},65%,55%,0.3)`;
       ctx.lineWidth = 0.5;
       ctx.beginPath();
       for(let i=0;i<=s.segments;i++){
@@ -2319,7 +2319,7 @@ function drawSphere(s){
       ctx.stroke();
 
       if(s.segments >= 5){
-        ctx.strokeStyle = `hsla(${hue},40%,45%,0.08)`;
+        ctx.strokeStyle = `hsla(${hue},55%,50%,0.2)`;
         ctx.beginPath();
         for(let i=0;i<s.segments;i++){
           const a1 = i*TAU/s.segments;
@@ -2332,7 +2332,7 @@ function drawSphere(s){
     }
     else if(s.sacredType === 1){
       // Seed of Life
-      ctx.strokeStyle = `hsla(${hue},60%,55%,0.25)`;
+      ctx.strokeStyle = `hsla(${hue},75%,65%,0.55)`;
       ctx.lineWidth = 1;
       const sr = r * 0.5; // sub radius
       ctx.beginPath(); ctx.arc(0,0,sr,0,TAU); ctx.stroke();
@@ -2341,12 +2341,12 @@ function drawSphere(s){
         ctx.arc(Math.cos(i*PI/3)*sr, Math.sin(i*PI/3)*sr, sr, 0, TAU);
         ctx.stroke();
       }
-      ctx.strokeStyle = `hsla(${hue},60%,55%,0.15)`;
+      ctx.strokeStyle = `hsla(${hue},75%,60%,0.35)`;
       ctx.beginPath(); ctx.arc(0,0,r,0,TAU); ctx.stroke();
     }
     else if(s.sacredType === 2){
       // Simplified Metatron / Cube
-      ctx.strokeStyle = `hsla(${hue},60%,55%,0.25)`;
+      ctx.strokeStyle = `hsla(${hue},75%,65%,0.5)`;
       ctx.lineWidth = 1;
       const pts = [];
       const mR = r * 0.8;
@@ -2363,7 +2363,7 @@ function drawSphere(s){
       }
       ctx.stroke();
 
-      ctx.fillStyle = `hsla(${hue},60%,60%,0.2)`;
+      ctx.fillStyle = `hsla(${hue},70%,60%,0.35)`;
       for(const pt of pts){
         ctx.beginPath(); ctx.arc(pt[0], pt[1], r*0.15, 0, TAU); ctx.fill();
         ctx.beginPath(); ctx.arc(pt[0], pt[1], r*0.15, 0, TAU); ctx.stroke();
@@ -2371,11 +2371,11 @@ function drawSphere(s){
     }
 
     // Inner circle
-    ctx.strokeStyle = `hsla(${hue},45%,50%,0.15)`;
+    ctx.strokeStyle = `hsla(${hue},65%,55%,0.35)`;
     ctx.beginPath(); ctx.arc(0,0,r*0.35,0,TAU); ctx.stroke();
 
     // Center dot
-    ctx.fillStyle = `hsla(${hue},60%,60%,0.3)`;
+    ctx.fillStyle = `hsla(${hue},75%,65%,0.55)`;
     ctx.beginPath(); ctx.arc(0,0,2,0,TAU); ctx.fill();
   }
 
