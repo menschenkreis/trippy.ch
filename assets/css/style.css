@@ -735,60 +735,109 @@ footer a:hover { color: var(--pink); }
   transform: scale(0.98);
 }
 
-/* ── Intro Name Input ── */
-#intro-name-row {
+/* ── Soul Name Modal ── */
+#soul-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 3, 12, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+#soul-modal.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+#soul-modal-card {
+  background: rgba(8, 6, 20, 0.88);
+  border: 1px solid rgba(140, 120, 200, 0.16);
+  border-radius: 28px;
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  padding: 2.8rem 2.4rem 2.2rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.55rem;
-  margin-bottom: 1.2rem;
-  opacity: 0;
-  transform: translateY(8px);
-  pointer-events: none;
-  transition: opacity 0.5s ease, transform 0.5s ease;
+  gap: 1.4rem;
+  max-width: min(320px, 82vw);
+  width: 100%;
+  box-shadow: 0 0 80px rgba(120, 80, 255, 0.07), 0 12px 60px rgba(0, 0, 0, 0.55);
+  transform: translateY(12px) scale(0.97);
+  transition: transform 0.5s cubic-bezier(0.2, 0, 0, 1);
 }
-#intro-name-row.visible {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: all;
+#soul-modal.visible #soul-modal-card {
+  transform: translateY(0) scale(1);
 }
-#intro-name-label {
-  font-size: 0.6rem;
-  text-transform: uppercase;
-  letter-spacing: 0.22em;
-  color: rgba(140, 120, 200, 0.45);
+#soul-modal-prompt {
+  font-size: clamp(1.05rem, 3vw, 1.3rem);
+  font-weight: 200;
+  letter-spacing: 0.14em;
+  color: rgba(200, 185, 230, 0.6);
+  text-align: center;
+  margin: 0;
+  text-shadow: 0 0 30px rgba(140, 120, 200, 0.15);
 }
-#intro-name-input {
+#soul-modal-input {
   -webkit-appearance: none;
   appearance: none;
-  background: rgba(140, 120, 200, 0.06);
+  background: rgba(140, 120, 200, 0.05);
   border: 1px solid rgba(140, 120, 200, 0.2);
-  color: rgba(200, 185, 230, 0.9);
-  padding: 0.65rem 1.6rem;
-  font-size: clamp(0.85rem, 2vw, 1.0rem);
+  color: rgba(220, 210, 245, 0.92);
+  padding: 0.75rem 1.8rem;
+  font-size: clamp(0.95rem, 2.5vw, 1.1rem);
   font-weight: 300;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   border-radius: 40px;
   cursor: text;
   font-family: inherit;
   text-align: center;
-  transition: all 0.4s ease;
+  transition: border-color 0.4s ease, background 0.4s ease, box-shadow 0.4s ease;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   outline: none;
-  width: min(200px, 58vw);
+  width: 100%;
   -webkit-user-select: text;
   user-select: text;
 }
-#intro-name-input::placeholder {
-  color: rgba(200, 185, 230, 0.25);
-  letter-spacing: 0.12em;
+#soul-modal-input::placeholder {
+  color: rgba(200, 185, 230, 0.2);
 }
-#intro-name-input:focus {
-  border-color: rgba(140, 120, 200, 0.45);
-  background: rgba(140, 120, 200, 0.1);
-  box-shadow: 0 0 20px rgba(140, 120, 200, 0.12);
-  color: rgba(220, 210, 245, 1);
+#soul-modal-input:focus {
+  border-color: rgba(140, 120, 200, 0.5);
+  background: rgba(140, 120, 200, 0.09);
+  box-shadow: 0 0 24px rgba(140, 120, 200, 0.13);
+}
+#soul-modal-confirm {
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(140, 120, 200, 0.06);
+  border: 1px solid rgba(140, 120, 200, 0.2);
+  color: rgba(200, 185, 230, 0.72);
+  padding: 0.72rem 2.2rem;
+  font-size: clamp(0.82rem, 2vw, 0.95rem);
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  border-radius: 40px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.4s ease;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+#soul-modal-confirm:hover {
+  background: rgba(140, 120, 200, 0.13);
+  border-color: rgba(140, 120, 200, 0.42);
+  box-shadow: 0 0 22px rgba(140, 120, 200, 0.12);
+  transform: scale(1.03);
+}
+#soul-modal-confirm:active {
+  transform: scale(0.97);
 }
 
 /* Reduced motion */

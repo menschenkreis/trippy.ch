@@ -4436,25 +4436,29 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 
-// Show the intro name input row, change btn text to "Begin →", wire Enter key.
-function _showIntroNameRow(btn, defaultName) {
-  const nameRow   = document.getElementById('intro-name-row');
-  const introInput= document.getElementById('intro-name-input');
-  if(!nameRow || !introInput) return; // graceful no-op if HTML is absent
-  introInput.value = defaultName || 'emy';
-  nameRow.style.display = 'flex';
-  // Trigger CSS transition on next paint
-  requestAnimationFrame(() => nameRow.classList.add('visible'));
-  btn.textContent = 'Begin \u2192';
-  // Focus after animation starts
-  setTimeout(() => { introInput.focus(); introInput.select(); }, 80);
-  // Enter key submits; stopPropagation prevents intro-sequence's window keydown
-  introInput.addEventListener('keydown', function onKey(ke) {
-    ke.stopPropagation();
-    if(ke.key === 'Enter') {
+// Show the soul-name modal, then call onConfirm(name) when the player commits.
+function _showSoulModal(onConfirm, defaultName) {
+  const modal      = document.getElementById('soul-modal');
+  const input      = document.getElementById('soul-modal-input');
+  const confirmBtn = document.getElementById('soul-modal-confirm');
+  if(!modal || !input || !confirmBtn) { onConfirm(defaultName || 'emy'); return; }
+
+  input.value = defaultName || '';
+  modal.classList.add('visible');
+  setTimeout(() => { input.focus(); input.select(); }, 90);
+
+  function commit() {
+    const nm = (input.value || '').trim() || 'emy';
+    modal.classList.remove('visible');
+    onConfirm(nm);
+  }
+  confirmBtn.onclick = (e) => { e.preventDefault(); commit(); };
+  input.addEventListener('keydown', function onKey(ke) {
+    ke.stopPropagation(); // prevent intro-sequence's window keydown from firing
+    if(ke.key === 'Enter' || ke.key === 'Escape') {
       ke.preventDefault();
-      introInput.removeEventListener('keydown', onKey);
-      btn.click();
+      input.removeEventListener('keydown', onKey);
+      commit();
     }
   });
 }
@@ -4499,18 +4503,11 @@ function checkResume(){
     }
     restartBtn.onclick = (e) => {
       e.preventDefault(); e.stopPropagation();
-      if(!restartBtn.dataset.namePhase) {
-        // Stage 1: reveal name input, pre-fill with current soul name
-        restartBtn.dataset.namePhase = 'true';
-        _showIntroNameRow(restartBtn, ragdolls[0]?.name || 'emy');
-      } else {
-        // Stage 2: sync name, wipe save, start birth
-        const introInput = document.getElementById('intro-name-input');
-        const nm = (introInput?.value || '').trim() || 'emy';
+      _showSoulModal((nm) => {
         window._fe.setName(nm);
         window._fe.clearSave();
         if(window._startBirth) window._startBirth();
-      }
+      }, ragdolls[0]?.name || 'emy');
     };
     promptArea.appendChild(restartBtn);
   }
@@ -4537,19 +4534,14 @@ if(introEl){
     // Note: onclick is already set in the window.load handler if resuming
     // This is the fallback for new journeys
     if(!embarkBtn.onclick) {
+      // New journey: intercept the embark button to ask for a soul name first
+      window._soulModalMode = true;
       embarkBtn.onclick = (e) => {
         e.preventDefault(); e.stopPropagation();
-        if(!embarkBtn.dataset.namePhase) {
-          // Stage 1: reveal name input
-          embarkBtn.dataset.namePhase = 'true';
-          _showIntroNameRow(embarkBtn, 'emy');
-        } else {
-          // Stage 2: sync name and start birth
-          const introInput = document.getElementById('intro-name-input');
-          const nm = (introInput?.value || '').trim() || 'emy';
+        _showSoulModal((nm) => {
           window._fe.setName(nm);
           if(window._startBirth) window._startBirth();
-        }
+        }, 'emy');
       };
     }
   }

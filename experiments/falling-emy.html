@@ -68,11 +68,15 @@
       <p id="intro-thought-text">Your journey has not been written yet.</p>
     </div>
     <div id="intro-prompt">
-      <div id="intro-name-row">
-        <span id="intro-name-label">name your soul</span>
-        <input id="intro-name-input" maxlength="20" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="emy">
-      </div>
       <button id="intro-embark">Embark into life</button>
+    </div>
+  </div>
+  <!-- Soul name modal — shown on new journey and Embark Again -->
+  <div id="soul-modal" role="dialog" aria-modal="true" aria-label="Name your soul">
+    <div id="soul-modal-card">
+      <p id="soul-modal-prompt">you call yourself</p>
+      <input id="soul-modal-input" type="text" maxlength="20" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="emy">
+      <button id="soul-modal-confirm">begin your journey</button>
     </div>
   </div>
   <canvas id="c"></canvas>

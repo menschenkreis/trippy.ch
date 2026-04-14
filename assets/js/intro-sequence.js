@@ -161,7 +161,7 @@
   document.addEventListener('touchmove', (e) => { if (e.touches.length) { mouseX = e.touches[0].clientX / W; mouseY = 1 - e.touches[0].clientY / H; } }, { passive: true });
   embarkBtn.addEventListener('click', (e) => {
     if (embarkBtn.dataset.resume === "true") return; // Handled by falling-emy.js
-    if (embarkBtn.dataset.namePhase) return; // Name input stage — handled by falling-emy.js
+    if (window._soulModalMode) return; // Soul name modal intercepts — falling-emy.js handles this
     e.preventDefault(); e.stopPropagation(); setPhase('born');
   });
   let skipReady = false;
