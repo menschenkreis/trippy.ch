@@ -77,7 +77,8 @@ function saveProgress(){
     const data = {
       cameraY, score, fallSpeed, time,
       nextChallengeY, nextShapeY, themeIdx,
-      journeyLog, // Save the milestones history
+      journeyLog,
+      isMuted,
       depthMeters: Math.max(0, cameraY / 100),
       savedAt: Date.now(),
     };
@@ -170,6 +171,14 @@ function restoreFromSave(data){
   // Restore journey log/milestones
   journeyLog = data.journeyLog || [];
   updateJourneyPanel();
+
+  // Restore audio toggle state (default to muted for old saves without the field)
+  isMuted = data.isMuted ?? true;
+  muteBtn.textContent = isMuted ? '🔇' : '🔊';
+  muteBtn.classList.toggle('is-on', !isMuted);
+  muteBtn.style.animation = 'none';
+  if(soundHintEl) soundHintEl.style.display = 'none';
+  if(!isMuted) initAudio(); // resume is triggered by a user gesture so autoplay is allowed
 
   // Reset transient state
   comboCount = 0; lastHitTime = 0;
