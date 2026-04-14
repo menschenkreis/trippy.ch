@@ -735,6 +735,62 @@ footer a:hover { color: var(--pink); }
   transform: scale(0.98);
 }
 
+/* ── Intro Name Input ── */
+#intro-name-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 1.2rem;
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+#intro-name-row.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: all;
+}
+#intro-name-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: rgba(140, 120, 200, 0.45);
+}
+#intro-name-input {
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(140, 120, 200, 0.06);
+  border: 1px solid rgba(140, 120, 200, 0.2);
+  color: rgba(200, 185, 230, 0.9);
+  padding: 0.65rem 1.6rem;
+  font-size: clamp(0.85rem, 2vw, 1.0rem);
+  font-weight: 300;
+  letter-spacing: 0.18em;
+  border-radius: 40px;
+  cursor: text;
+  font-family: inherit;
+  text-align: center;
+  transition: all 0.4s ease;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  outline: none;
+  width: min(200px, 58vw);
+  -webkit-user-select: text;
+  user-select: text;
+}
+#intro-name-input::placeholder {
+  color: rgba(200, 185, 230, 0.25);
+  letter-spacing: 0.12em;
+}
+#intro-name-input:focus {
+  border-color: rgba(140, 120, 200, 0.45);
+  background: rgba(140, 120, 200, 0.1);
+  box-shadow: 0 0 20px rgba(140, 120, 200, 0.12);
+  color: rgba(220, 210, 245, 1);
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .scroll-hint { animation: none; }

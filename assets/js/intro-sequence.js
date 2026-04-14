@@ -159,9 +159,10 @@
   // ── Events ───────────────────────────────────────────────────────────
   document.addEventListener('mousemove', (e) => { mouseX = e.clientX / W; mouseY = 1 - e.clientY / H; });
   document.addEventListener('touchmove', (e) => { if (e.touches.length) { mouseX = e.touches[0].clientX / W; mouseY = 1 - e.touches[0].clientY / H; } }, { passive: true });
-  embarkBtn.addEventListener('click', (e) => { 
+  embarkBtn.addEventListener('click', (e) => {
     if (embarkBtn.dataset.resume === "true") return; // Handled by falling-emy.js
-    e.preventDefault(); e.stopPropagation(); setPhase('born'); 
+    if (embarkBtn.dataset.namePhase) return; // Name input stage — handled by falling-emy.js
+    e.preventDefault(); e.stopPropagation(); setPhase('born');
   });
   let skipReady = false;
   window.addEventListener('scroll', () => { if (skipReady) startBirth(); }, { once: true });

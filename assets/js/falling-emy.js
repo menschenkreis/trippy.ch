@@ -231,7 +231,15 @@ function restoreFromSave(data){
 }
 
 // Expose to global scope for resume modal
-window._fe = { loadProgress, restoreFromSave, clearSave, formatDepth, formatTimeAgo };
+window._fe = { loadProgress, restoreFromSave, clearSave, formatDepth, formatTimeAgo,
+  setName: (n) => {
+    const nm = (n || '').trim() || 'emy';
+    if(ragdolls[0]) ragdolls[0].name = nm;
+    const ni = document.getElementById('emy-name');
+    if(ni) ni.value = nm;
+    saveProgress();
+  }
+};
 
 // ── Resize ───────────────────────────────────────────────────────────────
 let W, H, dpr;
@@ -4385,6 +4393,29 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 
+// Show the intro name input row, change btn text to "Begin →", wire Enter key.
+function _showIntroNameRow(btn, defaultName) {
+  const nameRow   = document.getElementById('intro-name-row');
+  const introInput= document.getElementById('intro-name-input');
+  if(!nameRow || !introInput) return; // graceful no-op if HTML is absent
+  introInput.value = defaultName || 'emy';
+  nameRow.style.display = 'flex';
+  // Trigger CSS transition on next paint
+  requestAnimationFrame(() => nameRow.classList.add('visible'));
+  btn.textContent = 'Begin \u2192';
+  // Focus after animation starts
+  setTimeout(() => { introInput.focus(); introInput.select(); }, 80);
+  // Enter key submits; stopPropagation prevents intro-sequence's window keydown
+  introInput.addEventListener('keydown', function onKey(ke) {
+    ke.stopPropagation();
+    if(ke.key === 'Enter') {
+      ke.preventDefault();
+      introInput.removeEventListener('keydown', onKey);
+      btn.click();
+    }
+  });
+}
+
 // Idempotent: this is wired up both synchronously below and on window.load
 // (some browsers fire 'load' before the sync call, others after). The guard
 // prevents re-binding the embark onclick handler and keeps the restart button
@@ -4425,10 +4456,18 @@ function checkResume(){
     }
     restartBtn.onclick = (e) => {
       e.preventDefault(); e.stopPropagation();
-      window._fe.clearSave();
-      // Silently start the birth sequence immediately
-      if(window._startBirth) window._startBirth();
-      else if(typeof setPhase === 'function') setPhase('born');
+      if(!restartBtn.dataset.namePhase) {
+        // Stage 1: reveal name input, pre-fill with current soul name
+        restartBtn.dataset.namePhase = 'true';
+        _showIntroNameRow(restartBtn, ragdolls[0]?.name || 'emy');
+      } else {
+        // Stage 2: sync name, wipe save, start birth
+        const introInput = document.getElementById('intro-name-input');
+        const nm = (introInput?.value || '').trim() || 'emy';
+        window._fe.setName(nm);
+        window._fe.clearSave();
+        if(window._startBirth) window._startBirth();
+      }
     };
     promptArea.appendChild(restartBtn);
   }
@@ -4456,10 +4495,18 @@ if(introEl){
     // This is the fallback for new journeys
     if(!embarkBtn.onclick) {
       embarkBtn.onclick = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if(typeof setPhase === 'function') setPhase('born');
-        else if(window._startBirth) window._startBirth();
+        e.preventDefault(); e.stopPropagation();
+        if(!embarkBtn.dataset.namePhase) {
+          // Stage 1: reveal name input
+          embarkBtn.dataset.namePhase = 'true';
+          _showIntroNameRow(embarkBtn, 'emy');
+        } else {
+          // Stage 2: sync name and start birth
+          const introInput = document.getElementById('intro-name-input');
+          const nm = (introInput?.value || '').trim() || 'emy';
+          window._fe.setName(nm);
+          if(window._startBirth) window._startBirth();
+        }
       };
     }
   }
