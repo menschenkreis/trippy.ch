@@ -1260,7 +1260,7 @@ function playMilestoneChord(){
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, now);
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.12, now + 0.1);
+    gain.gain.linearRampToValueAtTime(0.06, now + 0.1);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
     osc.connect(gain); gain.connect(masterGain);
     if(delayNode) gain.connect(delayNode);
