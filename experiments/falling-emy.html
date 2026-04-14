@@ -53,6 +53,11 @@
     .journey-entry-text{font-size:0.8rem;line-height:1.5;color:rgba(255,255,255,0.4)}
     .journey-entry-text strong{color:rgba(255,255,255,0.6);font-weight:400}
     @keyframes pulse-glow{0%,100%{box-shadow:0 0 0 0 rgba(140,100,255,0.3)}50%{box-shadow:0 0 12px 4px rgba(140,100,255,0.15)}}
+    .emy-name-row{display:flex;align-items:baseline;gap:0.35rem;margin-top:0.3rem;pointer-events:all}
+    .emy-name-label{font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:rgba(140,100,255,0.35);flex-shrink:0}
+    .emy-name-input{font-size:0.72rem;font-family:monospace;font-weight:200;letter-spacing:0.12em;color:rgba(255,255,255,0.45);background:transparent;border:none;border-bottom:1px solid rgba(140,100,255,0.18);outline:none;padding:0.05rem 0.1rem;width:110px;cursor:text;transition:color 0.2s,border-color 0.2s;-webkit-user-select:text;user-select:text}
+    .emy-name-input::placeholder{color:rgba(255,255,255,0.15)}
+    .emy-name-input:focus{color:rgba(255,255,255,0.75);border-bottom-color:rgba(140,100,255,0.55)}
   </style>
 </head>
 <body class="experiment-view">
@@ -81,6 +86,10 @@
   <div class="bottom-left">
     <div class="exp-tag">canvas · physics · sacred geometry</div>
     <h1 class="exp-title">Falling Emy</h1>
+    <div class="emy-name-row">
+      <span class="emy-name-label">soul</span>
+      <input id="emy-name" class="emy-name-input" value="emy" maxlength="20" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="name your soul">
+    </div>
   </div>
   <div class="panel-overlay" id="panel-overlay"></div>
   <div class="info-panel" id="info-panel">

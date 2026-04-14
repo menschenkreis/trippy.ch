@@ -84,6 +84,7 @@ function saveProgress(){
       nextChallengeY, nextShapeY, themeIdx,
       journeyLog,
       isMuted,
+      ragdollName: ragdolls[0]?.name || 'emy',
       depthMeters: Math.max(0, cameraY / 100),
       savedAt: Date.now(),
     };
@@ -218,8 +219,11 @@ function restoreFromSave(data){
     if(depthMeters >= triggerDepth) firedChapters.add(ci);
   }
 
-  // Re-create ragdoll at saved depth
-  ragdolls = [new Ragdoll(W/2, cameraY, 'emy')];
+  // Re-create ragdoll at saved depth, restoring the saved name
+  const _savedName = data.ragdollName || 'emy';
+  ragdolls = [new Ragdoll(W/2, cameraY, _savedName)];
+  const _nameInput = document.getElementById('emy-name');
+  if(_nameInput) _nameInput.value = _savedName;
   spheres = [];
   // Pre-spawn spheres in the visible range around saved position
   const aheadY = cameraY + H;
@@ -1887,6 +1891,8 @@ tiltBtn.onclick = () => {
   else initAccel(); // Ensure permission is requested if turned on explicitly
 };
 document.getElementById('reset-btn').onclick = () => {
+  // Preserve the chosen soul name across resets
+  const _keptName = ragdolls[0]?.name || document.getElementById('emy-name')?.value || 'emy';
   clearSave();
   isDragging = false; dragRagdoll = null; dragParticle = null;
   cameraY = 0; fallSpeed = 0;
@@ -1907,10 +1913,47 @@ document.getElementById('reset-btn').onclick = () => {
   nextShapeY = CONFIG.SHAPE_START_Y;
   nextChallengeY = CONFIG.CHALLENGE_SPACING_WORLD;
   particles = []; particleCount = 0;
-  ragdolls = [new Ragdoll(W/2, 0, 'emy')];
+  ragdolls = [new Ragdoll(W/2, 0, _keptName)];
   spheres = [];
   for(let i=0;i<8;i++) spawnSphereAtDepth(i*120+Math.random()*80);
 };
+
+// ── Soul name input ───────────────────────────────────────────────────────
+(function(){
+  const nameInput = document.getElementById('emy-name');
+  if(!nameInput) return;
+
+  // Initialise from any existing save immediately
+  const existing = loadProgress();
+  if(existing?.ragdollName){
+    nameInput.value = existing.ragdollName;
+    // Also set the live ragdoll name if it already exists
+    if(ragdolls[0]) ragdolls[0].name = existing.ragdollName;
+  }
+
+  // Live update: as the user types, the name tag above Emy changes in real time
+  nameInput.addEventListener('input', () => {
+    const v = nameInput.value.trim() || 'emy';
+    if(ragdolls[0]) ragdolls[0].name = v;
+  });
+
+  // On blur / Enter: trigger an immediate save so the name is never lost
+  const commit = () => {
+    // Normalise empty input back to 'emy'
+    if(!nameInput.value.trim()) nameInput.value = 'emy';
+    if(ragdolls[0]) ragdolls[0].name = nameInput.value;
+    saveProgress();
+  };
+  nameInput.addEventListener('blur', commit);
+  nameInput.addEventListener('keydown', e => {
+    if(e.key === 'Enter'){ e.preventDefault(); nameInput.blur(); }
+    // Prevent canvas pointer events from stealing focus while typing
+    e.stopPropagation();
+  });
+
+  // Prevent canvas touch/mouse handlers from triggering while the field is focused
+  nameInput.addEventListener('pointerdown', e => e.stopPropagation());
+})();
 
 // ── Sacred Geometry Drawing ──────────────────────────────────────────────
 function drawFlowerOfLife(cx, cy, radius, alpha){
