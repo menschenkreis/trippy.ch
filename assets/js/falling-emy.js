@@ -217,6 +217,10 @@ let W, H, dpr;
 // offscreen render caches know to redraw.
 let _viewportVersion = 0;
 let _themeVersion = 0;
+// Scale factor applied to all sphere radii. Coarse-pointer (touch) devices
+// keep scale = 1.0; fine-pointer (mouse/desktop) devices scale up with width
+// so shapes feel appropriately sized on large screens.
+let sphereSizeScale = 1.0;
 function resize(){
   dpr = Math.min(devicePixelRatio, 2);
   W = window.innerWidth; H = window.innerHeight;
@@ -224,6 +228,8 @@ function resize(){
   canvas.style.width = W+'px'; canvas.style.height = H+'px';
   ctx.setTransform(dpr,0,0,dpr,0,0);
   _viewportVersion++;
+  const isTouch = window.matchMedia('(pointer: coarse)').matches;
+  sphereSizeScale = isTouch ? 1.0 : clamp(W / 700, 1.3, 1.65);
 }
 window.addEventListener('resize', resize); resize();
 
@@ -480,17 +486,18 @@ class Sphere {
   constructor(x, y, r, type='sphere'){
     this.type = type;
     this.x = x; this.y = y;
+    const ss = sphereSizeScale;
     if(type === 'challenge'){
-      this.r = 35 + Math.random()*25;
+      this.r = (35 + Math.random()*25) * ss;
       this.challengeVariant = Math.floor(Math.random() * 5); // 5 distinct threat shapes
     } else if(type === 'heart'){
-      this.r = 25 + Math.random()*15;
+      this.r = (25 + Math.random()*15) * ss;
     } else if(type === 'setback'){
-      this.r = 30 + Math.random()*18;
+      this.r = (30 + Math.random()*18) * ss;
     } else if(type === 'chakra'){
-      this.r = 28 + Math.random()*20;
+      this.r = (28 + Math.random()*20) * ss;
     } else {
-      this.r = r || (15 + Math.random()*35);
+      this.r = (r || (15 + Math.random()*35)) * ss;
     }
     this.vx = 0;
     this.vy = 0;
