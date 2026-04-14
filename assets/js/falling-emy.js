@@ -1618,12 +1618,11 @@ function spawnSphereAtDepth(yWorld, forceType=null){
     if (r < 0.012) type = 'setback';
     else if (r < 0.027) type = 'heart';
     else if (r < 0.042) type = 'yinyang';
-    else if (r < 0.057) type = 'vesica';
-    else if (r < 0.072) type = 'chakra';
-    else if (r < 0.092) type = 'wave';
-    else if (r < 0.100) type = 'trail';
-    else if (r < 0.120) type = 'pulse';
-    else if (r < 0.140) type = 'magnet';
+    else if (r < 0.057) type = 'chakra';
+    else if (r < 0.077) type = 'wave';
+    else if (r < 0.085) type = 'trail';
+    else if (r < 0.105) type = 'pulse';
+    else if (r < 0.125) type = 'magnet';
   }
 
   spheres.push(new Sphere(
