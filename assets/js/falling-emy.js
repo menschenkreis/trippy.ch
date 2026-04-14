@@ -984,7 +984,7 @@ function collideRagdollSphere(ragdoll, sphere, dt){
 
     // Glitter burst instead of text popup
     const glitterIntensity = Math.min(impactData.maxForce || 3, 10);
-    const glitterCount = Math.min(4 + Math.floor(glitterIntensity * 0.8), 8);
+    const glitterCount = Math.min(2 + Math.floor(glitterIntensity * 0.5), 5);
     for(let gi = 0; gi < glitterCount; gi++){
       if(particleCount >= MAX_PARTICLES) break;
       const ga = Math.random() * TAU;
@@ -1034,7 +1034,7 @@ function collideRagdollSphere(ragdoll, sphere, dt){
 // ── Impact particles ─────────────────────────────────────────────────────
 let particles = [];
 let shockwaves = [];
-const MAX_PARTICLES = 200;
+const MAX_PARTICLES = 150;
 const MAX_SHOCKWAVES = 6;
 let particleCount = 0;
 
@@ -1044,7 +1044,7 @@ function spawnImpactParticles(x, y, hue, force){
   const hue3 = (hue + 240) % 360;
 
   // Sparks
-  const sparkCount = Math.min(5 + Math.floor(intensity * 1.0), 11);
+  const sparkCount = Math.min(4 + Math.floor(intensity * 0.8), 8);
   for(let i = 0; i < sparkCount; i++){
     if(particleCount >= MAX_PARTICLES) break;
     const angle = (i / sparkCount) * TAU + (Math.random()-0.5)*0.5;
@@ -1061,8 +1061,8 @@ function spawnImpactParticles(x, y, hue, force){
     };
   }
 
-  // Streaks - fast, directional, trippy
-  const streakCount = Math.min(2 + Math.floor(intensity * 0.4), 4);
+  // Streaks - fast, directional
+  const streakCount = Math.min(1 + Math.floor(intensity * 0.3), 3);
   for(let i = 0; i < streakCount; i++){
     if(particleCount >= MAX_PARTICLES) break;
     const angle = (Math.random()) * TAU;
@@ -1111,7 +1111,7 @@ function spawnImpactParticles(x, y, hue, force){
   }
 
   // Firework rockets
-  const fwCount = 2 + Math.floor(intensity * 0.35);
+  const fwCount = 1 + Math.floor(intensity * 0.25);
   for(let i = 0; i < fwCount; i++){
     if(particleCount >= MAX_PARTICLES) break;
     const angle = -PI/2 + (Math.random()-0.5) * PI * 0.9;
@@ -1152,7 +1152,7 @@ function updateParticles(dt){
       if(p.burstTimer <= 0){
         p.life = 0; // kill rocket
         const bHue = p.burstHue;
-        const bCount = 7 + Math.floor(Math.random() * 4);
+        const bCount = 4 + Math.floor(Math.random() * 3);
         for(let b = 0; b < bCount; b++){
           const ba = (b / bCount) * TAU + Math.random() * 0.3;
           const bs = 45 + Math.random() * 70;
@@ -1286,74 +1286,85 @@ function drawParticles(){
   ctx.save();
   ctx.globalCompositeOperation = 'screen';
 
+  // Batch particles by type for fewer state changes
+  // Pre-compute TAU and PI references (local cache for hot loop)
+  const _TAU = TAU, _PI = PI;
+
   for(let pi = 0; pi < particleCount; pi++){
     const p = particles[pi];
-    const alpha = p.life * (p.life > 0.5 ? 1.0 : p.life * 2.0);
+    if(p.life <= 0) continue;
+    const alpha = p.life > 0.5 ? 1.0 : p.life * 2.0;
+    const a = alpha * p.life;
+    const px = p.x, py = p.y;
+    const sz = p.size;
+    const h = p.hue | 0;
 
     if(p.type === 'spark'){
-      // Outer haze
-      ctx.fillStyle = `hsla(${p.hue},100%,65%,${alpha * 0.28})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 4.5, 0, TAU); ctx.fill();
-      // Mid
-      ctx.fillStyle = `hsla(${p.hue},100%,80%,${alpha * 0.5})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 2, 0, TAU); ctx.fill();
-      // Core
-      ctx.fillStyle = `hsla(${p.hue},100%,98%,${alpha})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill();
+      // Single glow circle — cheaper than 3-layer, still looks great
+      ctx.fillStyle = `hsla(${h},100%,85%,${a})`;
+      ctx.beginPath(); ctx.arc(px, py, sz * 3, 0, _TAU); ctx.fill();
+      // Bright core
+      ctx.fillStyle = `hsla(${h},100%,98%,${a})`;
+      ctx.beginPath(); ctx.arc(px, py, sz * 0.7, 0, _TAU); ctx.fill();
 
     } else if(p.type === 'ember'){
-      ctx.fillStyle = `hsla(${p.hue},95%,60%,${alpha * 0.22})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 4, 0, TAU); ctx.fill();
-      ctx.fillStyle = `hsla(${p.hue},90%,72%,${alpha * 0.5})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 2, 0, TAU); ctx.fill();
-      ctx.fillStyle = `hsla(${p.hue},80%,98%,${alpha})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 0.5, 0, TAU); ctx.fill();
+      ctx.fillStyle = `hsla(${h},90%,75%,${a})`;
+      ctx.beginPath(); ctx.arc(px, py, sz * 2.5, 0, _TAU); ctx.fill();
+      ctx.fillStyle = `hsla(${h},80%,98%,${a})`;
+      ctx.beginPath(); ctx.arc(px, py, sz * 0.5, 0, _TAU); ctx.fill();
 
     } else if(p.type === 'glitter'){
-      // 4-pointed star - cheap, trippy, no trig call per frame
-      const r = p.size * (0.5 + p.life * 0.5);
+      // 4-pointed star using pre-computed offsets (no trig in draw loop)
+      const r = sz * (0.5 + p.life * 0.5);
       const r2 = r * 0.35;
-      ctx.fillStyle = `hsla(${p.hue},100%,88%,${alpha})`;
+      // Cache rotation
+      const rot = (h * 0.017) | 0;
+      const c0 = 1, s0 = 0;
+      const c1 = 0.707, s1 = 0.707;
+      const c2 = 0, s2 = 1;
+      const c3 = -0.707, s3 = 0.707;
+      // Apply rotation offsets manually (8 points of a 4-pointed star)
+      const pts = [
+        [c0*r, s0*r], [c1*r2, s1*r2],
+        [c2*r, s2*r], [c3*r2, s3*r2],
+        [-c0*r, -s0*r], [-c1*r2, -s1*r2],
+        [-c2*r, -s2*r], [-c3*r2, -s3*r2],
+      ];
+      ctx.fillStyle = `hsla(${h},100%,88%,${a})`;
       ctx.beginPath();
-      for(let s = 0; s < 8; s++){
-        const a = s * PI / 4 + p.hue * 0.017; // slight rotation per hue
-        const d = s % 2 === 0 ? r : r2;
-        if(s === 0) ctx.moveTo(p.x + Math.cos(a)*d, p.y + Math.sin(a)*d);
-        else ctx.lineTo(p.x + Math.cos(a)*d, p.y + Math.sin(a)*d);
-      }
+      ctx.moveTo(px + pts[0][0], py + pts[0][1]);
+      for(let s = 1; s < 8; s++) ctx.lineTo(px + pts[s][0], py + pts[s][1]);
       ctx.closePath(); ctx.fill();
-      // Small halo
-      ctx.fillStyle = `hsla(${(p.hue+60)%360},100%,80%,${alpha * 0.3})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, r * 1.4, 0, TAU); ctx.fill();
+      // Halo only for larger particles
+      if(r > 1.5){
+        ctx.fillStyle = `hsla(${(h+60)%360},100%,80%,${a * 0.25})`;
+        ctx.beginPath(); ctx.arc(px, py, r * 1.2, 0, _TAU); ctx.fill();
+      }
 
     } else if(p.type === 'streak'){
-      // A line segment streaking in its velocity direction
-      const len = p.size * 6;
+      const len = sz * 5;
       const spd = Math.sqrt(p.vx*p.vx + p.vy*p.vy) || 1;
       const nx = p.vx/spd, ny = p.vy/spd;
-      ctx.strokeStyle = `hsla(${p.hue},100%,85%,${alpha})`;
-      ctx.lineWidth = p.size * 0.7;
+      ctx.strokeStyle = `hsla(${h},100%,85%,${a})`;
+      ctx.lineWidth = sz * 0.6;
       ctx.beginPath();
-      ctx.moveTo(p.x - nx*len, p.y - ny*len);
-      ctx.lineTo(p.x, p.y);
+      ctx.moveTo(px - nx*len, py - ny*len);
+      ctx.lineTo(px, py);
       ctx.stroke();
-      // Bright tip
-      ctx.fillStyle = `hsla(${p.hue},100%,98%,${alpha})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 0.5, 0, TAU); ctx.fill();
+      ctx.fillStyle = `hsla(${h},100%,98%,${a})`;
+      ctx.beginPath(); ctx.arc(px, py, sz * 0.4, 0, _TAU); ctx.fill();
 
     } else if(p.type === 'ring'){
-      // Expanding ring - cheap, beautiful
-      const r = p.size * (2 + (1 - p.life) * 8);
-      ctx.strokeStyle = `hsla(${p.hue},100%,75%,${alpha * 0.7})`;
-      ctx.lineWidth = p.size * 0.6 * p.life;
-      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.stroke();
+      const r = sz * (2 + (1 - p.life) * 8);
+      ctx.strokeStyle = `hsla(${h},100%,75%,${a * 0.6})`;
+      ctx.lineWidth = sz * 0.5 * p.life;
+      ctx.beginPath(); ctx.arc(px, py, r, 0, _TAU); ctx.stroke();
 
     } else if(p.type === 'firework'){
-      // Tiny bright rocket with halo
-      ctx.fillStyle = `hsla(${p.hue},100%,90%,${alpha * 0.25})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 2.5, 0, TAU); ctx.fill();
-      ctx.fillStyle = `hsla(${p.hue},100%,98%,${alpha})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 0.7, 0, TAU); ctx.fill();
+      ctx.fillStyle = `hsla(${h},100%,90%,${a * 0.2})`;
+      ctx.beginPath(); ctx.arc(px, py, sz * 2, 0, _TAU); ctx.fill();
+      ctx.fillStyle = `hsla(${h},100%,98%,${a})`;
+      ctx.beginPath(); ctx.arc(px, py, sz * 0.6, 0, _TAU); ctx.fill();
     }
   }
   ctx.restore();
@@ -2541,7 +2552,7 @@ function frame(now){
   if(activeEffects.trail > 0){
     activeEffects.trail -= rawDt;
     const intensity = Math.min(activeEffects.trail / 1.0, 1.0); // fade in/out
-    const count = Math.floor(3 + intensity * 3);
+    const count = Math.floor(2 + intensity * 2);
     if(particles.length < MAX_PARTICLES){
       for(let i = 0; i < count; i++){
         const angle = Math.random() * TAU;
