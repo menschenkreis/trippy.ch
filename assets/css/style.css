@@ -765,8 +765,8 @@ footer a:hover { color: var(--pink); }
 #soul-modal-card {
   position: relative;
   z-index: 1;
-  background: rgba(8, 6, 20, 0.82);
-  border: 1px solid rgba(140, 120, 200, 0.14);
+  background: rgba(8, 6, 20, 0.72);
+  border: 1px solid rgba(140, 120, 200, 0.22);
   border-radius: 28px;
   backdrop-filter: blur(30px);
   -webkit-backdrop-filter: blur(30px);
@@ -777,7 +777,12 @@ footer a:hover { color: var(--pink); }
   gap: 1.6rem;
   max-width: min(320px, 82vw);
   width: 100%;
-  box-shadow: 0 0 80px rgba(120, 80, 255, 0.06), 0 16px 64px rgba(0, 0, 0, 0.6);
+  box-shadow:
+    0 0 80px rgba(120, 80, 255, 0.08),
+    0 16px 64px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(140, 100, 255, 0.10),
+    0 0 0 7px rgba(120, 80, 220, 0.05),
+    0 0 0 14px rgba(100, 70, 200, 0.025);
   transform: translateY(16px) scale(0.96);
   transition: transform 0.6s cubic-bezier(0.2, 0, 0, 1);
 }
@@ -920,8 +925,8 @@ footer a:hover { color: var(--pink); }
 #sound-modal-card {
   position: relative;
   z-index: 1;
-  background: rgba(8, 6, 20, 0.82);
-  border: 1px solid rgba(140, 120, 200, 0.14);
+  background: rgba(8, 6, 20, 0.72);
+  border: 1px solid rgba(140, 120, 200, 0.22);
   border-radius: 28px;
   backdrop-filter: blur(30px);
   -webkit-backdrop-filter: blur(30px);
@@ -932,7 +937,12 @@ footer a:hover { color: var(--pink); }
   gap: 1.1rem;
   max-width: min(340px, 86vw);
   width: 100%;
-  box-shadow: 0 0 80px rgba(120, 80, 255, 0.06), 0 16px 64px rgba(0, 0, 0, 0.6);
+  box-shadow:
+    0 0 80px rgba(120, 80, 255, 0.08),
+    0 16px 64px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(140, 100, 255, 0.10),
+    0 0 0 7px rgba(120, 80, 220, 0.05),
+    0 0 0 14px rgba(100, 70, 200, 0.025);
   transform: translateY(16px) scale(0.96);
   transition: transform 0.6s cubic-bezier(0.2, 0, 0, 1);
 }

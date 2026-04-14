@@ -4468,6 +4468,7 @@ function _runMandala(canvasId) {
   window.addEventListener('resize', resize2);
 
   function circ(x, y, r) { ctx2.beginPath(); ctx2.arc(x, y, r, 0, TAU); ctx2.stroke(); }
+  function seg(x1, y1, x2, y2) { ctx2.beginPath(); ctx2.moveTo(x1, y1); ctx2.lineTo(x2, y2); ctx2.stroke(); }
 
   function tick2() {
     raf2 = requestAnimationFrame(tick2);
@@ -4475,46 +4476,68 @@ function _runMandala(canvasId) {
     const W = canvas.width, H = canvas.height;
     const cx = W * 0.5, cy = H * 0.5;
     ctx2.clearRect(0, 0, W, H);
-    ctx2.strokeStyle = '#a07eff';
+
+    // Slowly breathe through violet → indigo → blue
+    const hue = 265 + Math.sin(t2 * 0.15) * 20;
+    ctx2.strokeStyle = `hsl(${hue}, 65%, 68%)`;
     ctx2.lineWidth = 0.8;
 
     const breathe = 1 + 0.03 * Math.sin(t2 * 0.7);
-    const R  = Math.min(W, H) * 0.1 * breathe;
+    const R  = Math.min(W, H) * 0.12 * breathe;
     const sp  = t2 * 0.05;      // inner — clockwise
     const sp2 = -t2 * 0.032;    // outer — counter-clockwise
 
     // Center circle
-    ctx2.globalAlpha = 0.16;
+    ctx2.globalAlpha = 0.18;
     circ(cx, cy, R);
 
     // Seed of Life — 6 petals, slowly rotating
-    ctx2.globalAlpha = 0.11;
+    ctx2.globalAlpha = 0.13;
     for(let i = 0; i < 6; i++) {
       const a = sp + i * TAU / 6;
       circ(cx + Math.cos(a) * R, cy + Math.sin(a) * R, R);
     }
 
+    // Hexagram (Star of David) — two interlaced triangles inscribed in the Seed ring
+    ctx2.globalAlpha = 0.10;
+    for(let t = 0; t < 2; t++) {
+      ctx2.beginPath();
+      for(let i = 0; i < 3; i++) {
+        const a = sp + t * (TAU / 6) + i * (TAU / 3);
+        const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R;
+        i === 0 ? ctx2.moveTo(x, y) : ctx2.lineTo(x, y);
+      }
+      ctx2.closePath();
+      ctx2.stroke();
+    }
+
+    // Metatron long lines — 6 diameters through center connecting opposite petals
+    ctx2.globalAlpha = 0.038;
+    for(let i = 0; i < 6; i++) {
+      const a = sp + i * TAU / 6;
+      seg(cx - Math.cos(a) * R * 7.5, cy - Math.sin(a) * R * 7.5,
+          cx + Math.cos(a) * R * 7.5, cy + Math.sin(a) * R * 7.5);
+    }
+
     // Second petal ring — counter-rotating
-    ctx2.globalAlpha = 0.06;
+    ctx2.globalAlpha = 0.07;
     for(let i = 0; i < 6; i++) {
       const a = sp2 + Math.PI / 6 + i * TAU / 6;
       circ(cx + Math.cos(a) * R * 1.732, cy + Math.sin(a) * R * 1.732, R);
     }
 
     // Concentric boundary rings
-    ctx2.globalAlpha = 0.09;  circ(cx, cy, R * 2.0);
-    ctx2.globalAlpha = 0.06;  circ(cx, cy, R * 3.46);
-    ctx2.globalAlpha = 0.038; circ(cx, cy, R * 5.0);
-    ctx2.globalAlpha = 0.022; circ(cx, cy, R * 7.2);
+    ctx2.globalAlpha = 0.10;  circ(cx, cy, R * 2.0);
+    ctx2.globalAlpha = 0.07;  circ(cx, cy, R * 3.46);
+    ctx2.globalAlpha = 0.042; circ(cx, cy, R * 5.0);
+    ctx2.globalAlpha = 0.025; circ(cx, cy, R * 7.2);
 
     // 12-fold radial spokes, very faint
-    ctx2.globalAlpha = 0.032;
+    ctx2.globalAlpha = 0.035;
     for(let i = 0; i < 12; i++) {
       const a = sp * 0.35 + i * TAU / 12;
-      ctx2.beginPath();
-      ctx2.moveTo(cx + Math.cos(a) * R,       cy + Math.sin(a) * R);
-      ctx2.lineTo(cx + Math.cos(a) * R * 7.5, cy + Math.sin(a) * R * 7.5);
-      ctx2.stroke();
+      seg(cx + Math.cos(a) * R, cy + Math.sin(a) * R,
+          cx + Math.cos(a) * R * 7.5, cy + Math.sin(a) * R * 7.5);
     }
   }
 
@@ -4648,10 +4671,13 @@ function checkResume(){
     }
     restartBtn.onclick = (e) => {
       e.preventDefault(); e.stopPropagation();
+      window._soulModalMode = true;
       _showSoulModal((nm) => {
         window._fe.setName(nm);
         window._fe.clearSave();
-        if(window._startBirth) window._startBirth();
+        _showSoundModal(() => {
+          if(window._startBirth) window._startBirth();
+        });
       }, ragdolls[0]?.name || 'emy');
     };
     promptArea.appendChild(restartBtn);
