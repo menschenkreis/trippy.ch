@@ -2414,6 +2414,18 @@ function frame(now){
   const rawDt = Math.min((now - lastTime)/1000, 0.033);
   lastTime = now;
 
+  // Detect and recover from blank canvas (context state corruption)
+  if(Math.random() < 0.002) { // ~every 8 seconds at 60fps
+    const testPixel = ctx.getImageData(0, 0, 1, 1).data;
+    if(testPixel[3] === 0 && cameraY > 100) {
+      // Canvas is transparent when it shouldn't be — re-init
+      console.warn('[falling-emy] canvas appears blank, re-initializing context');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+    }
+  }
+
   // Freeze physics during intro
   const introEl = document.getElementById('intro-sequence');
   const introActive = !!introEl;
@@ -2927,7 +2939,7 @@ function frame(now){
         wordIdx++;
       }
     }
-    ctx.restore();
+    ctx.restore(); // end camera transform
   }
 
   // Score flies & counter in screen space
@@ -2953,7 +2965,13 @@ function frame(now){
     ctx.textAlign = 'center';
     ctx.fillText('hold to slow', W/2, H - 30);
   }
-  } catch(e) { console.error('[falling-emy] frame error:', e); }
+  } catch(e) { 
+    console.error('[falling-emy] frame error:', e);
+    // Reset canvas state on error to prevent corrupted transform
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+  }
 }
 requestAnimationFrame(frame);
 
