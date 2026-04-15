@@ -66,7 +66,6 @@
 
   <div class="top-controls">
     <button id="theme-btn" class="ctrl-btn" title="Theme">✦</button>
-    <button id="tilt-btn" class="ctrl-btn" title="Toggle tilt">📱</button>
     <button id="mute-btn" class="ctrl-btn ctrl-btn-sound" title="Toggle sound">🔇</button>
     <button id="reset-btn" class="ctrl-btn" title="Reset">⟳</button>
     <button id="info-btn" class="ctrl-btn" title="Info">i</button>
@@ -162,7 +161,7 @@
   let highScore = parseInt(localStorage.getItem('trippyJumpHigh') || '0');
   let cameraY = 0;
   let maxHeight = 0;
-  let tiltEnabled = false;
+  let tiltEnabled = true;
   let muted = false;
 
   // Player
@@ -326,10 +325,7 @@
     themeIndex = (themeIndex + 1) % themes.length;
     theme = themes[themeIndex];
   });
-  document.getElementById('tilt-btn').addEventListener('click', function() {
-    tiltEnabled = !tiltEnabled;
-    this.classList.toggle('is-on', tiltEnabled);
-  });
+
   document.getElementById('mute-btn').addEventListener('click', function() {
     muted = !muted;
     this.textContent = muted ? '🔊' : '🔇';
