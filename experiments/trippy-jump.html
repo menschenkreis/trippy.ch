@@ -316,7 +316,7 @@
   // Tilt
   window.addEventListener('deviceorientation', e => {
     if (tiltEnabled && e.gamma !== null) {
-      tiltX = Math.max(-1, Math.min(1, (e.gamma || 0) / 30));
+      tiltX = Math.max(-1, Math.min(1, -(e.gamma || 0) / 30));
     }
   });
 
