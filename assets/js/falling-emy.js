@@ -295,6 +295,10 @@ function restoreFromSave(data){
   for(let y = behindY; y < aheadY; y += 400 + Math.random()*400){
     if(y > 2500) spawnSphereAtDepth(y);
   }
+  // Snap cameraY so the ragdoll head is already at the target ratio when the
+  // intro overlay fades in — no camera drift during the countdown means no
+  // camera-lag induced upward flick when physics starts at intro-complete.
+  cameraY = ragdolls[0].particles[0].y - H * CONFIG.CAMERA_TARGET_RATIO;
   lastSaveTime = time;
 }
 
@@ -3790,6 +3794,12 @@ window.addEventListener('intro-complete', () => {
   // rather than flicking in whatever direction the idle sway happened to be.
   for (const r of ragdolls) {
     for (const p of r.particles) { p.ox = p.x; p.oy = p.y; }
+  }
+  // Snap the camera to the ragdoll's exact position so there is no residual
+  // camera lag to catch up on the first physics frame (which would look like
+  // the ragdoll briefly rising before falling).
+  if (ragdolls.length > 0) {
+    cameraY = ragdolls[0].particles[0].y - H * CONFIG.CAMERA_TARGET_RATIO;
   }
 });
 
