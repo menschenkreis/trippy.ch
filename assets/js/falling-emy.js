@@ -35,6 +35,56 @@ function hexToRgb(hex){
   return [(n>>16)&255, (n>>8)&255, n&255];
 }
 
+// ── § 1. Internationalisation ────────────────────────────────────────────
+// FE_CONTENT is declared in falling-emy-content.js, loaded before this file.
+// Language order of preference: localStorage override → browser language → 'en'.
+{
+  const _avail  = Object.keys(window.FE_CONTENT || { en: 1 });
+  const _stored = localStorage.getItem('fe-lang') || '';
+  const _browser = (navigator.language || '').slice(0, 2).toLowerCase();
+  window.FE_LANG = _avail.includes(_stored)  ? _stored  :
+                   _avail.includes(_browser) ? _browser : 'en';
+}
+
+// Resolve a dot-path key from the current language's ui table.
+// Falls back to English, then to the raw key if nothing matches.
+// Optional vars object replaces {placeholder} tokens.
+function t(key, vars) {
+  const lang = window.FE_LANG || 'en';
+  const content = window.FE_CONTENT || {};
+  function resolve(obj, path) {
+    const keys = path.split('.');
+    let v = obj;
+    for (const k of keys) v = v?.[k];
+    return v;
+  }
+  let val = resolve(content[lang]?.ui, key);
+  if (typeof val !== 'string') val = resolve(content.en?.ui, key);
+  if (typeof val !== 'string') val = key;
+  if (!vars) return val;
+  return val.replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? ''));
+}
+
+// Apply data-i18n / data-i18n-placeholder attributes to the DOM.
+// Called once at startup so static HTML elements get translated.
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const v = t(el.dataset.i18n);
+    if (v !== el.dataset.i18n) el.textContent = v;
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const v = t(el.dataset.i18nPlaceholder);
+    if (v !== el.dataset.i18nPlaceholder) el.placeholder = v;
+  });
+  // Sound hint has nested markup — rebuild it
+  const sh = document.getElementById('sound-hint');
+  if (sh) {
+    const inner = sh.querySelector('span');
+    if (inner) inner.innerHTML =
+      `${t('soundHintFor')}<br><span style="color:rgba(180,140,255,0.8)">${t('soundHintLabel')}</span>`;
+  }
+}
+
 // ── § 1. Tuning / magic-number consolidation ────────────────────────────
 // Only values used in more than one place OR clear tuning knobs are hoisted.
 // Numerical values are UNCHANGED from their former inline occurrences.
@@ -113,16 +163,16 @@ function clearSave(){
 }
 
 function formatDepth(m){
-  if(m >= 1000) return (m/1000).toFixed(1) + ' km';
-  return m.toFixed(0) + ' m';
+  if(m >= 1000) return t('depthKm', { n: (m/1000).toFixed(1) });
+  return t('depthM', { n: m.toFixed(0) });
 }
 
 function formatTimeAgo(ts){
   const s = Math.floor((Date.now() - ts) / 1000);
-  if(s < 60) return 'just now';
-  if(s < 3600) return Math.floor(s/60) + ' min ago';
-  if(s < 86400) return Math.floor(s/3600) + 'h ago';
-  return Math.floor(s/86400) + 'd ago';
+  if(s < 60)    return t('timeJustNow');
+  if(s < 3600)  return t('timeMinAgo', { n: Math.floor(s/60) });
+  if(s < 86400) return t('timeHAgo',   { n: Math.floor(s/3600) });
+  return t('timeDayAgo', { n: Math.floor(s/86400) });
 }
 
 function autoSave(now){
@@ -143,8 +193,9 @@ function updateJourneyPanel(){
   let html = '';
   for(let i = journeyLog.length - 1; i >= 0; i--){
     const e = journeyLog[i];
-    const isAge = e.label.startsWith('year ');
-    const isBirth = e.label === 'birth';
+    // Use data properties so the check works regardless of language
+    const isAge   = e.age  !== undefined;
+    const isBirth = !isAge && e.depth === 5;
     const size = 18, cx = 9, cy = 9;
     let svg;
     if(isBirth){
@@ -436,54 +487,10 @@ let chapterDisplay = null; // {text, life, phase}
 let chapterSlowMo = 0;
 let firedChapters = new Set();
 
-const lifeChapters = [
-  { depth: 5, label: 'birth', text: 'no past. so much future.' },
-  { depth: 100, label: 'flow', text: 'life is not a problem to be solved, but a reality to be experienced.' },
-  { depth: 200, label: 'resistance', text: 'the obstacle is the path. every collision is an awakening.' },
-  { depth: 300, label: 'drift', text: 'sometimes the void carries you. sometimes you carry the void.' },
-  { depth: 400, label: 'pattern', text: 'the shapes repeat, but you never see them the same way twice.' },
-  { depth: 500, label: 'descent', text: 'to fall is to surrender. to surrender is to find the rhythm.' },
-  { depth: 600, label: 'momentum', text: 'you cannot steer what you do not accept.' },
-  { depth: 700, label: 'gravity', text: 'the pull is not the enemy. it is the only honest direction.' },
-  { depth: 800, label: 'echo', text: 'every sound you make returns - fainter, but never gone.' },
-  { depth: 900, label: 'trust', text: 'the void has caught you every time you have fallen so far.' },
-  { depth: 1000, label: 'year 1', text: 'a thousand meters. the world is finally becoming real.' },
-  { depth: 1100, label: 'curiosity', text: 'we do not travel to find ourselves, but to find how much there is to lose.' },
-  { depth: 1200, label: 'stillness', text: 'the faster you fall, the more still the center must become.' },
-  { depth: 1300, label: 'light', text: 'even in the void, you are the thing that glows.' },
-  { depth: 1400, label: 'letting go', text: 'you stop choosing the fall. the fall was always choosing you.' },
-  { depth: 1500, label: 'breath', text: 'the air changes at depth. so do you.' },
-  { depth: 1600, label: 'time', text: 'time does not pass. you pass through it.' },
-  { depth: 1700, label: 'edge', text: 'standing at the border between who you were and who you are becoming.' },
-  { depth: 1800, label: 'fragility', text: 'what breaks reveals what was holding it together.' },
-  { depth: 1900, label: 'resilience', text: 'the fracture is where the light enters. and the light was always entering.' },
-  { depth: 2000, label: 'year 2', text: 'two kilometers of descent. you are not the same shape that began.' },
-  { depth: 2100, label: 'horizon', text: 'there is no horizon here. only the next moment, and the next.' },
-  { depth: 2200, label: 'faith', text: 'not belief. just the quiet decision to keep falling.' },
-  { depth: 2300, label: 'depth', text: 'depth is merely height seen from a different point of view.' },
-  { depth: 2400, label: 'silence', text: 'the void does not answer. it only reflects the light you bring.' },
-  { depth: 2500, label: 'presence', text: 'you are not falling through the void. you are the void experiencing itself.' },
-  { depth: 2600, label: 'interconnected', text: 'there are no separate objects, only different frequencies of the same descent.' },
-  { depth: 2700, label: 'acceptance', text: 'not everything has a reason. some things just are.' },
-  { depth: 2800, label: 'gratitude', text: 'for the fall. for the shapes. for the one who is falling.' },
-  { depth: 2900, label: 'wonder', text: 'after all this distance, everything is still strange and new.' },
-  { depth: 3000, label: 'year 3', text: 'three kilometers. what was once terrifying is now just the way things are.' },
-  { age: 5, label: 'year 5', text: 'the void gets deeper, but so do you.' },
-  { age: 9, label: 'year 9', text: 'almost double digits. time starts to feel real.' },
-  { age: 12, label: 'year 12', text: 'a turning point. everything begins to change.' },
-  { age: 13, label: 'year 13', text: 'the void gets deeper.' },
-  { age: 15, label: 'year 15', text: 'first love. first heartbreak. the obstacles get sharper.' },
-  { age: 18, label: 'year 18', text: 'adulthood arrives. nobody feels ready.' },
-  { age: 25, label: 'year 25', text: 'a quarter century. who am i now?' },
-  { age: 30, label: 'year 30', text: 'the fall feels different from here.' },
-  { age: 40, label: 'year 40', text: 'not a crisis - a clearing.' },
-  { age: 50, label: 'year 50', text: 'half a century. grace finds its rhythm.' },
-  { age: 60, label: 'year 60', text: 'wisdom is not knowing more. it is carrying less.' },
-  { age: 70, label: 'year 70', text: 'the obstacles soften. the geometry becomes beautiful.' },
-  { age: 80, label: 'year 80', text: 'a long fall. a good fall. still falling.' },
-  { age: 90, label: 'year 90', text: 'the void and you are old friends.' },
-  { age: 100, label: 'year 100', text: 'a hundred years of descent. what a journey.' },
-];
+// Chapters are sourced from the content file (falling-emy-content.js).
+// Falls back to an empty array only if the content file failed to load.
+const lifeChapters = (window.FE_CONTENT?.[window.FE_LANG]?.chapters) ||
+                     (window.FE_CONTENT?.en?.chapters) || [];
 
 // ── Accelerometer ────────────────────────────────────────────────────────
 let accelInited = false;
@@ -3767,7 +3774,14 @@ let lastTime = 0;
 // Cached once; flipped to false by the 'intro-complete' listener below so the
 // hot path does not pay for a document.getElementById() every frame.
 let introActive = !!document.getElementById('intro-sequence');
-window.addEventListener('intro-complete', () => { introActive = false; });
+window.addEventListener('intro-complete', () => {
+  introActive = false;
+  // Zero out sway-induced Verlet velocities so the ragdoll falls from rest
+  // rather than flicking in whatever direction the idle sway happened to be.
+  for (const r of ragdolls) {
+    for (const p of r.particles) { p.ox = p.x; p.oy = p.y; }
+  }
+});
 
 function frame(now){
   requestAnimationFrame(frame);
@@ -4636,11 +4650,11 @@ function _showSoulModal(onConfirm, defaultName) {
   const prompt     = document.getElementById('soul-modal-prompt');
   const input      = document.getElementById('soul-modal-input');
   const confirmBtn = document.getElementById('soul-modal-confirm');
-  if(!modal || !input || !confirmBtn) { onConfirm(defaultName || 'emy'); return; }
+  if(!modal || !input || !confirmBtn) { onConfirm(defaultName || 'anything'); return; }
 
   // Reset any previous reveal state
   [prompt, input, confirmBtn].forEach(el => el?.classList.remove('revealed'));
-  confirmBtn.textContent = 'begin your journey';
+  confirmBtn.textContent = t('soulConfirm');
   input.value = defaultName || '';
 
   // Start mandala + show backdrop
@@ -4652,15 +4666,15 @@ function _showSoulModal(onConfirm, defaultName) {
   setTimeout(() => input.classList.add('revealed'),     1100);
   setTimeout(() => confirmBtn.classList.add('revealed'), 1500);
 
-  // Live confirm label: "begin as alice"
+  // Live confirm label: "begin as alice" / "als alice beginnen"
   function onType() {
     const n = input.value.trim();
-    confirmBtn.textContent = n ? `begin as ${n}` : 'begin your journey';
+    confirmBtn.textContent = n ? t('soulBeginAs', { name: n }) : t('soulConfirm');
   }
   input.addEventListener('input', onType);
 
   function commit() {
-    const nm = (input.value || '').trim() || 'emy';
+    const nm = (input.value || '').trim() || 'anything';
     input.removeEventListener('input', onType);
     [prompt, input, confirmBtn].forEach(el => el?.classList.remove('revealed'));
     modal.classList.remove('visible');
@@ -4725,11 +4739,11 @@ function checkResume(){
   _resumeChecked = true;
 
   const thoughtText = document.getElementById('intro-thought-text');
-  if(thoughtText) thoughtText.textContent = "Your journey has already begun";
+  if(thoughtText) thoughtText.textContent = t('introThoughtReturn');
 
   const embarkBtn = document.getElementById('intro-embark');
   if(embarkBtn) {
-    embarkBtn.textContent = "Resume journey";
+    embarkBtn.textContent = t('introResume');
     embarkBtn.dataset.resume = "true";
     embarkBtn.onclick = (e) => {
       e.preventDefault(); e.stopPropagation();
@@ -4742,7 +4756,7 @@ function checkResume(){
     const embarkEl = document.getElementById('intro-embark');
     const restartBtn = document.createElement('button');
     restartBtn.id = 'intro-restart';
-    restartBtn.textContent = "Embark again";
+    restartBtn.textContent = t('introRestart');
     // Copy all CSS properties from embark button to ensure visual match
     if(embarkEl){
       const cs = getComputedStyle(embarkEl);
@@ -4759,7 +4773,7 @@ function checkResume(){
         _showSoundModal(() => {
           if(window._startBirth) window._startBirth();
         });
-      }, ragdolls[0]?.name || 'emy');
+      }, ragdolls[0]?.name || '');
     };
     promptArea.appendChild(restartBtn);
   }
@@ -4795,7 +4809,7 @@ if(introEl){
           _showSoundModal(() => {
             if(window._startBirth) window._startBirth();
           });
-        }, 'emy');
+        }, '');
       };
     }
   }
@@ -4842,5 +4856,8 @@ function updateSoundHint() {
     }, 3500);
   }
 }
+
+// Apply i18n translations to all data-i18n marked elements
+applyI18n();
 
 })();
