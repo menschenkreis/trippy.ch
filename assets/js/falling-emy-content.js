@@ -36,13 +36,25 @@
         })
       ),
 
-      chapters: data.chapters.map(function (ch) {
+      // Merge depth-based chapters and age-based milestones into one sorted array.
+      chapters: (data.chapters || []).map(function (ch) {
         return {
           depth: ch.depth,
-          age:   ch.age,
           label: ch.label[lang] !== undefined ? ch.label[lang] : ch.label.en,
           text:  ch.text[lang]  !== undefined ? ch.text[lang]  : ch.text.en,
         };
+      }).concat(
+        (data.ages || []).map(function (a) {
+          return {
+            age:   a.age,
+            label: a.label[lang] !== undefined ? a.label[lang] : a.label.en,
+            text:  a.text[lang]  !== undefined ? a.text[lang]  : a.text.en,
+          };
+        })
+      ).sort(function (a, b) {
+        var da = a.depth !== undefined ? a.depth : a.age * 1000;
+        var db = b.depth !== undefined ? b.depth : b.age * 1000;
+        return da - db;
       }),
 
     };
