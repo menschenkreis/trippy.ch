@@ -4735,7 +4735,7 @@ function checkResume(){
   if(_resumeChecked) return;
   if(!window._fe) return;
   const saved = window._fe.loadProgress();
-  if(!saved || saved.depthMeters < CONFIG.INTRO_RESUME_MIN_M) return;
+  if(!saved) return;
   _resumeChecked = true;
 
   const thoughtText = document.getElementById('intro-thought-text');
