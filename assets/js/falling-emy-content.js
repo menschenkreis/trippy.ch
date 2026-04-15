@@ -6,7 +6,7 @@
  *
  * Template variables use {placeholder} syntax, e.g. "begin as {name}".
  * ─────────────────────────────────────────────────────────────────────── */
-const FE_CONTENT = {
+window.FE_CONTENT = {
 
   // ── English ──────────────────────────────────────────────────────────
   en: {
