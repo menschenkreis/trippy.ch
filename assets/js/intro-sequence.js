@@ -140,6 +140,25 @@
 
   window._startBirth = startBirth;
 
+  // Fast variant for "Resume journey": physics starts immediately, overlay fades
+  // in 0.4 s instead of the normal 2.4 s — seamless for returning players.
+  window._startBirthFast = function() {
+    if (birthStarted) return;
+    birthStarted = true;
+    thoughtBubble.classList.remove('visible');
+    promptArea.classList.remove('visible');
+    // Fire intro-complete NOW so falling-emy.js zeroes velocities and snaps camera
+    // before the first physics frame runs.
+    window.dispatchEvent(new CustomEvent('intro-complete'));
+    intro.style.transition = 'opacity 0.4s ease';
+    intro.style.opacity = '0';
+    setTimeout(() => {
+      phase = 'done';
+      cancelAnimationFrame(raf);
+      if (intro.parentNode) intro.remove();
+    }, 400);
+  };
+
   function startBirth() {
     if (birthStarted) return;
     birthStarted = true;

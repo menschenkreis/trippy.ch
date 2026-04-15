@@ -283,9 +283,20 @@ function restoreFromSave(data){
     if(depthMeters >= triggerDepth) firedChapters.add(ci);
   }
 
-  // Re-create ragdoll at saved depth, restoring the saved name
+  // Teleport the existing ragdoll to the saved depth instead of creating a new
+  // one — this preserves the ragdoll's hue/colour so there is no colour flash
+  // when the intro overlay fades away on resume.
   const _savedName = data.ragdollName || 'emy';
-  ragdolls = [new Ragdoll(W/2, cameraY, _savedName)];
+  if (ragdolls.length > 0) {
+    const r = ragdolls[0];
+    r.name = _savedName;
+    // new Ragdoll(W/2, cameraY) places the head at (cameraY - s*4) = cameraY - 72
+    const targetHeadY = cameraY - 72;
+    const dy = targetHeadY - r.particles[0].y;
+    for (const p of r.particles) { p.y += dy; p.oy = p.y; p.ox = p.x; }
+  } else {
+    ragdolls = [new Ragdoll(W/2, cameraY, _savedName)];
+  }
   const _nameInput = document.getElementById('emy-name');
   if(_nameInput) _nameInput.value = _savedName;
   spheres = [];
@@ -4803,7 +4814,8 @@ function checkResume(){
     embarkBtn.onclick = (e) => {
       e.preventDefault(); e.stopPropagation();
       window._fe.restoreFromSave(saved);
-      if(window._startBirth) window._startBirth();
+      if(window._startBirthFast) window._startBirthFast();
+      else if(window._startBirth) window._startBirth();
     };
   }
   const promptArea = document.getElementById('intro-prompt');
