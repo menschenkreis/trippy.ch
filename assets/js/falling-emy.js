@@ -134,6 +134,7 @@ function saveProgress(){
       nextChallengeY, nextShapeY, themeIdx,
       journeyLog,
       isMuted,
+      lang: window.FE_LANG || 'en',
       ragdollName: ragdolls[0]?.name || 'emy',
       depthMeters: Math.max(0, cameraY / 100),
       savedAt: Date.now(),
@@ -236,6 +237,18 @@ function restoreFromSave(data){
   // Restore journey log/milestones
   journeyLog = data.journeyLog || [];
   updateJourneyPanel();
+
+  // Restore language (old saves without the field keep current language)
+  if(data.lang) {
+    const avail = Object.keys(window.FE_CONTENT || { en: 1 });
+    if(avail.includes(data.lang)) {
+      window.FE_LANG = data.lang;
+      localStorage.setItem('fe-lang', data.lang);
+      applyI18n();
+      const lb = document.getElementById('lang-btn');
+      if(lb) lb.textContent = data.lang.toUpperCase();
+    }
+  }
 
   // Restore audio toggle state (default to muted for old saves without the field)
   isMuted = data.isMuted ?? true;
