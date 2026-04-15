@@ -1,0 +1,699 @@
+{
+  "ui": {
+
+    "introThoughtNew": {
+      "context": "Intro screen — poetic subtitle shown to first-time players behind the animated sacred-geometry mandala",
+      "en": "Your journey has not been written yet.",
+      "de": "Deine Reise wartet noch auf dich."
+    },
+    "introThoughtReturn": {
+      "context": "Intro screen — poetic subtitle shown to returning players who have an existing save",
+      "en": "Your journey has already begun",
+      "de": "Deine Reise hat bereits begonnen"
+    },
+    "introEmbark": {
+      "context": "Intro screen — primary call-to-action button for first-time players",
+      "en": "Embark into life",
+      "de": "Ins Leben stürzen"
+    },
+    "introResume": {
+      "context": "Intro screen — primary call-to-action button for returning players (save exists)",
+      "en": "Resume journey",
+      "de": "Reise fortsetzen"
+    },
+    "introRestart": {
+      "context": "Intro screen — secondary button for returning players who want to start over",
+      "en": "Embark again",
+      "de": "Neu beginnen"
+    },
+
+    "langTitle": {
+      "context": "Language-selection modal — heading shown before the player name modal, for new players only",
+      "en": "in which tongue?",
+      "de": "in welcher Sprache?"
+    },
+    "langHint": {
+      "context": "Language-selection modal — small hint below the language buttons",
+      "en": "you can change this at any time",
+      "de": "du kannst das jederzeit ändern"
+    },
+
+    "soulPrompt": {
+      "context": "Soul-name modal — label above the name input field",
+      "en": "you call yourself",
+      "de": "du nennst dich"
+    },
+    "soulPlaceholder": {
+      "context": "Soul-name modal — placeholder text inside the name input field",
+      "en": "anything",
+      "de": "irgendjemand"
+    },
+    "soulConfirm": {
+      "context": "Soul-name modal — confirm button when no name has been typed",
+      "en": "begin your journey",
+      "de": "deine Reise beginnen"
+    },
+    "soulBeginAs": {
+      "context": "Soul-name modal — confirm button label once the player has typed a name; {name} is replaced with the typed name",
+      "en": "begin as {name}",
+      "de": "als {name} beginnen"
+    },
+
+    "soundTitle": {
+      "context": "Sound-preference modal — heading; shown once to new players after the soul-name modal",
+      "en": "sound & music",
+      "de": "Ton & Musik"
+    },
+    "soundHint": {
+      "context": "Sound-preference modal — small hint below the heading",
+      "en": "headphones make the journey deeper",
+      "de": "Kopfhörer machen die Reise tiefer"
+    },
+    "soundYes": {
+      "context": "Sound-preference modal — button to start the game with audio enabled",
+      "en": "yes, with sound",
+      "de": "ja, mit Ton"
+    },
+    "soundNo": {
+      "context": "Sound-preference modal — button to start the game muted",
+      "en": "begin in silence",
+      "de": "in der Stille beginnen"
+    },
+
+    "soundHintFor": {
+      "context": "Sound-hint overlay (top-right, fades out at ~50 m depth) — first line; prompts the player to tap the mute button",
+      "en": "tap 🔇 for",
+      "de": "🔇 antippen für"
+    },
+    "soundHintLabel": {
+      "context": "Sound-hint overlay — second line, highlighted in purple",
+      "en": "sound & music",
+      "de": "Ton & Musik"
+    },
+
+    "expTag": {
+      "context": "Bottom-left HUD — small uppercase tag line shown beneath the game title",
+      "en": "canvas · physics · sacred geometry",
+      "de": "Canvas · Physik · Heilige Geometrie"
+    },
+    "expTitle": {
+      "context": "Bottom-left HUD — main game title (intentionally not translated)",
+      "en": "Falling Emy",
+      "de": "Falling Emy"
+    },
+    "soulLabel": {
+      "context": "Bottom-left HUD — label above the soul-name input field during gameplay",
+      "en": "soul",
+      "de": "Seele"
+    },
+    "namePlaceholder": {
+      "context": "Bottom-left HUD — placeholder text inside the in-game soul-name input (shown when no name is set)",
+      "en": "name your soul",
+      "de": "Seele benennen"
+    },
+
+    "journeyEmpty": {
+      "context": "Journey log side panel — empty-state message shown before any milestone has been reached",
+      "en": "The journey just began…",
+      "de": "Die Reise beginnt gerade…"
+    },
+
+    "timeJustNow": {
+      "context": "Journey log — relative timestamp for entries reached within the last minute",
+      "en": "just now",
+      "de": "gerade eben"
+    },
+    "timeMinAgo": {
+      "context": "Journey log — relative timestamp for entries reached 1–59 minutes ago; {n} is replaced with the number of minutes",
+      "en": "{n} min ago",
+      "de": "vor {n} Min."
+    },
+    "timeHAgo": {
+      "context": "Journey log — relative timestamp for entries reached 1–23 hours ago; {n} is replaced with the number of hours",
+      "en": "{n}h ago",
+      "de": "vor {n} Std."
+    },
+    "timeDayAgo": {
+      "context": "Journey log — relative timestamp for entries reached 1+ days ago; {n} is replaced with the number of days",
+      "en": "{n}d ago",
+      "de": "vor {n} Tagen"
+    },
+
+    "depthKm": {
+      "context": "Depth display — used when depth ≥ 1000 m; {n} is replaced with the formatted kilometre value (e.g. '3.5')",
+      "en": "{n} km",
+      "de": "{n} km"
+    },
+    "depthM": {
+      "context": "Depth display — used when depth < 1000 m; {n} is replaced with the formatted metre value",
+      "en": "{n} m",
+      "de": "{n} m"
+    },
+
+    "infoPanelTitle": {
+      "context": "Info panel — large title at the top of the slide-out panel",
+      "en": "Falling Emy",
+      "de": "Falling Emy"
+    },
+    "infoPanelTag": {
+      "context": "Info panel — small tag line directly below the panel title",
+      "en": "Canvas 2D · Verlet Physics · Life Lessons",
+      "de": "Canvas 2D · Verlet-Physik · Lebenslektionen"
+    },
+
+    "infoJourneyH": {
+      "context": "Info panel — section heading for the narrative introduction",
+      "en": "The Journey",
+      "de": "Die Reise"
+    },
+    "infoJourneyP": {
+      "context": "Info panel — paragraph of narrative text under 'The Journey' heading",
+      "en": "There is no ground. There never was. We are born into the fall and learn to call it living — navigating the space between what happens to us and what we do with it. The shapes you encounter aren't obstacles. They're the architecture of meaning: love, balance, challenge, pattern. You can slow time, but you can't stop it. You can dodge, but you can't skip ahead. The only way through is through.",
+      "de": "Es gibt keinen Boden. Den gab es nie. Wir werden in den Fall hineingeboren und lernen, ihn Leben zu nennen — navigierend im Raum zwischen dem, was uns geschieht, und dem, was wir daraus machen. Die Formen, denen du begegnest, sind keine Hindernisse. Sie sind die Architektur des Sinns: Liebe, Balance, Herausforderung, Muster. Du kannst die Zeit verlangsamen, aber nicht anhalten. Du kannst ausweichen, aber nicht überspringen. Der einzige Weg ist durch."
+    },
+
+    "infoHowH": {
+      "context": "Info panel — section heading for the 'How to play' instructions",
+      "en": "How to play",
+      "de": "Wie man spielt"
+    },
+    "infoHoldHint": {
+      "context": "Info panel — first gameplay instruction (hold/drag mechanic)",
+      "en": "Hold to slow time and drag Emy to reposition him.",
+      "de": "Halten um die Zeit zu verlangsamen und Emy neu zu positionieren."
+    },
+    "infoTiltHint": {
+      "context": "Info panel — second gameplay instruction (device tilt / accelerometer)",
+      "en": "Enable tilt to steer gravity with your device.",
+      "de": "Neigung aktivieren um die Schwerkraft mit dem Gerät zu steuern."
+    },
+    "infoAddHint": {
+      "context": "Info panel — third gameplay instruction (add more characters via the + button)",
+      "en": "Add more souls to the void.",
+      "de": "Weitere Seelen der Leere hinzufügen."
+    },
+
+    "infoSymbolsH": {
+      "context": "Info panel — section heading above the symbols grid",
+      "en": "The Symbols of Life",
+      "de": "Die Symbole des Lebens"
+    },
+
+    "symbolHeartTitle": {
+      "context": "Info panel — name of the Heart symbol in the symbols grid",
+      "en": "Heart",
+      "de": "Herz"
+    },
+    "symbolHeartText": {
+      "context": "Info panel — description of the Heart symbol (rare, warm chord, gentle reminder)",
+      "en": "Rare moments of love and connection. They play a warm, ringing major chord. Gentle reminders of what matters most.",
+      "de": "Seltene Momente der Liebe und Verbindung. Sie spielen einen warmen, klingenden Dur-Akkord. Sanfte Erinnerungen daran, was wirklich wichtig ist."
+    },
+
+    "symbolYinYangTitle": {
+      "context": "Info panel — name of the Yin Yang symbol in the symbols grid",
+      "en": "Yin Yang",
+      "de": "Yin Yang"
+    },
+    "symbolYinYangText": {
+      "context": "Info panel — description of the Yin Yang symbol (balance, dual harmonic tones)",
+      "en": "Balance between light and dark, action and stillness. Emitting dual harmonic tones that echo through the void.",
+      "de": "Balance zwischen Licht und Dunkel, Handeln und Stille. Dual harmonische Töne erklingen und hallen durch die Leere."
+    },
+
+    "symbolChallengeTitle": {
+      "context": "Info panel — name of the Challenge symbol (spiky/threatening shape)",
+      "en": "Challenge",
+      "de": "Herausforderung"
+    },
+    "symbolChallengeText": {
+      "context": "Info panel — description of the Challenge symbol (sharp, transformative threshold)",
+      "en": "The edges that force growth. Sharp and threatening, they mark thresholds — each one a portal to a dimension you hadn't imagined yet. You don't destroy them. They transform you.",
+      "de": "Die Kanten, die Wachstum erzwingen. Scharf und bedrohlich markieren sie Schwellen — jede ein Portal in eine Dimension, die du dir noch nicht vorgestellt hast. Du zerstörst sie nicht. Sie verwandeln dich."
+    },
+
+    "symbolGeometryTitle": {
+      "context": "Info panel — name of the Sacred Geometry symbol (Seed of Life, Metatron's Cube, polygons)",
+      "en": "Sacred Geometry",
+      "de": "Heilige Geometrie"
+    },
+    "symbolGeometryText": {
+      "context": "Info panel — description of the Sacred Geometry symbol",
+      "en": "The patterns of existence: Seed of Life, Metatron's Cube, and perfect Polygons. The crystalline structure of the universe.",
+      "de": "Die Muster der Existenz: Samen des Lebens, Metatrons Würfel und perfekte Polygone. Die kristalline Struktur des Universums."
+    },
+
+    "symbolSetbackTitle": {
+      "context": "Info panel — name of the Setback symbol (hexagram / Seal of Solomon — bounces player upward)",
+      "en": "Setback",
+      "de": "Rückschlag"
+    },
+    "symbolSetbackText": {
+      "context": "Info panel — description of the Setback symbol (sends player back up, perspective not punishment)",
+      "en": "A hexagram — the Seal of Solomon. Two triangles pulling in opposite directions, perfectly balanced yet immovable. It sends you back up. Sometimes life does this: just when you found your rhythm, the ground disappears and you fall upward again. Not punishment. Perspective. You'll cover the same distance twice, but never see it the same way.",
+      "de": "Ein Hexagramm — das Siegel Salomons. Zwei Dreiecke, die in entgegengesetzte Richtungen ziehen, perfekt ausbalanciert und doch unbeweglich. Es schickt dich zurück nach oben. Manchmal tut das Leben so: Genau wenn du deinen Rhythmus gefunden hast, verschwindet der Boden und du fällst wieder aufwärts. Keine Strafe. Perspektive. Du wirst dieselbe Strecke zweimal zurücklegen, aber sie nie gleich sehen."
+    },
+
+    "symbolChakrasTitle": {
+      "context": "Info panel — name of the Chakras symbol (7 coloured circles)",
+      "en": "Chakras",
+      "de": "Chakras"
+    },
+    "symbolChakrasText": {
+      "context": "Info panel — description of the Chakras symbol (seven energy centres, singing bowl sounds)",
+      "en": "Seven energy centers, from Root to Crown. They resonate like singing bowls, each color a different frequency of being.",
+      "de": "Sieben Energiezentren, von der Wurzel bis zur Krone. Sie schwingen wie Klangschalen — jede Farbe eine andere Frequenz des Seins."
+    },
+
+    "symbolMerkabTitle": {
+      "context": "Info panel — name of the Merkaba symbol (two spinning tetrahedra)",
+      "en": "Merkaba",
+      "de": "Merkaba"
+    },
+    "symbolMerkabText": {
+      "context": "Info panel — description of the Merkaba symbol (vehicle of light, ascending arpeggio sound)",
+      "en": "The vehicle of light — two tetrahedra spinning in opposite directions, projecting a field of sacred geometry around the body. A symbol of ascension and multi-dimensional awareness. Each encounter plays a crystalline ascending arpeggio: root, fifth, octave.",
+      "de": "Das Fahrzeug des Lichts — zwei Tetraeder, die sich in entgegengesetzte Richtungen drehen und ein Feld heiliger Geometrie um den Körper projizieren. Ein Symbol der Himmelfahrt und mehrdimensionalen Bewusstheit. Jede Begegnung spielt ein kristallines aufsteigendes Arpeggio: Grundton, Quinte, Oktave."
+    },
+
+    "symbolTorusTitle": {
+      "context": "Info panel — name of the Torus symbol (donut / toroidal energy flow)",
+      "en": "Torus",
+      "de": "Torus"
+    },
+    "symbolTorusText": {
+      "context": "Info panel — description of the Torus symbol (loops endlessly, low resonant drone sound)",
+      "en": "The fundamental shape of energy flow — a donut of light that loops endlessly through itself. Every field in nature curves back into itself this way: electromagnetic, gravitational, toroidal. Its sound is a low resonant drone, a reminder that all endings are beginnings.",
+      "de": "Die fundamentale Form des Energieflusses — ein Lichtring, der endlos durch sich selbst läuft. Jedes Feld in der Natur krümmt sich so in sich selbst zurück: elektromagnetisch, gravitativ, toroidal. Sein Klang ist ein tiefer resonanter Drone — eine Erinnerung daran, dass alle Enden Anfänge sind."
+    },
+
+    "infoPowerUpsH": {
+      "context": "Info panel — section heading above the power-up descriptions",
+      "en": "Power-Ups",
+      "de": "Power-Ups"
+    },
+
+    "symbolAuraTitle": {
+      "context": "Info panel — name of the Aura power-up (three iridescent rings, purely meditative)",
+      "en": "Aura ✦",
+      "de": "Aura ✦"
+    },
+    "symbolAuraText": {
+      "context": "Info panel — description of the Aura power-up (5 seconds, no obstacles, living light crown)",
+      "en": "Three iridescent rings bloom around Emy — a crown of living light that slowly cycles through all colours. Purely meditative. No obstacles to dodge, no force applied. Just Emy, radiant, for five seconds. A reminder that sometimes grace simply arrives.",
+      "de": "Drei schillernde Ringe entfalten sich um Emy — eine Krone aus lebendigem Licht, die langsam durch alle Farben wechselt. Rein meditativ. Keine Hindernisse, keine Kraft. Nur Emy, strahlend, für fünf Sekunden. Eine Erinnerung daran, dass Gnade manchmal einfach ankommt."
+    },
+
+    "symbolNovaTitle": {
+      "context": "Info panel — name of the Nova power-up (eight rays of light, 3 seconds)",
+      "en": "Nova ✦",
+      "de": "Nova ✦"
+    },
+    "symbolNovaText": {
+      "context": "Info panel — description of the Nova power-up (starburst, bright crystalline chord sound)",
+      "en": "Eight rays of pure light radiate from Emy's head — a starburst of brilliance that lasts three seconds. An outpouring of inner light that transforms Emy briefly into a source rather than a subject of the void. The sound is a bright crystalline chord, clear as glass.",
+      "de": "Acht Strahlen reinen Lichts strahlen von Emys Kopf — ein Sternausbruch, der drei Sekunden andauert. Ein Ausströmen inneren Lichts, das Emy kurz in eine Quelle verwandelt statt in ein Objekt der Leere. Der Klang ist ein heller kristalliner Akkord, klar wie Glas."
+    },
+
+    "infoJourneySoFarH": {
+      "context": "Info panel — section heading above the journey log (list of reached milestones)",
+      "en": "The Journey So Far",
+      "de": "Die Reise bisher"
+    }
+
+  },
+
+  "chapters": [
+
+    {
+      "id": "birth",
+      "context": "Journey log milestone — triggered at 5 m depth, the very start of the fall",
+      "depth": 5,
+      "label": { "en": "birth",         "de": "Geburt" },
+      "text":  { "en": "no past. so much future.",
+                 "de": "keine Vergangenheit. so viel Zukunft." }
+    },
+    {
+      "id": "flow",
+      "context": "Journey log milestone — triggered at 100 m depth",
+      "depth": 100,
+      "label": { "en": "flow",           "de": "Fluss" },
+      "text":  { "en": "life is not a problem to be solved, but a reality to be experienced.",
+                 "de": "das Leben ist kein Problem, das gelöst werden muss, sondern eine Wirklichkeit, die erlebt werden will." }
+    },
+    {
+      "id": "resistance",
+      "context": "Journey log milestone — triggered at 200 m depth",
+      "depth": 200,
+      "label": { "en": "resistance",     "de": "Widerstand" },
+      "text":  { "en": "the obstacle is the path. every collision is an awakening.",
+                 "de": "das Hindernis ist der Weg. jede Kollision ist ein Erwachen." }
+    },
+    {
+      "id": "drift",
+      "context": "Journey log milestone — triggered at 300 m depth",
+      "depth": 300,
+      "label": { "en": "drift",          "de": "Drift" },
+      "text":  { "en": "sometimes the void carries you. sometimes you carry the void.",
+                 "de": "manchmal trägt dich die Leere. manchmal trägst du die Leere." }
+    },
+    {
+      "id": "pattern",
+      "context": "Journey log milestone — triggered at 400 m depth",
+      "depth": 400,
+      "label": { "en": "pattern",        "de": "Muster" },
+      "text":  { "en": "the shapes repeat, but you never see them the same way twice.",
+                 "de": "die Formen wiederholen sich, aber du siehst sie nie auf dieselbe Weise zweimal." }
+    },
+    {
+      "id": "descent",
+      "context": "Journey log milestone — triggered at 500 m depth",
+      "depth": 500,
+      "label": { "en": "descent",        "de": "Abstieg" },
+      "text":  { "en": "to fall is to surrender. to surrender is to find the rhythm.",
+                 "de": "zu fallen bedeutet, sich hinzugeben. sich hinzugeben bedeutet, den Rhythmus zu finden." }
+    },
+    {
+      "id": "momentum",
+      "context": "Journey log milestone — triggered at 600 m depth",
+      "depth": 600,
+      "label": { "en": "momentum",       "de": "Schwung" },
+      "text":  { "en": "you cannot steer what you do not accept.",
+                 "de": "du kannst nicht steuern, was du nicht annimmst." }
+    },
+    {
+      "id": "gravity",
+      "context": "Journey log milestone — triggered at 700 m depth",
+      "depth": 700,
+      "label": { "en": "gravity",        "de": "Schwerkraft" },
+      "text":  { "en": "the pull is not the enemy. it is the only honest direction.",
+                 "de": "die Anziehung ist nicht der Feind. sie ist die einzig ehrliche Richtung." }
+    },
+    {
+      "id": "echo",
+      "context": "Journey log milestone — triggered at 800 m depth",
+      "depth": 800,
+      "label": { "en": "echo",           "de": "Echo" },
+      "text":  { "en": "every sound you make returns — fainter, but never gone.",
+                 "de": "jeder Klang, den du erzeugst, kehrt zurück — leiser, aber niemals ganz weg." }
+    },
+    {
+      "id": "trust",
+      "context": "Journey log milestone — triggered at 900 m depth",
+      "depth": 900,
+      "label": { "en": "trust",          "de": "Vertrauen" },
+      "text":  { "en": "the void has caught you every time you have fallen so far.",
+                 "de": "die Leere hat dich jedes Mal aufgefangen, wenn du bisher gefallen bist." }
+    },
+    {
+      "id": "year-1",
+      "context": "Journey log milestone — triggered at 1000 m depth (metaphorical year 1 of life)",
+      "depth": 1000,
+      "label": { "en": "year 1",         "de": "Jahr 1" },
+      "text":  { "en": "a thousand meters. the world is finally becoming real.",
+                 "de": "tausend Meter. die Welt wird endlich wirklich." }
+    },
+    {
+      "id": "curiosity",
+      "context": "Journey log milestone — triggered at 1100 m depth",
+      "depth": 1100,
+      "label": { "en": "curiosity",      "de": "Neugier" },
+      "text":  { "en": "we do not travel to find ourselves, but to find how much there is to lose.",
+                 "de": "wir reisen nicht, um uns selbst zu finden, sondern um zu entdecken, wie viel es zu verlieren gibt." }
+    },
+    {
+      "id": "stillness",
+      "context": "Journey log milestone — triggered at 1200 m depth",
+      "depth": 1200,
+      "label": { "en": "stillness",      "de": "Stille" },
+      "text":  { "en": "the faster you fall, the more still the center must become.",
+                 "de": "je schneller du fällst, desto stiller muss das Zentrum werden." }
+    },
+    {
+      "id": "light",
+      "context": "Journey log milestone — triggered at 1300 m depth",
+      "depth": 1300,
+      "label": { "en": "light",          "de": "Licht" },
+      "text":  { "en": "even in the void, you are the thing that glows.",
+                 "de": "selbst in der Leere bist du das, was leuchtet." }
+    },
+    {
+      "id": "letting-go",
+      "context": "Journey log milestone — triggered at 1400 m depth",
+      "depth": 1400,
+      "label": { "en": "letting go",     "de": "Loslassen" },
+      "text":  { "en": "you stop choosing the fall. the fall was always choosing you.",
+                 "de": "du hörst auf, den Fall zu wählen. der Fall hat dich schon immer gewählt." }
+    },
+    {
+      "id": "breath",
+      "context": "Journey log milestone — triggered at 1500 m depth",
+      "depth": 1500,
+      "label": { "en": "breath",         "de": "Atem" },
+      "text":  { "en": "the air changes at depth. so do you.",
+                 "de": "die Luft verändert sich in der Tiefe. du auch." }
+    },
+    {
+      "id": "time",
+      "context": "Journey log milestone — triggered at 1600 m depth",
+      "depth": 1600,
+      "label": { "en": "time",           "de": "Zeit" },
+      "text":  { "en": "time does not pass. you pass through it.",
+                 "de": "die Zeit vergeht nicht. du vergehst durch sie." }
+    },
+    {
+      "id": "edge",
+      "context": "Journey log milestone — triggered at 1700 m depth",
+      "depth": 1700,
+      "label": { "en": "edge",           "de": "Schwelle" },
+      "text":  { "en": "standing at the border between who you were and who you are becoming.",
+                 "de": "stehend an der Grenze zwischen dem, der du warst, und dem, der du wirst." }
+    },
+    {
+      "id": "fragility",
+      "context": "Journey log milestone — triggered at 1800 m depth",
+      "depth": 1800,
+      "label": { "en": "fragility",      "de": "Zerbrechlichkeit" },
+      "text":  { "en": "what breaks reveals what was holding it together.",
+                 "de": "was zerbricht, zeigt, was es zusammengehalten hat." }
+    },
+    {
+      "id": "resilience",
+      "context": "Journey log milestone — triggered at 1900 m depth",
+      "depth": 1900,
+      "label": { "en": "resilience",     "de": "Widerstandskraft" },
+      "text":  { "en": "the fracture is where the light enters. and the light was always entering.",
+                 "de": "der Riss ist der Ort, wo das Licht eintritt. und das Licht ist immer eingetreten." }
+    },
+    {
+      "id": "year-2",
+      "context": "Journey log milestone — triggered at 2000 m depth (metaphorical year 2 of life)",
+      "depth": 2000,
+      "label": { "en": "year 2",         "de": "Jahr 2" },
+      "text":  { "en": "two kilometers of descent. you are not the same shape that began.",
+                 "de": "zwei Kilometer des Abstiegs. du hast nicht mehr dieselbe Form wie am Anfang." }
+    },
+    {
+      "id": "horizon",
+      "context": "Journey log milestone — triggered at 2100 m depth",
+      "depth": 2100,
+      "label": { "en": "horizon",        "de": "Horizont" },
+      "text":  { "en": "there is no horizon here. only the next moment, and the next.",
+                 "de": "es gibt keinen Horizont hier. nur den nächsten Moment, und den nächsten." }
+    },
+    {
+      "id": "faith",
+      "context": "Journey log milestone — triggered at 2200 m depth",
+      "depth": 2200,
+      "label": { "en": "faith",          "de": "Glaube" },
+      "text":  { "en": "not belief. just the quiet decision to keep falling.",
+                 "de": "kein Glaubenssatz. nur die stille Entscheidung, weiter zu fallen." }
+    },
+    {
+      "id": "depth",
+      "context": "Journey log milestone — triggered at 2300 m depth",
+      "depth": 2300,
+      "label": { "en": "depth",          "de": "Tiefe" },
+      "text":  { "en": "depth is merely height seen from a different point of view.",
+                 "de": "Tiefe ist lediglich Höhe, aus einem anderen Blickwinkel gesehen." }
+    },
+    {
+      "id": "silence",
+      "context": "Journey log milestone — triggered at 2400 m depth",
+      "depth": 2400,
+      "label": { "en": "silence",        "de": "Schweigen" },
+      "text":  { "en": "the void does not answer. it only reflects the light you bring.",
+                 "de": "die Leere antwortet nicht. sie spiegelt nur das Licht, das du mitbringst." }
+    },
+    {
+      "id": "presence",
+      "context": "Journey log milestone — triggered at 2500 m depth",
+      "depth": 2500,
+      "label": { "en": "presence",       "de": "Gegenwart" },
+      "text":  { "en": "you are not falling through the void. you are the void experiencing itself.",
+                 "de": "du fällst nicht durch die Leere. du bist die Leere, die sich selbst erlebt." }
+    },
+    {
+      "id": "interconnected",
+      "context": "Journey log milestone — triggered at 2600 m depth",
+      "depth": 2600,
+      "label": { "en": "interconnected", "de": "Verbundenheit" },
+      "text":  { "en": "there are no separate objects, only different frequencies of the same descent.",
+                 "de": "es gibt keine getrennten Objekte, nur verschiedene Frequenzen desselben Abstiegs." }
+    },
+    {
+      "id": "acceptance",
+      "context": "Journey log milestone — triggered at 2700 m depth",
+      "depth": 2700,
+      "label": { "en": "acceptance",     "de": "Akzeptanz" },
+      "text":  { "en": "not everything has a reason. some things just are.",
+                 "de": "nicht alles hat einen Grund. manche Dinge sind einfach so." }
+    },
+    {
+      "id": "gratitude",
+      "context": "Journey log milestone — triggered at 2800 m depth",
+      "depth": 2800,
+      "label": { "en": "gratitude",      "de": "Dankbarkeit" },
+      "text":  { "en": "for the fall. for the shapes. for the one who is falling.",
+                 "de": "für den Fall. für die Formen. für den, der fällt." }
+    },
+    {
+      "id": "wonder",
+      "context": "Journey log milestone — triggered at 2900 m depth",
+      "depth": 2900,
+      "label": { "en": "wonder",         "de": "Staunen" },
+      "text":  { "en": "after all this distance, everything is still strange and new.",
+                 "de": "nach all dieser Strecke ist alles noch immer fremd und neu." }
+    },
+    {
+      "id": "year-3",
+      "context": "Journey log milestone — triggered at 3000 m depth (metaphorical year 3 of life)",
+      "depth": 3000,
+      "label": { "en": "year 3",         "de": "Jahr 3" },
+      "text":  { "en": "three kilometers. what was once terrifying is now just the way things are.",
+                 "de": "drei Kilometer. was einst erschreckend war, ist jetzt einfach so." }
+    },
+
+    {
+      "id": "year-5",
+      "context": "Journey log milestone — triggered at metaphorical age 5 (depth continues beyond 3 km)",
+      "age": 5,
+      "label": { "en": "year 5",         "de": "Jahr 5" },
+      "text":  { "en": "the void gets deeper, but so do you.",
+                 "de": "die Leere wird tiefer, aber du auch." }
+    },
+    {
+      "id": "year-9",
+      "context": "Journey log milestone — triggered at metaphorical age 9",
+      "age": 9,
+      "label": { "en": "year 9",         "de": "Jahr 9" },
+      "text":  { "en": "almost double digits. time starts to feel real.",
+                 "de": "fast zweistellig. die Zeit beginnt sich real anzufühlen." }
+    },
+    {
+      "id": "year-12",
+      "context": "Journey log milestone — triggered at metaphorical age 12",
+      "age": 12,
+      "label": { "en": "year 12",        "de": "Jahr 12" },
+      "text":  { "en": "a turning point. everything begins to change.",
+                 "de": "ein Wendepunkt. alles beginnt sich zu verändern." }
+    },
+    {
+      "id": "year-13",
+      "context": "Journey log milestone — triggered at metaphorical age 13 (teenage years)",
+      "age": 13,
+      "label": { "en": "year 13",        "de": "Jahr 13" },
+      "text":  { "en": "the void gets deeper.",
+                 "de": "die Leere wird tiefer." }
+    },
+    {
+      "id": "year-15",
+      "context": "Journey log milestone — triggered at metaphorical age 15",
+      "age": 15,
+      "label": { "en": "year 15",        "de": "Jahr 15" },
+      "text":  { "en": "first love. first heartbreak. the obstacles get sharper.",
+                 "de": "erste Liebe. erster Herzschmerz. die Hindernisse werden schärfer." }
+    },
+    {
+      "id": "year-18",
+      "context": "Journey log milestone — triggered at metaphorical age 18 (adulthood)",
+      "age": 18,
+      "label": { "en": "year 18",        "de": "Jahr 18" },
+      "text":  { "en": "adulthood arrives. nobody feels ready.",
+                 "de": "das Erwachsensein kommt. niemand fühlt sich bereit." }
+    },
+    {
+      "id": "year-25",
+      "context": "Journey log milestone — triggered at metaphorical age 25",
+      "age": 25,
+      "label": { "en": "year 25",        "de": "Jahr 25" },
+      "text":  { "en": "a quarter century. who am i now?",
+                 "de": "ein Vierteljahrhundert. wer bin ich jetzt?" }
+    },
+    {
+      "id": "year-30",
+      "context": "Journey log milestone — triggered at metaphorical age 30",
+      "age": 30,
+      "label": { "en": "year 30",        "de": "Jahr 30" },
+      "text":  { "en": "the fall feels different from here.",
+                 "de": "der Fall fühlt sich von hier anders an." }
+    },
+    {
+      "id": "year-40",
+      "context": "Journey log milestone — triggered at metaphorical age 40",
+      "age": 40,
+      "label": { "en": "year 40",        "de": "Jahr 40" },
+      "text":  { "en": "not a crisis — a clearing.",
+                 "de": "keine Krise — eine Klärung." }
+    },
+    {
+      "id": "year-50",
+      "context": "Journey log milestone — triggered at metaphorical age 50",
+      "age": 50,
+      "label": { "en": "year 50",        "de": "Jahr 50" },
+      "text":  { "en": "half a century. grace finds its rhythm.",
+                 "de": "ein halbes Jahrhundert. Anmut findet ihren Rhythmus." }
+    },
+    {
+      "id": "year-60",
+      "context": "Journey log milestone — triggered at metaphorical age 60",
+      "age": 60,
+      "label": { "en": "year 60",        "de": "Jahr 60" },
+      "text":  { "en": "wisdom is not knowing more. it is carrying less.",
+                 "de": "Weisheit bedeutet nicht, mehr zu wissen. es bedeutet, weniger zu tragen." }
+    },
+    {
+      "id": "year-70",
+      "context": "Journey log milestone — triggered at metaphorical age 70",
+      "age": 70,
+      "label": { "en": "year 70",        "de": "Jahr 70" },
+      "text":  { "en": "the obstacles soften. the geometry becomes beautiful.",
+                 "de": "die Hindernisse werden sanfter. die Geometrie wird schön." }
+    },
+    {
+      "id": "year-80",
+      "context": "Journey log milestone — triggered at metaphorical age 80",
+      "age": 80,
+      "label": { "en": "year 80",        "de": "Jahr 80" },
+      "text":  { "en": "a long fall. a good fall. still falling.",
+                 "de": "ein langer Fall. ein guter Fall. noch immer fallend." }
+    },
+    {
+      "id": "year-90",
+      "context": "Journey log milestone — triggered at metaphorical age 90",
+      "age": 90,
+      "label": { "en": "year 90",        "de": "Jahr 90" },
+      "text":  { "en": "the void and you are old friends.",
+                 "de": "die Leere und du seid alte Freunde." }
+    },
+    {
+      "id": "year-100",
+      "context": "Journey log milestone — triggered at metaphorical age 100 (the last chapter)",
+      "age": 100,
+      "label": { "en": "year 100",       "de": "Jahr 100" },
+      "text":  { "en": "a hundred years of descent. what a journey.",
+                 "de": "hundert Jahre des Abstiegs. was für eine Reise." }
+    }
+
+  ]
+}
