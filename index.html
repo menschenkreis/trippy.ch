@@ -82,6 +82,64 @@
     }
     .sticky-nav .nav-links a:hover::after { width: 100%; }
 
+    /* Hamburger button (mobile) */
+    .nav-hamburger {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      width: 28px;
+      height: 20px;
+      position: relative;
+      z-index: 110;
+    }
+    .nav-hamburger span {
+      display: block;
+      width: 100%;
+      height: 2px;
+      background: var(--fg);
+      border-radius: 2px;
+      transition: transform 0.3s, opacity 0.3s;
+      position: absolute;
+      left: 0;
+    }
+    .nav-hamburger span:nth-child(1) { top: 0; }
+    .nav-hamburger span:nth-child(2) { top: 9px; }
+    .nav-hamburger span:nth-child(3) { top: 18px; }
+    .nav-hamburger.is-open span:nth-child(1) { transform: translateY(9px) rotate(45deg); }
+    .nav-hamburger.is-open span:nth-child(2) { opacity: 0; }
+    .nav-hamburger.is-open span:nth-child(3) { transform: translateY(-9px) rotate(-45deg); }
+
+    @media (max-width: 640px) {
+      .nav-hamburger { display: block; }
+      .sticky-nav .nav-links {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        flex-direction: column;
+        justify-content: center;
+        gap: 2rem;
+        background: rgba(10, 4, 26, 0.95);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s;
+      }
+      .sticky-nav .nav-links.is-open {
+        opacity: 1;
+        pointer-events: all;
+      }
+      .sticky-nav .nav-links a {
+        font-size: 1.2rem;
+        letter-spacing: 0.12em;
+      }
+      .sticky-nav .nav-links a::after { display: none; }
+    }
+
     /* ── Experiments Section ── */
     .home-exp-section {
       padding: 5rem 2rem 4rem;
@@ -229,11 +287,14 @@
   <!-- Sticky Navigation -->
   <nav class="sticky-nav" id="sticky-nav">
     <a href="#" class="nav-logo">trippy</a>
-    <div class="nav-links">
+    <div class="nav-links" id="nav-links">
       <a href="#experiments">Experiments</a>
       <a href="#insights">Insights</a>
       <a href="https://github.com/menschenkreis/trippy.ch" target="_blank" rel="noopener">Source</a>
     </div>
+    <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
   </nav>
 
   <!-- Hero -->
@@ -308,6 +369,20 @@
       stickyNav.classList.toggle('is-visible', !entry.isIntersecting);
     }, { threshold: 0.15 });
     observer.observe(hero);
+
+    // Mobile hamburger menu
+    const hamburger = document.getElementById('nav-hamburger');
+    const navLinks = document.getElementById('nav-links');
+    hamburger.addEventListener('click', () => {
+      hamburger.classList.toggle('is-open');
+      navLinks.classList.toggle('is-open');
+    });
+    navLinks.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => {
+        hamburger.classList.remove('is-open');
+        navLinks.classList.remove('is-open');
+      });
+    });
   </script>
 </body>
 </html>
