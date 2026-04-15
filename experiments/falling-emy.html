@@ -16,7 +16,9 @@
     .ctrl-btn:hover{border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.8)}
     .ctrl-btn.is-on{color:rgba(180,140,255,0.9);border-color:rgba(180,140,255,0.4);box-shadow:0 0 15px rgba(140,100,255,0.2)}
     .ctrl-btn-sound{width:42px!important;height:42px!important;font-size:1.1rem!important;border-color:rgba(180,140,255,0.3)!important;color:rgba(200,180,255,0.85)!important;box-shadow:0 0 12px rgba(140,100,255,0.15)!important}
-    #theme-btn,#add-btn,#tilt-btn,#mute-btn,#reset-btn,#info-btn{position:static!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;width:36px!important;height:36px!important;border-radius:50%!important;font-size:0.75rem!important;animation:none!important}
+    .ctrl-btn-info{border-color:rgba(180,140,255,0.45)!important;color:rgba(200,180,255,0.9)!important;box-shadow:0 0 14px rgba(140,100,255,0.2)!important;font-style:italic!important;font-size:1rem!important;font-weight:500!important}
+    .ctrl-btn-info:hover{border-color:rgba(180,140,255,0.75)!important;color:#fff!important;box-shadow:0 0 20px rgba(140,100,255,0.35)!important}
+    #theme-btn,#add-btn,#tilt-btn,#mute-btn,#lang-btn,#info-btn{position:static!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;width:36px!important;height:36px!important;border-radius:50%!important;font-size:0.75rem!important;animation:none!important}
     .back-link{position:fixed;top:1rem;left:1rem;z-index:200;font-size:0.85rem;color:rgba(255,255,255,0.3);text-decoration:none;letter-spacing:0.05em;transition:color 0.25s;backdrop-filter:blur(6px);background:rgba(0,0,0,0.3);padding:0.4rem 0.8rem;border-radius:20px;border:1px solid rgba(255,255,255,0.06)}
     .back-link:hover{color:rgba(180,140,255,0.8)}
     .bottom-left{position:fixed;bottom:1.5rem;left:1.5rem;z-index:200;pointer-events:none}
@@ -104,8 +106,8 @@
     <button id="tilt-btn" class="ctrl-btn" title="Toggle tilt">📱</button>
     <button id="mute-btn" class="ctrl-btn ctrl-btn-sound" title="Toggle sound" style="animation:pulse-glow 2s ease-in-out infinite">🔇</button>
     <div id="sound-hint" style="position:fixed;top:3.5rem;right:1rem;z-index:200;pointer-events:none;text-align:right;opacity:1 !important;display:block !important;filter:drop-shadow(0 0 10px rgba(140,100,255,0.2))"><span style="font-size:0.65rem;color:rgba(255,255,255,0.4);letter-spacing:0.1em;display:block;line-height:1.4;text-transform:uppercase;font-weight:300">tap 🔇 for<br><span style="color:rgba(180,140,255,0.8)">sound & music</span></span></div>
-    <button id="reset-btn" class="ctrl-btn" title="Reset">⟳</button>
-    <button id="info-btn" class="ctrl-btn" title="Info">i</button>
+    <button id="lang-btn" class="ctrl-btn" title="Switch language">EN</button>
+    <button id="info-btn" class="ctrl-btn ctrl-btn-info" title="Info">i</button>
   </div>
   <div class="bottom-left">
     <div class="exp-tag" data-i18n="expTag">canvas · physics · sacred geometry</div>

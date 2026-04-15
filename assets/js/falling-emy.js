@@ -1984,33 +1984,24 @@ tiltBtn.onclick = () => {
   if(!tiltEnabled) gravityX = 0;
   else initAccel(); // Ensure permission is requested if turned on explicitly
 };
-document.getElementById('reset-btn').onclick = () => {
-  // Preserve the chosen soul name across resets
-  const _keptName = ragdolls[0]?.name || document.getElementById('emy-name')?.value || 'emy';
-  clearSave();
-  isDragging = false; dragRagdoll = null; dragParticle = null;
-  cameraY = 0; fallSpeed = 0;
-  portal = null;
-  score = 0; displayScore = 0; comboCount = 0; lastHitTime = 0;
-  scorePopups = []; scoreFlies = [];
-  harmonyIndex = 0; harmonicCooldown = 0;
-  activeEffects = { wave: 0, trail: 0, pulse: 0, magnet: 0, aura: 0, nova: 0 };
-  waveRings = [];
-  journeyLog = []; updateJourneyPanel();
-  firedChapters = new Set();
-  chapterDisplay = null; chapterSlowMo = 0;
-  braids = [];
-  breathRings = []; nextBreathY = 4000;
-  breathSlowMo = 0;
-  for(let i = 0; i < harmonyNotes.length; i++) harmonyNotes[i] = HARMONY_UNSET;
-  chordBloomCooldown = 0; chordBloomFlash = 0;
-  nextShapeY = CONFIG.SHAPE_START_Y;
-  nextChallengeY = CONFIG.CHALLENGE_SPACING_WORLD;
-  particles = []; particleCount = 0;
-  ragdolls = [new Ragdoll(W/2, 0, _keptName)];
-  spheres = [];
-  for(let i=0;i<8;i++) spawnSphereAtDepth(i*120+Math.random()*80);
-};
+// ── Language toggle ───────────────────────────────────────────────────────
+(function(){
+  const btn = document.getElementById('lang-btn');
+  if(!btn) return;
+  const avail = Object.keys(window.FE_CONTENT || { en: 1, de: 1 });
+  function updateBtn(){ btn.textContent = (window.FE_LANG || 'en').toUpperCase(); }
+  updateBtn();
+  btn.onclick = () => {
+    const cur = window.FE_LANG || 'en';
+    const next = avail[(avail.indexOf(cur) + 1) % avail.length];
+    window.FE_LANG = next;
+    localStorage.setItem('fe-lang', next);
+    applyI18n();
+    _resumeChecked = false; // allow checkResume to re-apply translated text
+    checkResume();
+    updateBtn();
+  };
+})();
 
 // ── Soul name input ───────────────────────────────────────────────────────
 (function(){
