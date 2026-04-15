@@ -23,15 +23,224 @@
   <meta name="twitter:image"       content="https://trippy.ch/assets/og-preview.jpg">
 
   <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    /* ── Sticky Nav ── */
+    .sticky-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+      background: rgba(26, 10, 46, 0.6);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(107, 33, 168, 0.12);
+      transition: opacity 0.4s, transform 0.4s;
+      opacity: 0;
+      transform: translateY(-100%);
+    }
+    .sticky-nav.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .sticky-nav .nav-logo {
+      font-size: 1.1rem;
+      font-weight: 300;
+      letter-spacing: 0.12em;
+      color: var(--fg);
+      text-decoration: none;
+      transition: color 0.3s;
+    }
+    .sticky-nav .nav-logo:hover { color: var(--teal); }
+    .sticky-nav .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      align-items: center;
+    }
+    .sticky-nav .nav-links a {
+      color: var(--fg-muted);
+      font-size: 0.85rem;
+      letter-spacing: 0.08em;
+      text-decoration: none;
+      transition: color 0.3s;
+      position: relative;
+    }
+    .sticky-nav .nav-links a:hover { color: var(--fg); }
+    .sticky-nav .nav-links a::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      width: 0;
+      height: 1px;
+      background: var(--teal);
+      transition: width 0.3s;
+    }
+    .sticky-nav .nav-links a:hover::after { width: 100%; }
+
+    /* ── Experiments Section ── */
+    .home-exp-section {
+      padding: 5rem 2rem 4rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .home-exp-section .section-header {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+    .home-exp-section .section-header h2 {
+      font-size: clamp(1.5rem, 4vw, 2.2rem);
+      font-weight: 300;
+      letter-spacing: 0.1em;
+      text-shadow: 0 0 30px var(--purple-glow);
+      margin-bottom: 0.5rem;
+      transition: var(--transition-colors);
+    }
+    .home-exp-section .section-header p {
+      color: var(--fg-muted);
+      font-size: 0.95rem;
+      letter-spacing: 0.05em;
+    }
+    .home-exp-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+    .home-exp-card {
+      display: block;
+      background: var(--bg-light);
+      border: 1px solid rgba(107, 33, 168, 0.18);
+      border-radius: 16px;
+      padding: 2rem 1.8rem;
+      text-decoration: none;
+      transition: transform 0.4s ease, box-shadow 0.4s ease, border-color 0.4s ease, background-color 0.6s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .home-exp-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--purple), var(--teal), var(--pink));
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+    .home-exp-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 40px var(--purple-glow);
+      border-color: var(--purple);
+    }
+    .home-exp-card:hover::before { opacity: 1; }
+    .home-exp-card .tag {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--teal);
+      display: block;
+      margin-bottom: 0.6rem;
+      transition: var(--transition-colors);
+    }
+    .home-exp-card h3 {
+      font-size: 1.2rem;
+      font-weight: 400;
+      margin-bottom: 0.5rem;
+      color: var(--fg);
+      letter-spacing: 0.04em;
+      transition: var(--transition-colors);
+    }
+    .home-exp-card p {
+      color: var(--fg-muted);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      transition: var(--transition-colors);
+    }
+
+    /* ── Blog Preview Section ── */
+    .home-blog-section {
+      padding: 3rem 2rem 5rem;
+      max-width: 1100px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .home-blog-section .section-header {
+      margin-bottom: 1.5rem;
+    }
+    .home-blog-section .section-header h2 {
+      font-size: clamp(1.5rem, 4vw, 2.2rem);
+      font-weight: 300;
+      letter-spacing: 0.1em;
+      text-shadow: 0 0 30px var(--purple-glow);
+      margin-bottom: 0.5rem;
+      transition: var(--transition-colors);
+    }
+    .home-blog-section .section-header p {
+      color: var(--fg-muted);
+      font-size: 0.95rem;
+      letter-spacing: 0.05em;
+    }
+    .blog-link-card {
+      display: inline-block;
+      background: var(--bg-light);
+      border: 1px solid rgba(107, 33, 168, 0.18);
+      border-radius: 16px;
+      padding: 2rem 3rem;
+      text-decoration: none;
+      transition: transform 0.4s ease, box-shadow 0.4s ease, border-color 0.4s ease, background-color 0.6s ease;
+    }
+    .blog-link-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 40px var(--teal-glow);
+      border-color: var(--teal);
+    }
+    .blog-link-card .card-icon {
+      font-size: 1.8rem;
+      margin-bottom: 0.8rem;
+      display: block;
+    }
+    .blog-link-card h3 {
+      font-size: 1.2rem;
+      font-weight: 400;
+      margin-bottom: 0.4rem;
+      color: var(--fg);
+      transition: var(--transition-colors);
+    }
+    .blog-link-card p {
+      color: var(--fg-muted);
+      font-size: 0.9rem;
+      transition: var(--transition-colors);
+    }
+
+    /* Hide the old explore section */
+    .nav-section { display: none; }
+  </style>
 </head>
 <body>
   <div id="page-transition" class="page-transition"></div>
   <button id="contrast-btn" title="Toggle high contrast">LC</button>
   <button id="theme-btn" title="Randomize theme">✦</button>
+
+  <!-- Sticky Navigation -->
+  <nav class="sticky-nav" id="sticky-nav">
+    <a href="#" class="nav-logo">trippy</a>
+    <div class="nav-links">
+      <a href="#experiments">Experiments</a>
+      <a href="#insights">Insights</a>
+      <a href="https://github.com/menschenkreis/trippy.ch" target="_blank" rel="noopener">Source</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
   <section class="hero">
     <canvas id="cosmic-canvas"></canvas>
     <div class="hero-content">
-      <a href="experiments.html" class="portal-trigger">
+      <a href="#experiments" class="portal-trigger">
         <h1 class="hero-title">trippy</h1>
       </a>
       <p class="hero-sub">visual experiments &amp; insights</p>
@@ -39,20 +248,47 @@
     <div class="scroll-hint">↡ drift deeper ↡</div>
   </section>
 
-  <section class="nav-section">
-    <h2>explore</h2>
-    <div class="nav-grid">
-      <a href="experiments.html" class="nav-card">
-        <span class="card-icon">✦</span>
-        <h3>Experiments</h3>
-        <p>Psychedelic visual explorations — shaders, generative art, interactive web experiences.</p>
+  <!-- Experiments -->
+  <section class="home-exp-section" id="experiments">
+    <div class="section-header">
+      <h2>Experiments</h2>
+      <p>Psychedelic visual explorations — shaders, physics, games, and generative art.</p>
+    </div>
+    <div class="home-exp-grid">
+      <a href="experiments/fractal-dreams.html" class="home-exp-card">
+        <span class="tag">webgl · fractal · julia set</span>
+        <h3>Fractal Dreams</h3>
+        <p>Gently evolving Julia set fractals bathed in DMT-inspired hues. Touch to guide the morphing and watch infinity unfold.</p>
       </a>
-      <a href="blog.html" class="nav-card">
-        <span class="card-icon">◎</span>
-        <h3>Trippy Insights</h3>
-        <p>Occasional thoughts on creativity, AI collaboration, and the space between.</p>
+      <a href="experiments/kaleidoscope.html" class="home-exp-card">
+        <span class="tag">webgl · kaleidoscope · hyperbolic</span>
+        <h3>Non-Euclidean Kaleidoscope</h3>
+        <p>A psychedelic kaleidoscope that folds space through hyperbolic geometry. Move to warp infinite recursive reflections.</p>
+      </a>
+      <a href="experiments/falling-emy.html" class="home-exp-card">
+        <span class="tag">canvas · physics · sacred geometry</span>
+        <h3>Falling Emy</h3>
+        <p>Stick-figure ragdolls tumble through an infinite void of frictionless sacred-geometry spheres. Tilt your phone, drag them around.</p>
+      </a>
+      <a href="experiments/trippy-jump.html" class="home-exp-card">
+        <span class="tag">canvas · game · sacred geometry</span>
+        <h3>Trippy Jump</h3>
+        <p>A psychedelic Doodle Jump — bounce up through an infinite void of sacred-geometry platforms. Screen-wrap, springs, fragile platforms, and neon trails.</p>
       </a>
     </div>
+  </section>
+
+  <!-- Blog / Insights -->
+  <section class="home-blog-section" id="insights">
+    <div class="section-header">
+      <h2>Trippy Insights</h2>
+      <p>Occasional thoughts on creativity, AI collaboration, and the space between.</p>
+    </div>
+    <a href="blog.html" class="blog-link-card">
+      <span class="card-icon">◎</span>
+      <h3>Read the Blog</h3>
+      <p>Explore insights, behind-the-scenes, and creative reflections.</p>
+    </a>
   </section>
 
   <footer>
@@ -61,6 +297,17 @@
 
   <script src="assets/js/hero-morph.js"></script>
   <script src="assets/js/main.js"></script>
-  <script>document.getElementById('page-transition').classList.add('is-active');requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('page-transition').classList.remove('is-active')));</script>
+  <script>
+    document.getElementById('page-transition').classList.add('is-active');
+    requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('page-transition').classList.remove('is-active')));
+
+    // Sticky nav: show after scrolling past hero
+    const stickyNav = document.getElementById('sticky-nav');
+    const hero = document.querySelector('.hero');
+    const observer = new IntersectionObserver(([entry]) => {
+      stickyNav.classList.toggle('is-visible', !entry.isIntersecting);
+    }, { threshold: 0.15 });
+    observer.observe(hero);
+  </script>
 </body>
 </html>
