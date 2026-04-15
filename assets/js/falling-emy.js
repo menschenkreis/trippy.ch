@@ -4647,6 +4647,41 @@ function _runMandala(canvasId) {
   };
 }
 
+// Shows the language-selection modal for first-time players (no save).
+// Calls onDone() once the player picks a language.
+function _showLangModal(onDone) {
+  const modal = document.getElementById('lang-modal');
+  const title = document.getElementById('lang-modal-title');
+  const hint  = document.getElementById('lang-modal-hint');
+  const btns  = document.getElementById('lang-modal-btns');
+  if(!modal) { onDone(); return; }
+
+  [title, hint, btns].forEach(el => el?.classList.remove('revealed'));
+
+  const stopMandala = _runMandala('lang-mandala-canvas');
+  modal.classList.add('visible');
+
+  setTimeout(() => title?.classList.add('revealed'), 450);
+  setTimeout(() => hint?.classList.add('revealed'),  900);
+  setTimeout(() => btns?.classList.add('revealed'), 1200);
+
+  function choose(lang) {
+    window.FE_LANG = lang;
+    localStorage.setItem('fe-lang', lang);
+    applyI18n();
+    const lb = document.getElementById('lang-btn');
+    if(lb) lb.textContent = lang.toUpperCase();
+    [title, hint, btns].forEach(el => el?.classList.remove('revealed'));
+    modal.classList.remove('visible');
+    setTimeout(() => { onDone(); stopMandala(); }, 560);
+  }
+
+  const enBtn = document.getElementById('lang-modal-en');
+  const deBtn = document.getElementById('lang-modal-de');
+  if(enBtn) enBtn.onclick = (e) => { e.preventDefault(); choose('en'); };
+  if(deBtn) deBtn.onclick = (e) => { e.preventDefault(); choose('de'); };
+}
+
 // Shows the soul-name modal, then calls onConfirm(name) once the player commits.
 // Elements materialize sequentially: prompt → input → confirm button.
 function _showSoulModal(onConfirm, defaultName) {
@@ -4802,16 +4837,18 @@ if(introEl){
     // Note: onclick is already set in the window.load handler if resuming
     // This is the fallback for new journeys
     if(!embarkBtn.onclick) {
-      // New journey: name modal → sound modal → birth
+      // New journey: lang modal → name modal → sound modal → birth
       window._soulModalMode = true;
       embarkBtn.onclick = (e) => {
         e.preventDefault(); e.stopPropagation();
-        _showSoulModal((nm) => {
-          window._fe.setName(nm);
-          _showSoundModal(() => {
-            if(window._startBirth) window._startBirth();
-          });
-        }, '');
+        _showLangModal(() => {
+          _showSoulModal((nm) => {
+            window._fe.setName(nm);
+            _showSoundModal(() => {
+              if(window._startBirth) window._startBirth();
+            });
+          }, '');
+        });
       };
     }
   }

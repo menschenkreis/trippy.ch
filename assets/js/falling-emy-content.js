@@ -18,6 +18,10 @@ window.FE_CONTENT = {
       introResume:        'Resume journey',
       introRestart:       'Embark again',
 
+      // Language-selection modal (shown before soul modal for new players)
+      langTitle: 'in which tongue?',
+      langHint:  'you can change this at any time',
+
       // Soul-name modal
       soulPrompt:      'you call yourself',
       soulPlaceholder: 'anything',
@@ -155,6 +159,10 @@ window.FE_CONTENT = {
       introEmbark:        'Ins Leben stürzen',
       introResume:        'Reise fortsetzen',
       introRestart:       'Neu beginnen',
+
+      // Sprachauswahl-Modal
+      langTitle: 'in welcher Sprache?',
+      langHint:  'du kannst das jederzeit ändern',
 
       // Seelen-Modal
       soulPrompt:      'du nennst dich',
