@@ -695,7 +695,6 @@ footer a:hover { color: var(--pink); }
   cursor: pointer;
   font-family: inherit;
   transition: all 0.5s ease;
-  backdrop-filter: blur(12px);
 }
 #intro-embark:hover {
   background: rgba(140, 120, 200, 0.12);
@@ -719,8 +718,6 @@ footer a:hover { color: var(--pink); }
   cursor: pointer;
   font-family: inherit;
   transition: all 0.5s ease;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   margin-top: 0.8rem;
   -webkit-appearance: none;
   appearance: none;
