@@ -603,6 +603,8 @@ class Sphere {
       this.r = (25 + Math.random()*15) * ss;
     } else if(type === 'setback'){
       this.r = (32 + Math.random()*20) * ss; // slightly larger — hexagram reads better
+      this.bounceMax   = 3 + Math.floor(Math.random() * 7); // 3–9 bounces before going passive
+      this.bounceCount = 0;
     } else if(type === 'chakra'){
       this.r = (28 + Math.random()*20) * ss;
     } else if(type === 'merkaba'){
@@ -1364,7 +1366,10 @@ function collideParticleSphere(p, s, dt, impactData){
       p.x += nx * overlap * 0.45;
       p.y += ny * overlap * 0.45;
     }
-    const pushForce = Math.min(overlap * 0.4, 5); // cap sphere displacement
+    // Setback hexagrams get a stronger push so they slide out of the way faster
+    const pushMult  = s.type === 'setback' ? 1.5 : 0.4;
+    const pushCap   = s.type === 'setback' ? 18  : 5;
+    const pushForce = Math.min(overlap * pushMult, pushCap);
     s.x -= nx * pushForce;
     s.y -= ny * pushForce;
     // Keep spheres in reasonable bounds
@@ -1442,12 +1447,13 @@ function collideRagdollSphere(ragdoll, sphere, dt){
     }
 
     // ── Setback Trampoline: launch ragdoll upward ──
-    if(sphere.type === 'setback'){
-      const bounceStrength = 70 + Math.random() * 30; // 70-100 units/sec upward (≈40% of original)
+    // Only fires up to bounceMax times (3–9); afterwards the shape behaves passively.
+    if(sphere.type === 'setback' && sphere.bounceCount < sphere.bounceMax){
+      const bounceStrength = 70 + Math.random() * 30; // 70-100 units/sec upward
       for(const p of ragdoll.particles){
-        // Set old position above current to create upward velocity
         p.oy = p.y + bounceStrength * 0.016 * 3; // ~3 frames worth of upward velocity
       }
+      sphere.bounceCount++;
     }
 
     // ── Power-Up Activation ──
