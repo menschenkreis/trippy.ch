@@ -4780,8 +4780,6 @@ function checkResume(){
 }
 
 window.addEventListener('load', checkResume);
-// Also run immediately in case load already fired
-checkResume();
 
 // ── Gate: hide UI during intro, game canvas visible underneath ─────
 const introEl = document.getElementById('intro-sequence');
@@ -4857,7 +4855,9 @@ function updateSoundHint() {
   }
 }
 
-// Apply i18n translations to all data-i18n marked elements
+// Apply i18n translations to all data-i18n marked elements, then let
+// checkResume overwrite the thought text if a save exists.
 applyI18n();
+checkResume();
 
 })();
