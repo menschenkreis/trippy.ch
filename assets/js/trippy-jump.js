@@ -613,17 +613,17 @@
     for (let i = journeyLog.length - 1; i >= 0; i--) {
       const e = journeyLog[i];
       let svg;
-      if (e.score <= 10) {
-        // Origin — circle with centre dot
+      if (e.score <= 500) {
+        // First km — circle with centre dot
         svg = `<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1" opacity="0.7"/><circle cx="8" cy="8" r="2" fill="currentColor" opacity="0.8"/></svg>`;
-      } else if (e.score <= 500) {
-        // Early ascent — single upward triangle
+      } else if (e.score <= 2500) {
+        // Mid ascent — single upward triangle
         svg = `<svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,2 14,14 2,14" fill="none" stroke="currentColor" stroke-width="1" opacity="0.65"/></svg>`;
-      } else if (e.score <= 2300) {
-        // Mid ascent — nested triangles
+      } else if (e.score <= 5000) {
+        // High ascent — nested triangles
         svg = `<svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,2 14,14 2,14" fill="none" stroke="currentColor" stroke-width="1" opacity="0.65"/><polygon points="8,5 12,13 4,13" fill="none" stroke="currentColor" stroke-width="0.7" opacity="0.35"/></svg>`;
       } else {
-        // High ascent — hexagram (Star of David / Merkaba)
+        // Peak ascent — hexagram (Star of David / Merkaba)
         svg = `<svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,1 14,12 2,12" fill="none" stroke="currentColor" stroke-width="0.9" opacity="0.6"/><polygon points="8,15 14,4 2,4" fill="none" stroke="currentColor" stroke-width="0.9" opacity="0.6"/></svg>`;
       }
       html += `<div class="journey-entry"><div class="journey-icon">${svg}</div><div class="journey-entry-text"><strong>${e.label}</strong> — ${e.text}</div></div>`;
@@ -1671,8 +1671,8 @@
     if (chordBloomCooldown > 0) chordBloomCooldown -= 0.016;
     if (chordBloomFlash > 0) chordBloomFlash -= 0.016 * 0.45;
 
-    // Score milestone chords — gentle musical reward at key heights (inspired by Falling Emy)
-    const _scoreSteps = [100, 200, 500, 1000, 2000, 5000];
+    // Altitude milestone chords — gentle musical reward every 500m
+    const _scoreSteps = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 5000, 6000, 7500];
     for (let _si = 0; _si < _scoreSteps.length; _si++) {
       if (score >= _scoreSteps[_si] && lastMilestone < _scoreSteps[_si]) {
         lastMilestone = _scoreSteps[_si];
@@ -1725,8 +1725,8 @@
   function endGame() {
     playing = false; gameOver = true;
     if (score > highScore) { highScore = score; localStorage.setItem('trippyJumpHigh', highScore); }
-    document.getElementById('final-score').textContent = score;
-    document.getElementById('final-high').textContent = 'BEST: ' + highScore;
+    document.getElementById('final-score').textContent = score + 'm';
+    document.getElementById('final-high').textContent = 'BEST: ' + highScore + 'm';
     document.getElementById('game-over').classList.add('is-active');
     playGameOverSound();
   }
@@ -1794,11 +1794,11 @@
       
       drawPlayer(player.x, player.y - camY);
 
-      // Score — positioned below the control buttons to avoid visual overlap
+      // Altitude (meters) — positioned below the control buttons to avoid visual overlap
       ctx.fillStyle = 'rgba(255,255,255,0.8)';
       ctx.font = `200 ${3.0 * sphereSizeScale}rem sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText(score, W/2, 130);
+      ctx.fillText(score + 'm', W/2, 130);
 
       // Touch zone hints: shown briefly at game start on touch devices, then fade out
       if (isTouch && time < 8) {
@@ -1903,12 +1903,12 @@
 
   function checkResume() {
     const saved = loadGame();
-    if (saved && saved.score > 20) {
+    if (saved && saved.score > 200) {
       const startBtn = document.getElementById('start-btn');
       startBtn.textContent = 'RESUME JOURNEY';
       startBtn.onclick = (e) => { e.preventDefault(); document.getElementById('start-screen').classList.add('hidden'); initGame(true); };
       const sub = document.querySelector('#start-screen .sub');
-      if (sub) sub.textContent = `last height: ${saved.score}`;
+      if (sub) sub.textContent = `last height: ${saved.score}m`;
       const fresh = document.createElement('p');
       fresh.style.cssText = 'margin-top:1rem;font-size:0.7rem;color:rgba(140,100,255,0.6);cursor:pointer;text-decoration:underline';
       fresh.textContent = 'start fresh';

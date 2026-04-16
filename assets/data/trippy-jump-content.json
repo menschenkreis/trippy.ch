@@ -13,9 +13,9 @@
   },
   "milestones": [
     {
-      "id": "score-5",
-      "context": "Very first milestone — a few jumps in. Sets the tone of wonder and beginning.",
-      "score": 5,
+      "id": "m-500",
+      "context": "First milestone at 500m. Sets the tone of wonder and beginning.",
+      "score": 500,
       "label": { "en": "first light", "de": "erstes Licht" },
       "text": {
         "en": "the first jump is the bravest. everything after is momentum.",
@@ -23,9 +23,9 @@
       }
     },
     {
-      "id": "score-40",
-      "context": "Early milestone — the player is finding a rhythm. Theme: being met by the path.",
-      "score": 40,
+      "id": "m-1000",
+      "context": "Milestone at 1000m. Theme: being met by the path.",
+      "score": 1000,
       "label": { "en": "rising", "de": "Aufstieg" },
       "text": {
         "en": "each platform is a gift the path places beneath you.",
@@ -33,9 +33,9 @@
       }
     },
     {
-      "id": "score-100",
-      "context": "First major score milestone. Theme: entering flow state, body wisdom.",
-      "score": 100,
+      "id": "m-1500",
+      "context": "Milestone at 1500m. Theme: entering flow state, body wisdom.",
+      "score": 1500,
       "label": { "en": "flow", "de": "Fluss" },
       "text": {
         "en": "when the mind quiets, the body knows exactly where to land.",
@@ -43,9 +43,9 @@
       }
     },
     {
-      "id": "score-200",
-      "context": "Theme: remembering innate potential rather than striving toward it.",
-      "score": 200,
+      "id": "m-2000",
+      "context": "Milestone at 2000m. Theme: remembering innate potential.",
+      "score": 2000,
       "label": { "en": "remembering", "de": "Erinnern" },
       "text": {
         "en": "you are not climbing. you are remembering how high you already are.",
@@ -53,9 +53,9 @@
       }
     },
     {
-      "id": "score-350",
-      "context": "Theme: trust and commitment — the universe meets you at the point of decision.",
-      "score": 350,
+      "id": "m-2500",
+      "context": "Milestone at 2500m. Theme: trust and commitment.",
+      "score": 2500,
       "label": { "en": "trust", "de": "Vertrauen" },
       "text": {
         "en": "the platform appears the moment you commit to the leap.",
@@ -63,9 +63,9 @@
       }
     },
     {
-      "id": "score-500",
-      "context": "Theme: the sacred space of potential — the gap between where we are and could be.",
-      "score": 500,
+      "id": "m-3000",
+      "context": "Milestone at 3000m. Theme: the sacred space of potential.",
+      "score": 3000,
       "label": { "en": "courage", "de": "Mut" },
       "text": {
         "en": "the gap between where you are and where you could be — that space is sacred.",
@@ -73,9 +73,9 @@
       }
     },
     {
-      "id": "score-750",
-      "context": "Theme: gaining perspective on former fears from a new vantage point.",
-      "score": 750,
+      "id": "m-3500",
+      "context": "Milestone at 3500m. Theme: gaining perspective on former fears.",
+      "score": 3500,
       "label": { "en": "perspective", "de": "Perspektive" },
       "text": {
         "en": "from this height, your former fears look like the small shapes they always were.",
@@ -83,9 +83,9 @@
       }
     },
     {
-      "id": "score-1100",
-      "context": "Theme: releasing control as the prerequisite for genuine ascent.",
-      "score": 1100,
+      "id": "m-4000",
+      "context": "Milestone at 4000m. Theme: releasing control.",
+      "score": 4000,
       "label": { "en": "release", "de": "Loslassen" },
       "text": {
         "en": "control is the last thing you surrender before you truly rise.",
@@ -93,9 +93,9 @@
       }
     },
     {
-      "id": "score-1600",
-      "context": "Theme: the ego's story quiets at the heights awareness reaches.",
-      "score": 1600,
+      "id": "m-4500",
+      "context": "Milestone at 4500m. Theme: the ego's story quiets.",
+      "score": 4500,
       "label": { "en": "silence", "de": "Stille" },
       "text": {
         "en": "at a certain altitude, the noise of who you think you are simply falls away.",
@@ -103,9 +103,9 @@
       }
     },
     {
-      "id": "score-2300",
-      "context": "Theme: failure as teacher — each stumble refines the aim of the next attempt.",
-      "score": 2300,
+      "id": "m-5000",
+      "context": "Milestone at 5000m. Theme: failure as teacher.",
+      "score": 5000,
       "label": { "en": "clarity", "de": "Klarheit" },
       "text": {
         "en": "every stumble teaches the next leap where to aim.",
@@ -113,9 +113,9 @@
       }
     },
     {
-      "id": "score-3200",
-      "context": "Theme: non-duality — the boundary between mover and movement dissolves.",
-      "score": 3200,
+      "id": "m-5500",
+      "context": "Milestone at 5500m. Theme: non-duality.",
+      "score": 5500,
       "label": { "en": "grace", "de": "Anmut" },
       "text": {
         "en": "you have become the motion itself. the separation was never real.",
@@ -123,9 +123,9 @@
       }
     },
     {
-      "id": "score-4500",
-      "context": "Theme: shadow work — inner depth as foundation for outer height.",
-      "score": 4500,
+      "id": "m-6000",
+      "context": "Milestone at 6000m. Theme: shadow work — inner depth.",
+      "score": 6000,
       "label": { "en": "depth", "de": "Tiefe" },
       "text": {
         "en": "to rise this high required going this deep within.",
@@ -133,8 +133,8 @@
       }
     },
     {
-      "id": "score-6500",
-      "context": "Theme: all challenges as teachers; the self as both student and subject.",
+      "id": "m-6500",
+      "context": "Milestone at 6500m. Theme: the self as student and subject.",
       "score": 6500,
       "label": { "en": "presence", "de": "Gegenwart" },
       "text": {
@@ -143,9 +143,9 @@
       }
     },
     {
-      "id": "score-9000",
-      "context": "Theme: limitlessness — no ceiling, only sky becoming more sky.",
-      "score": 9000,
+      "id": "m-7000",
+      "context": "Milestone at 7000m. Theme: limitlessness.",
+      "score": 7000,
       "label": { "en": "infinite", "de": "Unendlich" },
       "text": {
         "en": "there is no ceiling. there never was. only sky becoming more sky.",
@@ -153,9 +153,9 @@
       }
     },
     {
-      "id": "score-13000",
-      "context": "Final milestone — all experiences integrated as altitude, not just memory.",
-      "score": 13000,
+      "id": "m-7500",
+      "context": "Milestone at 7500m. Theme: all experiences integrated as altitude.",
+      "score": 7500,
       "label": { "en": "radiance", "de": "Leuchten" },
       "text": {
         "en": "you carry every jump inside you now — not as memory, but as height.",
