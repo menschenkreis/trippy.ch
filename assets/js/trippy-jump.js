@@ -97,6 +97,14 @@
   let mountains = [];
   let clouds = [];
 
+  // ── Juiciness State ──
+  // Squish/stretch: axes lerp back to 1 each frame
+  let squishX = 1, squishY = 1;
+  // Screen shake: random offset per-frame, magnitude decays exponentially
+  let shakeX = 0, shakeY = 0, shakeMag = 0;
+  // Trail tint: colour set by the jump type, stored per trail dot
+  let trailLaunchColor = null;
+
   const keys = {};
   let touchDir = 0;
   let tiltX = 0;
@@ -209,6 +217,17 @@
     shockwaves.push({ x, y, radius: 0, maxRadius: 120, alpha: 0.7, color: color || theme.primary });
   }
 
+  // Kick screen shake; subsequent calls only increase magnitude, never decrease it
+  function triggerShake(mag) {
+    shakeMag = Math.max(shakeMag, mag);
+  }
+
+  // Landing squash (wide+flat) — axes lerp back to 1 automatically in update()
+  function triggerSquish() {
+    squishX = 1.45;
+    squishY = 0.62;
+  }
+
   // ── Init Game ──
   function initGame(restore = false) {
     const saved = restore ? loadGame() : null;
@@ -227,6 +246,9 @@
     shockwaves = [];
     powerUps = [];
     time = 0;
+    squishX = 1; squishY = 1;
+    shakeX = 0; shakeY = 0; shakeMag = 0;
+    trailLaunchColor = null;
 
     if (saved) {
       player.x = saved.player.x; player.y = saved.player.y;
@@ -402,6 +424,9 @@
   function drawPlayer(x, y) {
     ctx.save();
     ctx.translate(x, y);
+    // Scale before rotate so the squish/stretch is always in canvas (screen) space,
+    // not in the player's own rotated space — keeps it readable at any rotation angle.
+    ctx.scale(squishX, squishY);
     ctx.rotate(player.rotation);
     const pW = player.width * sphereSizeScale;
 
@@ -517,8 +542,12 @@
         player.powerTimer = 10;
         addShockwave(p.x, p.y - cameraY, [255,255,255]);
         playNote(880, 'sine', 0.5, 1.2);
-        vibrate([15, 8, 15, 8, 40]); // distinctive power-up rumble
-        if (p.type === 'nova') player.vy = SPRING_VEL * 1.6;
+        vibrate([15, 8, 15, 8, 40]);
+        if (p.type === 'nova') {
+          player.vy = SPRING_VEL * 1.6;
+          trailLaunchColor = [255, 80, 100]; // nova = crimson trail
+          triggerShake(6);
+        }
       }
     }
 
@@ -538,13 +567,18 @@
             jump = player.powerUp === 'aura' ? SPRING_VEL * 1.3 : SPRING_VEL;
             addShockwave(player.x, p.y - cameraY, [255, 220, 50]);
             burst(player.x, p.y - cameraY, [255, 255, 150], 25, 'spark');
-            vibrate([12, 5, 30]); // double pulse for spring bounce
+            vibrate([12, 5, 30]);
+            triggerShake(p.type === 'spring' ? 5 : 4);
+            trailLaunchColor = p.type === 'spring' ? [255, 220, 50] : [100, 255, 200];
+          } else {
+            trailLaunchColor = null; // normal bounce → use theme colour
           }
           if (p.type === 'fragile') { p.alive = false; burst(p.x + p.w/2, p.y - cameraY, [255, 80, 100], 15); vibrate(8); }
           if (p.type === 'vanishing') p.fade = 1;
           player.vy = jump; playJumpSound(p.type === 'spring');
-          if (p.type !== 'spring' && player.powerUp !== 'aura') vibrate(18); // normal jump tap
+          if (p.type !== 'spring' && player.powerUp !== 'aura') vibrate(18);
           burst(player.x, p.y - cameraY, theme.secondary, 12);
+          triggerSquish(); // landing squash — springs back via lerp
           break;
         }
       }
@@ -556,8 +590,10 @@
       if (p.fade > 0) { p.fade += 0.05; p.opacity = Math.max(0, 1 - p.fade); if (p.opacity <= 0) p.alive = false; }
     }
 
-    trail.push({ x: player.x, y: player.y, a: 1.0 });
-    if (trail.length > 25) trail.shift();
+    // Trail length stretches to 40 dots after a big jump (spring / nova / aura)
+    const trailMax = trailLaunchColor !== null || Math.abs(player.vy) > 14 ? 40 : 25;
+    trail.push({ x: player.x, y: player.y, a: 1.0, color: trailLaunchColor });
+    if (trail.length > trailMax) trail.shift();
     for (let i = 0; i < trail.length; i++) trail[i].a *= 0.92;
 
     for (let i = particles.length - 1; i >= 0; i--) {
@@ -568,6 +604,17 @@
     for (let i = shockwaves.length - 1; i >= 0; i--) {
       const s = shockwaves[i]; s.radius += 6; s.alpha *= 0.93; if (s.alpha < 0.01) shockwaves.splice(i, 1);
     }
+
+    // Squish spring-back: lerp each axis toward 1.0 (~10 frames to settle)
+    squishX += (1 - squishX) * 0.22;
+    squishY += (1 - squishY) * 0.22;
+
+    // Screen shake: new random offset every frame, magnitude decays ~8 frames
+    if (shakeMag > 0.1) {
+      shakeX = (Math.random() - 0.5) * shakeMag * 2;
+      shakeY = (Math.random() - 0.5) * shakeMag * 2;
+      shakeMag *= 0.82;
+    } else { shakeMag = 0; shakeX = 0; shakeY = 0; }
 
     if (platforms.length > 0 && platforms[platforms.length - 1].y > cameraY - 1200) generatePlatforms(platforms[platforms.length - 1].y, cameraY - 3500);
     if (time % 5 < 0.02) saveGame();
@@ -583,24 +630,33 @@
   }
 
   function render() {
+    // Clear without any transform so we never leave uncleared slivers at screen edges
     ctx.clearRect(0, 0, W, H);
+
+    // Apply screen shake as a translate on top of the DPR transform.
+    // save/restore brackets ALL drawing so the offset is removed before the next frame.
+    ctx.save();
+    if (shakeMag > 0.1) ctx.translate(shakeX, shakeY);
+
     drawBackground();
-    
+
     if (playing || gameOver) {
       const camY = cameraY;
-      
+
       for (let i = 0; i < powerUps.length; i++) drawPowerUp(powerUps[i]);
-      
+
       for (let i = 0; i < platforms.length; i++) {
         const p = platforms[i];
         const sy = p.y - camY;
         if (sy > -100 && sy < H + 100) drawPlatform(p, sy);
       }
 
+      // Trail — each dot stores the launch colour set at the moment of the jump
       ctx.save();
       for (let i = 0; i < trail.length; i++) {
         const t = trail[i];
-        ctx.fillStyle = rgb(theme.primary, t.a * 0.4);
+        const tColor = t.color || theme.primary;
+        ctx.fillStyle = rgb(tColor, t.a * 0.4);
         ctx.beginPath(); ctx.arc(t.x, t.y - camY, 6 * t.a, 0, TAU); ctx.fill();
       }
       ctx.restore();
@@ -641,6 +697,9 @@
         ctx.restore();
       }
     }
+
+    ctx.restore(); // remove shake offset
+
     requestAnimationFrame(render);
     update();
   }
