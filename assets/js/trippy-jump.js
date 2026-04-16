@@ -9,6 +9,10 @@
   let sphereSizeScale = 1.0;
   const TAU = Math.PI * 2;
 
+  // Offscreen canvas for static sacred geometry layers (Parallax layers)
+  const bgCanvas = document.createElement('canvas');
+  const bgCtx = bgCanvas.getContext('2d');
+
   function resize() {
     W = window.innerWidth;
     H = window.innerHeight;
@@ -17,13 +21,18 @@
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    bgCanvas.width = W * dpr;
+    bgCanvas.height = H * dpr;
+    bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
     const isTouch = window.matchMedia('(pointer: coarse)').matches;
-    sphereSizeScale = isTouch ? 1.0 : Math.min(W / 800, 1.4);
+    sphereSizeScale = isTouch ? 1.0 : Math.min(W / 900, 1.4);
   }
   resize();
   window.addEventListener('resize', resize);
 
-  // ── Color Themes (Vibrant & Neon - Falling Emy Style) ──
+  // ── Color Themes ──
   const themes = [
     { name: 'deepsky', primary: [40,150,255], secondary: [255,255,255], accent: [200,230,255], bg: '#0a0d14' },
     { name: 'violet',  primary: [180,100,255], secondary: [255,80,200], accent: [220,180,255], bg: '#08060f' },
@@ -176,6 +185,8 @@
 
   // ── Helpers ──
   function burst(x, y, color, count, type = 'dot') {
+    const len = particles.length;
+    if (len > 300) return; // Hard cap on particles for performance
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * TAU;
       const speed = Math.random() * 5 + 1;
@@ -187,6 +198,7 @@
   }
 
   function addShockwave(x, y, color) {
+    if (shockwaves.length > 5) return;
     shockwaves.push({ x, y, radius: 0, maxRadius: 120, alpha: 0.7, color: color || theme.primary });
   }
 
@@ -226,8 +238,6 @@
     let y = fromY;
     const baseGap = 70;
     const maxDifficultyGap = 70;
-    
-    // Use an array to store new items and add them all at once
     const newPlatforms = [];
     
     while (y > toY) {
@@ -257,25 +267,24 @@
   }
 
   // ── Drawing ──
-  function drawSg(cx, cy, r, alpha, sides = 6, rot = 0) {
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.strokeStyle = rgb(theme.primary);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
+  function drawSg(targetCtx, cx, cy, r, alpha, sides = 6, rot = 0) {
+    targetCtx.save();
+    targetCtx.globalAlpha = alpha;
+    targetCtx.strokeStyle = rgb(theme.primary);
+    targetCtx.lineWidth = 1;
+    targetCtx.beginPath();
     for (let i = 0; i < sides; i++) {
       const a = (TAU / sides) * i + rot;
-      ctx.arc(cx + Math.cos(a) * r * 0.5, cy + Math.sin(a) * r * 0.5, r * 0.5, 0, TAU);
+      targetCtx.arc(cx + Math.cos(a) * r * 0.5, cy + Math.sin(a) * r * 0.5, r * 0.5, 0, TAU);
     }
-    ctx.stroke();
-    ctx.restore();
+    targetCtx.stroke();
+    targetCtx.restore();
   }
 
   function drawBackground() {
     const depth = -cameraY;
     const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
     
-    // Falling Emy Style Color Ramps
     let topColor = '#050a12', botColor = '#0f1420';
     if (depth < 8000) {
        const f = depth / 8000;
@@ -292,53 +301,53 @@
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, W, H);
 
-    // Mountains (Silhouettes)
+    // Mountains
     if (depth < 10000) {
       const mAlpha = Math.max(0, 1 - depth / 8000);
       ctx.save();
       ctx.globalAlpha = mAlpha;
-      mountains.forEach(m => {
+      for (let i = 0; i < mountains.length; i++) {
+        const m = mountains[i];
         const mx = (m.x - cameraY * 0.04) % (W + 500) - 250;
-        const g = ctx.createLinearGradient(mx, H - m.h, mx, H);
-        g.addColorStop(0, `rgba(${m.c},${m.c+10},${m.c+20}, 0.9)`);
-        g.addColorStop(1, '#050a12');
-        ctx.fillStyle = g;
+        ctx.fillStyle = `rgba(${m.c},${m.c+10},${m.c+20}, 0.9)`;
         ctx.beginPath(); ctx.moveTo(mx, H); ctx.lineTo(mx + m.w/2, H - m.h); ctx.lineTo(mx + m.w, H); ctx.fill();
-      });
+      }
       ctx.restore();
     }
 
-    // Clouds (Soft orbs)
+    // Clouds
     if (depth > 500 && depth < 15000) {
       const cAlpha = depth < 4000 ? (depth-500)/3500 : Math.max(0, 1-(depth-10000)/5000);
       ctx.save();
       ctx.globalAlpha = cAlpha;
-      clouds.forEach(c => {
+      for (let i = 0; i < clouds.length; i++) {
+        const c = clouds[i];
         const cy = (c.y - cameraY * c.s) % (H + 500) - 250;
         const g = ctx.createRadialGradient(c.x, cy, 0, c.x, cy, c.r);
         g.addColorStop(0, 'rgba(255,255,255,0.15)');
         g.addColorStop(1, 'transparent');
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(c.x, cy, c.r, 0, TAU); ctx.fill();
-      });
+      }
       ctx.restore();
     }
 
-    // Deep Cosmic Space
+    // Stars & Deep Space
     if (depth > 8000) {
       const sAlpha = Math.min(1, (depth - 8000) / 4000);
       ctx.save();
       ctx.globalAlpha = sAlpha;
-      bgParticles.forEach(p => {
+      for (let i = 0; i < bgParticles.length; i++) {
+        const p = bgParticles[i];
         const sy = (p.y - cameraY * p.s) % H;
         ctx.fillStyle = rgb(theme.accent, p.a);
         ctx.beginPath(); ctx.arc(p.x, sy, p.r, 0, TAU); ctx.fill();
-      });
+      }
       for (let i = 0; i < 4; i++) {
         const r = (150 + i * 180) * sphereSizeScale;
         const tx = W/2 + Math.sin(time * 0.08 + i) * 120;
         const ty = H/2 + Math.cos(time * 0.12 + i) * 120;
-        drawSg(tx, ty, r, 0.05 * sAlpha, 6 + i, time * 0.05);
+        drawSg(ctx, tx, ty, r, 0.05 * sAlpha, 6 + i, time * 0.05);
       }
       ctx.restore();
     }
@@ -364,11 +373,8 @@
     g.addColorStop(1, 'transparent');
     ctx.fillStyle = g;
     ctx.fillRect(0, sy-10, W, 20);
-    
-    ctx.strokeStyle = rgb(color, 0.8);
-    ctx.lineWidth = 2;
     for (let x = -50; x < W + 100; x += 80) {
-      drawSg(x - (time * 60)%80, sy, 35, 0.3, 6, time);
+      drawSg(ctx, x - (time * 60)%80, sy, 35, 0.3, 6, time);
     }
     ctx.restore();
   }
@@ -381,8 +387,8 @@
     const bob = Math.sin(time * 6 + p.phase) * 12;
     const color = p.type === 'aura' ? [100,255,200] : p.type === 'nova' ? [255,80,100] : [255,220,50];
     ctx.shadowColor = rgb(color, 0.9);
-    ctx.shadowBlur = 20;
-    drawSg(p.x, sy + bob, 22, 0.9, p.type === 'aura' ? 6 : p.type === 'nova' ? 8 : 4, time * 2.5);
+    ctx.shadowBlur = 15;
+    drawSg(ctx, p.x, sy + bob, 22, 0.9, p.type === 'aura' ? 6 : p.type === 'nova' ? 8 : 4, time * 2.5);
     ctx.restore();
   }
 
@@ -392,27 +398,22 @@
     ctx.rotate(player.rotation);
     const pW = player.width * sphereSizeScale;
 
-    // PowerUp Effects
     if (player.powerUp) {
       ctx.save();
       const pc = player.powerUp === 'aura' ? [100,255,200] : player.powerUp === 'nova' ? [255,80,100] : [255,220,50];
       ctx.strokeStyle = rgb(pc, 0.5 + Math.sin(time*12)*0.3);
       ctx.lineWidth = 3;
-      drawSg(0, 0, pW * 2.8, 0.6, 6, -time * 4);
+      drawSg(ctx, 0, 0, pW * 2.8, 0.6, 6, -time * 4);
       ctx.restore();
     }
 
-    // Main Body Glow
     const g = ctx.createRadialGradient(0,0,0, 0,0, pW * 1.8);
     g.addColorStop(0, rgb(theme.secondary, 0.6));
     g.addColorStop(1, 'transparent');
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(0,0, pW * 1.8, 0, TAU); ctx.fill();
 
-    // Sacred Geometry Core
     ctx.strokeStyle = rgb(theme.primary, 1.0);
-    ctx.shadowColor = rgb(theme.primary, 0.8);
-    ctx.shadowBlur = 10;
     ctx.lineWidth = 2.5;
     for (let j = 0; j < 2; j++) {
       ctx.beginPath();
@@ -440,12 +441,9 @@
     if (p.type === 'moving') color = [100, 255, 200];
     if (p.type === 'vanishing') color = [220, 120, 255];
 
-    ctx.shadowColor = rgb(color, 0.7);
-    ctx.shadowBlur = 12;
     ctx.strokeStyle = rgb(color, 0.9);
     ctx.lineWidth = 2.5;
     if (p.type === 'fragile') ctx.setLineDash([5, 3]);
-    
     ctx.beginPath(); ctx.roundRect(p.x, sy, p.w, 10, 5); ctx.stroke();
     ctx.fillStyle = rgb(color, 0.2); ctx.fill();
 
@@ -501,8 +499,9 @@
       if (player.powerUp === 'nova' && time % 0.15 < 0.02) burst(player.x, player.y - cameraY, [255,80,100], 3, 'spark');
     }
 
-    powerUps.forEach(p => {
-      if (!p.alive) return;
+    for (let i = 0; i < powerUps.length; i++) {
+      const p = powerUps[i];
+      if (!p.alive) continue;
       if (Math.hypot(player.x - p.x, (player.y - cameraY) - (p.y - cameraY)) < 45) {
         p.alive = false;
         player.powerUp = p.type;
@@ -511,7 +510,7 @@
         playNote(880, 'sine', 0.5, 1.2);
         if (p.type === 'nova') player.vy = SPRING_VEL * 1.6;
       }
-    });
+    }
 
     if (chillMode && player.y - cameraY > H - 40) {
       player.y = cameraY + H - 40; player.vy = JUMP_VEL; playJumpSound(false);
@@ -519,7 +518,8 @@
     }
 
     if (player.vy > 0) {
-      for (const p of platforms) {
+      for (let i = 0; i < platforms.length; i++) {
+        const p = platforms[i];
         if (!p.alive) continue;
         if (player.y + 12 > p.y && player.y < p.y + 10 &&
             player.x > p.x && player.x < p.x + p.w) {
@@ -538,14 +538,15 @@
       }
     }
 
-    platforms.forEach(p => {
+    for (let i = 0; i < platforms.length; i++) {
+      const p = platforms[i];
       if (p.type === 'moving') { p.x += p.vx; if (p.x < 0 || p.x + p.w > W) p.vx *= -1; }
       if (p.fade > 0) { p.fade += 0.05; p.opacity = Math.max(0, 1 - p.fade); if (p.opacity <= 0) p.alive = false; }
-    });
+    }
 
     trail.push({ x: player.x, y: player.y, a: 1.0 });
-    if (trail.length > 30) trail.shift();
-    trail.forEach(t => t.a *= 0.9);
+    if (trail.length > 25) trail.shift();
+    for (let i = 0; i < trail.length; i++) trail[i].a *= 0.92;
 
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i]; p.x += p.vx; p.y += p.vy;
@@ -557,7 +558,7 @@
     }
 
     if (platforms.length > 0 && platforms[platforms.length - 1].y > cameraY - 1200) generatePlatforms(platforms[platforms.length - 1].y, cameraY - 3500);
-    if (time % 3 < 0.02) saveGame();
+    if (time % 5 < 0.02) saveGame();
     if (!chillMode && player.y - cameraY > H + 120) endGame();
   }
 
@@ -574,30 +575,24 @@
     drawBackground();
     
     if (playing || gameOver) {
-      const camY = cameraY; // Cache for performance
+      const camY = cameraY;
       
-      // Render powerups
-      for (let i = 0; i < powerUps.length; i++) {
-        drawPowerUp(powerUps[i]);
-      }
+      for (let i = 0; i < powerUps.length; i++) drawPowerUp(powerUps[i]);
       
-      // Render platforms with frustum culling
       for (let i = 0; i < platforms.length; i++) {
         const p = platforms[i];
         const sy = p.y - camY;
         if (sy > -100 && sy < H + 100) drawPlatform(p, sy);
       }
 
-      // Trail - draw as a single path if possible, or batched
+      ctx.save();
       for (let i = 0; i < trail.length; i++) {
         const t = trail[i];
-        ctx.fillStyle = rgb(theme.primary, t.a * 0.5);
-        ctx.beginPath(); 
-        ctx.arc(t.x, t.y - camY, 6 * t.a, 0, TAU); 
-        ctx.fill();
+        ctx.fillStyle = rgb(theme.primary, t.a * 0.4);
+        ctx.beginPath(); ctx.arc(t.x, t.y - camY, 6 * t.a, 0, TAU); ctx.fill();
       }
+      ctx.restore();
 
-      // Particles
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
         ctx.fillStyle = rgb(p.color, p.life);
@@ -606,7 +601,6 @@
         ctx.fill();
       }
 
-      // Shockwaves
       for (let i = 0; i < shockwaves.length; i++) {
         const s = shockwaves[i];
         ctx.strokeStyle = rgb(s.color, s.alpha);
@@ -616,7 +610,6 @@
       
       drawPlayer(player.x, player.y - camY);
       
-      // Score
       ctx.fillStyle = 'rgba(255,255,255,0.8)'; 
       ctx.font = `200 ${3.0 * sphereSizeScale}rem sans-serif`; 
       ctx.textAlign = 'center'; 
