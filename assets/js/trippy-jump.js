@@ -529,34 +529,6 @@
         osc.connect(g); routeToOutput(g, panner);
         osc.start(now); osc.stop(now + 1.9);
       });
-    } else if (type === 'vesica') {
-      // Deep drone with filter sweep
-      const osc = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      const filt = audioCtx.createBiquadFilter();
-      osc.type = 'sine'; osc.frequency.setValueAtTime(note.freq * 0.25, now);
-      filt.type = 'lowpass'; filt.frequency.setValueAtTime(200, now);
-      filt.frequency.linearRampToValueAtTime(2000, now + 0.4);
-      filt.frequency.exponentialRampToValueAtTime(400, now + 1.2);
-      filt.Q.setValueAtTime(5, now);
-      g.gain.setValueAtTime(0, now);
-      g.gain.linearRampToValueAtTime(0.15, now + 0.05);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 1.3);
-      osc.connect(filt); filt.connect(g); routeToOutput(g, panner);
-      osc.start(now); osc.stop(now + 1.4);
-    } else if (type === 'seed') {
-      // Quick bright ascending triad
-      [note.freq, note.freq * 1.26, note.freq * 1.5].forEach((f, i) => {
-        const osc = audioCtx.createOscillator();
-        const g = audioCtx.createGain();
-        const t = now + i * 0.06;
-        osc.type = 'sine'; osc.frequency.setValueAtTime(f, t);
-        g.gain.setValueAtTime(0, t);
-        g.gain.linearRampToValueAtTime(0.2, t + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
-        osc.connect(g); routeToOutput(g, panner);
-        osc.start(t); osc.stop(t + 0.9);
-      });
     } else if (type === 'star') {
       // Bright major chord shimmer
       [1.0, 1.26, 1.5, 2.0].forEach(ratio => {
@@ -922,7 +894,7 @@
       prevP = p; // next platform must be reachable from this one
 
       if (-y / 10 >= sessionStartScore + 100 && Math.random() < 0.09) {
-        const pTypes = ['aura', 'nova', 'magnet', 'merkaba', 'lotus', 'vesica', 'seed', 'star'];
+        const pTypes = ['aura', 'nova', 'magnet', 'merkaba', 'lotus', 'star'];
         powerUps.push({ x: x + w/2, y: y - 35, type: pTypes[Math.floor(Math.random()*pTypes.length)], alive: true, phase: Math.random()*TAU });
       }
     }
@@ -1241,49 +1213,6 @@
       ctx.strokeStyle = `hsla(${hue}, 60%, 70%, 0.6)`; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(cx, cy, R * 0.18, 0, TAU); ctx.stroke();
 
-    } else if (p.type === 'vesica') {
-      // Two overlapping circles
-      const hue = (265 + th + Math.sin(time * 1.5) * 15) % 360;
-      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.6);
-      g.addColorStop(0, `hsla(${hue}, 70%, 65%, 0.3)`);
-      g.addColorStop(1, 'transparent');
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 1.6, 0, TAU); ctx.fill();
-      const offset = R * 0.4;
-      ctx.strokeStyle = `hsla(${hue}, 75%, 65%, 0.6)`; ctx.lineWidth = 1.2;
-      ctx.beginPath(); ctx.arc(cx - offset, cy, R * 0.7, 0, TAU); ctx.stroke();
-      ctx.beginPath(); ctx.arc(cx + offset, cy, R * 0.7, 0, TAU); ctx.stroke();
-      // Vesica intersection fill
-      ctx.fillStyle = `hsla(${hue}, 60%, 50%, 0.2)`;
-      ctx.beginPath(); ctx.arc(cx - offset, cy, R * 0.7, 0, TAU); ctx.fill();
-      ctx.save(); ctx.globalCompositeOperation = 'destination-out';
-      ctx.fillStyle = 'rgba(0,0,0,1)';
-      ctx.beginPath(); ctx.arc(cx - offset * 2, cy, R * 0.7, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.arc(cx + offset * 2, cy, R * 0.7, 0, TAU); ctx.fill();
-      ctx.restore();
-      // Inner point
-      ctx.fillStyle = `hsla(${hue}, 80%, 85%, 0.8)`;
-      ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, TAU); ctx.fill();
-
-    } else if (p.type === 'seed') {
-      // Seed of life: 7 circles
-      const hue = (140 + th + Math.sin(time * 2.5) * 25) % 360;
-      const breath = 1 + Math.sin(time * 2 + p.phase) * 0.06;
-      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.5);
-      g.addColorStop(0, `hsla(${hue}, 70%, 60%, 0.3)`);
-      g.addColorStop(1, 'transparent');
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 1.5, 0, TAU); ctx.fill();
-      const cr = R * 0.45 * breath;
-      ctx.strokeStyle = `hsla(${hue}, 75%, 60%, 0.7)`; ctx.lineWidth = 1;
-      // Center
-      ctx.beginPath(); ctx.arc(cx, cy, cr, 0, TAU); ctx.stroke();
-      // 6 around
-      for (let i = 0; i < 6; i++) {
-        const a = (TAU / 6) * i + time * 0.15;
-        ctx.beginPath(); ctx.arc(cx + Math.cos(a) * cr, cy + Math.sin(a) * cr, cr, 0, TAU); ctx.stroke();
-      }
-      ctx.fillStyle = `hsla(${hue}, 80%, 80%, 0.8)`;
-      ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, TAU); ctx.fill();
-
     } else if (p.type === 'star') {
       // 5-pointed star + rays
       const hue = (50 + th + Math.sin(time * 3) * 15) % 360;
@@ -1375,16 +1304,6 @@
           ctx.quadraticCurveTo(Math.cos(a + 0.35) * AR * 1.05, Math.sin(a + 0.35) * AR * 1.05, 0, 0);
           ctx.stroke();
         }
-      } else if (player.powerUp === 'vesica') {
-        const off = AR * 0.3;
-        ctx.strokeStyle = `hsla(${(265 + th) % 360}, 70%, 65%, 0.4)`; ctx.lineWidth = 1.2;
-        ctx.beginPath(); ctx.arc(-off, 0, AR * 0.6, 0, TAU); ctx.stroke();
-        ctx.beginPath(); ctx.arc(off, 0, AR * 0.6, 0, TAU); ctx.stroke();
-      } else if (player.powerUp === 'seed') {
-        const cr = AR * 0.35;
-        ctx.strokeStyle = `hsla(${(140 + th) % 360}, 70%, 55%, 0.4)`; ctx.lineWidth = 0.9;
-        ctx.beginPath(); ctx.arc(0, 0, cr, 0, TAU); ctx.stroke();
-        for (let i = 0; i < 6; i++) { const a = (TAU / 6) * i + time * 0.25; ctx.beginPath(); ctx.arc(Math.cos(a) * cr, Math.sin(a) * cr, cr, 0, TAU); ctx.stroke(); }
       } else if (player.powerUp === 'star') {
         ctx.strokeStyle = `hsla(${(50 + th) % 360}, 85%, 75%, 0.5)`; ctx.lineWidth = 1.4;
         ctx.beginPath();
@@ -1526,27 +1445,8 @@
     for (let i = 0; i < powerUps.length; i++) {
       const p = powerUps[i];
       if (!p.alive) continue;
-      if (Math.hypot(player.x - p.x, (player.y - cameraY) - (p.y - cameraY)) < 45) {
+      if (Math.hypot(player.x - p.x, player.y - p.y) < 45) {
         p.alive = false;
-        if (p.type === 'vesica') {
-          player.y -= 500;
-          addShockwave(player.x, player.y - cameraY, [140, 100, 255]);
-          burst(player.x, player.y - cameraY, [180, 140, 255], 30, 'spark');
-          player.powerUp = null; player.powerTimer = 0;
-          playPowerUpSound(p.type);
-          vibrate([15, 8, 15, 8, 40]);
-          continue;
-        }
-        if (p.type === 'seed') {
-          for (let s = 0; s < 3; s++) {
-            platforms.push({ x: player.x - 50 + Math.random() * 100, y: player.y - 100 - s * 80, w: 80, h: 10, type: 'normal', alive: true, opacity: 1, vx: 0, fade: 0 });
-          }
-          burst(player.x, player.y - cameraY, [100, 255, 140], 20, 'spark');
-          player.powerUp = null; player.powerTimer = 0;
-          playPowerUpSound(p.type);
-          vibrate([15, 8, 15, 8, 40]);
-          continue;
-        }
         player.powerUp = p.type;
         player.powerTimer = p.type === 'merkaba' ? 8 : p.type === 'lotus' ? 6 : p.type === 'star' ? 10 : 10;
         addShockwave(p.x, p.y - cameraY, [255,255,255]);
@@ -1560,7 +1460,7 @@
       }
     }
 
-    if (chillMode && player.y - cameraY > H - 40) {
+    if ((chillMode || milestoneDisplay) && player.y - cameraY > H - 40) {
       player.y = cameraY + H - 40; player.vy = JUMP_VEL; playJumpSound('normal');
       burst(player.x, H - 25, theme.accent, 20, 'spark');
     }
@@ -1678,7 +1578,7 @@
     }
 
     if (time % 5 < 0.02) saveGame();
-    if (!chillMode && player.y - cameraY > H + 120) endGame();
+    if (!(chillMode || milestoneDisplay) && player.y - cameraY > H + 120) endGame();
   }
 
   function endGame() {
@@ -1772,37 +1672,88 @@
       ctx.textAlign = 'center';
       ctx.fillText(score + 'm', W/2, 130);
 
-      // Milestone quote — gentle fade-in/out text overlay
+      // Milestone quote — gentle fade-in/out animated thought bubble
       if (milestoneDisplay) {
         const { text, label, life, maxLife } = milestoneDisplay;
         const elapsed = maxLife - life;
         const fadeIn = Math.min(elapsed / 0.8, 1);
         const fadeOut = Math.min(life / 1.5, 1);
-        const alpha = fadeIn * fadeOut * 0.75;
+        const alpha = fadeIn * fadeOut * 0.9;
+        
         ctx.save();
         ctx.globalAlpha = alpha;
+        
+        // Wrap text first to calculate bubble height
+        const words = text.split(' ');
+        const lines = [];
+        let curLine = '';
+        for (const w of words) {
+          const test = curLine + w + ' ';
+          if (test.length > 32 && curLine) {
+            lines.push(curLine.trim());
+            curLine = w + ' ';
+          } else {
+            curLine = test;
+          }
+        }
+        if (curLine) lines.push(curLine.trim());
+        
+        const lineH = 22 * sphereSizeScale;
+        const totalTextH = lines.length * lineH;
+        const bubbleW = 340 * sphereSizeScale;
+        const bubbleH = (totalTextH + 60) * sphereSizeScale;
+        const bx = W/2, by = H * 0.72; // Center position
+        
+        // Draw the cloud-like thought bubble
+        ctx.fillStyle = 'rgba(10, 10, 20, 0.85)';
+        ctx.strokeStyle = rgb(theme.accent, 0.4);
+        ctx.lineWidth = 2;
+        
+        // Simple procedural cloud: overlapping circles
+        const lobes = 10;
+        const timeScale = time * 2;
+        ctx.beginPath();
+        for (let i = 0; i < lobes; i++) {
+          const a = (TAU / lobes) * i;
+          const wobble = Math.sin(timeScale + i) * 5;
+          const lx = bx + Math.cos(a) * (bubbleW/2 + wobble);
+          const ly = by + Math.sin(a) * (bubbleH/2 + wobble);
+          ctx.arc(lx, ly, 40 * sphereSizeScale, 0, TAU);
+        }
+        ctx.fill();
+        ctx.stroke();
+        
+        // Inner fill to clear overlap artifacts
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.beginPath();
+        ctx.ellipse(bx, by, bubbleW/2, bubbleH/2, 0, 0, TAU);
+        ctx.fill();
+
+        // Small thought circles
+        for (let i = 0; i < 3; i++) {
+          const a = Math.PI * 0.7; // toward player
+          const d = 80 + i * 30;
+          const r = 12 - i * 3;
+          const wobble = Math.sin(timeScale + i) * 3;
+          ctx.beginPath();
+          ctx.arc(bx + Math.cos(a) * d + wobble, by + Math.sin(a) * d + wobble, r * sphereSizeScale, 0, TAU);
+          ctx.fill();
+          ctx.stroke();
+        }
+
         ctx.textAlign = 'center';
         // Label (small, accent)
         ctx.fillStyle = rgb(theme.accent, 1);
         ctx.font = `${Math.round(13 * sphereSizeScale)}px sans-serif`;
-        ctx.fillText(label, W/2, H * 0.78 - 20);
+        ctx.fillText(label, bx, by - totalTextH/2 - 10);
+        
         // Quote (larger, white)
         ctx.fillStyle = 'rgba(255,255,255,0.95)';
-        ctx.font = `${Math.round(16 * sphereSizeScale)}px sans-serif`;
-        // Word-wrap if needed (max ~35 chars per line)
-        const words = text.split(' ');
-        let line = '', ly = H * 0.78;
-        for (const w of words) {
-          const test = line + w + ' ';
-          if (test.length > 38 && line) {
-            ctx.fillText(line.trim(), W/2, ly);
-            line = w + ' ';
-            ly += 22 * sphereSizeScale;
-          } else {
-            line = test;
-          }
-        }
-        if (line) ctx.fillText(line.trim(), W/2, ly);
+        ctx.font = `italic ${Math.round(17 * sphereSizeScale)}px serif`;
+        lines.forEach((l, i) => {
+          ctx.fillText(l, bx, by - totalTextH/2 + 15 + i * lineH);
+        });
+        
         ctx.restore();
       }
 
