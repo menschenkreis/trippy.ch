@@ -16,21 +16,20 @@
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    
-    // Scale for desktop
     const isTouch = window.matchMedia('(pointer: coarse)').matches;
-    sphereSizeScale = isTouch ? 1.0 : Math.min(W / 800, 1.5);
+    sphereSizeScale = isTouch ? 1.0 : Math.min(W / 800, 1.4);
   }
   resize();
   window.addEventListener('resize', resize);
 
   // ── Color Themes ──
   const themes = [
+    { name: 'sky',    primary: [40,150,255], secondary: [255,255,255], accent: [200,230,255], bg: '#87CEEB' },
     { name: 'violet', primary: [140,100,255], secondary: [255,80,200], accent: [180,140,255], bg: '#08060f' },
     { name: 'cyan',   primary: [0,220,255],  secondary: [150,240,255], accent: [100,255,220], bg: '#060d12' },
     { name: 'ember',  primary: [255,140,60],  secondary: [255,50,120], accent: [255,180,80], bg: '#120806' },
     { name: 'jade',   primary: [80,255,160],  secondary: [180,80,255], accent: [100,255,180], bg: '#061208' },
-    { name: 'cosmic', primary: [255,100,255], secondary: [100,180,255], accent: [200,150,255], bg: '#0a0810' }
+    { name: 'void',   primary: [255,100,255], secondary: [100,180,255], accent: [200,150,255], bg: '#020005' }
   ];
   let themeIndex = 0;
   let theme = { ...themes[0] };
@@ -38,7 +37,7 @@
   function rgb(c, a) { return a !== undefined ? `rgba(${c[0]},${c[1]},${c[2]},${a})` : `rgb(${c[0]},${c[1]},${c[2]})`; }
 
   // ── Persistence ──
-  const SAVE_KEY = 'trippy-jump-save';
+  const SAVE_KEY = 'trippy-jump-save-v2';
   function saveGame() {
     const data = {
       score, cameraY, maxHeight, themeIndex, chillMode,
@@ -49,10 +48,7 @@
   }
   function loadGame() {
     const saved = localStorage.getItem(SAVE_KEY);
-    if (!saved) return null;
-    try {
-      return JSON.parse(saved);
-    } catch(e) { return null; }
+    return saved ? JSON.parse(saved) : null;
   }
 
   // ── Game State ──
@@ -69,7 +65,9 @@
   const player = {
     x: 0, y: 0, vx: 0, vy: 0,
     width: 24, height: 24,
-    rotation: 0
+    rotation: 0,
+    powerUp: null, // 'aura', 'nova', 'magnet'
+    powerTimer: 0
   };
 
   const GRAVITY = 0.32;
@@ -81,7 +79,12 @@
   let particles = [];
   let trail = [];
   let shockwaves = [];
-  let bgParticles = [];
+  let bgParticles = []; // used for stars/clouds
+  let powerUps = []; // {x, y, type, alive}
+
+  // Parallax Layers
+  let mountains = [];
+  let clouds = [];
 
   const keys = {};
   let touchDir = 0;
@@ -128,7 +131,7 @@
 
   function playJumpSound(isSpring) {
     const base = isSpring ? 150 : 220;
-    const freq = base + Math.min(score / 10, 400);
+    const freq = base + Math.min(score / 10, 600);
     playNote(freq, 'sine', 0.3, isSpring ? 1.2 : 0.6);
   }
 
@@ -155,6 +158,22 @@
     } else setupEvents();
   }
 
+  // ── Parallax Init ──
+  function initParallax() {
+    mountains = [];
+    for (let i = 0; i < 5; i++) {
+      mountains.push({ x: i * 400, w: 600, h: 200 + Math.random() * 200, c: 100 + Math.random() * 50 });
+    }
+    clouds = [];
+    for (let i = 0; i < 15; i++) {
+      clouds.push({ x: Math.random() * W, y: Math.random() * 1000 + 500, r: 50 + Math.random() * 100, s: 0.2 + Math.random() * 0.3 });
+    }
+    bgParticles = [];
+    for (let i = 0; i < 100; i++) {
+      bgParticles.push({ x: Math.random() * W, y: Math.random() * H, r: Math.random() * 1.5 + 0.5, s: Math.random() * 0.5 + 0.1, a: Math.random() * 0.8 + 0.2 });
+    }
+  }
+
   // ── Helpers ──
   function burst(x, y, color, count, type = 'dot') {
     for (let i = 0; i < count; i++) {
@@ -168,13 +187,12 @@
   }
 
   function addShockwave(x, y, color) {
-    shockwaves.push({ x, y, radius: 0, maxRadius: 80, alpha: 0.6, color: color || theme.primary });
+    shockwaves.push({ x, y, radius: 0, maxRadius: 100, alpha: 0.6, color: color || theme.primary });
   }
 
   // ── Init Game ──
   function initGame(restore = false) {
     const saved = restore ? loadGame() : null;
-    
     score = saved ? saved.score : 0;
     cameraY = saved ? saved.cameraY : 0;
     maxHeight = saved ? saved.maxHeight : 0;
@@ -188,107 +206,171 @@
     particles = [];
     trail = [];
     shockwaves = [];
+    powerUps = [];
     time = 0;
 
     if (saved) {
-      player.x = saved.player.x;
-      player.y = saved.player.y;
-      player.vx = saved.player.vx;
-      player.vy = saved.player.vy;
+      player.x = saved.player.x; player.y = saved.player.y;
+      player.vx = saved.player.vx; player.vy = saved.player.vy;
       platforms = saved.platforms;
     } else {
-      player.x = W / 2;
-      player.y = H - 150;
-      player.vx = 0;
-      player.vy = JUMP_VEL;
+      player.x = W / 2; player.y = H - 150;
+      player.vx = 0; player.vy = JUMP_VEL;
       platforms = [{ x: W/2 - 50, y: H - 100, w: 100, h: 10, type: 'normal', alive: true, opacity: 1 }];
       generatePlatforms(H - 100, H - 3000);
     }
-
-    bgParticles = [];
-    for (let i = 0; i < 50; i++) {
-      bgParticles.push({ x: Math.random() * W, y: Math.random() * H, r: Math.random() * 2 + 0.5, s: Math.random() * 0.5 + 0.2, a: Math.random() * 0.4 + 0.1 });
-    }
+    initParallax();
   }
 
   function generatePlatforms(fromY, toY) {
     let y = fromY;
-    const baseGap = 90 * sphereSizeScale;
+    const baseGap = 95 * sphereSizeScale;
     while (y > toY) {
-      y -= baseGap + Math.random() * 40 + Math.min(score / 150, 60);
-      const w = (65 + Math.random() * 20) * sphereSizeScale;
+      y -= baseGap + Math.random() * 45 + Math.min(score / 120, 70);
+      const w = (60 + Math.random() * 25) * sphereSizeScale;
       const x = Math.random() * (W - w);
 
       let type = 'normal';
       const r = Math.random();
-      const diff = Math.min(-y / 10000, 0.7);
+      const diff = Math.min(-y / 15000, 0.8);
       if (r < 0.06 + diff * 0.1) type = 'spring';
       else if (r < 0.15 + diff * 0.15) type = 'fragile';
-      else if (r < 0.28 + diff * 0.15) type = 'moving';
-      else if (r < 0.38 + diff * 0.1) type = 'vanishing';
+      else if (r < 0.3 + diff * 0.15) type = 'moving';
+      else if (r < 0.4 + diff * 0.1) type = 'vanishing';
 
-      platforms.push({ x, y, w, h: 10, type, alive: true, opacity: 1, vx: (Math.random() - 0.5) * 3, fade: 0 });
+      platforms.push({ x, y, w, h: 10, type, alive: true, opacity: 1, vx: (Math.random() - 0.5) * 4, fade: 0 });
+
+      // PowerUps (Sacred Geometry Orbs)
+      if (Math.random() < 0.05) {
+        const pTypes = ['aura', 'nova', 'magnet'];
+        powerUps.push({ x: x + w/2, y: y - 30, type: pTypes[Math.floor(Math.random()*pTypes.length)], alive: true, phase: Math.random()*TAU });
+      }
     }
   }
 
   // ── Drawing ──
-  function drawSg(cx, cy, r, alpha, sides = 6) {
+  function drawSg(cx, cy, r, alpha, sides = 6, rot = 0) {
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = rgb(theme.primary);
     ctx.lineWidth = 0.5;
     ctx.beginPath();
     for (let i = 0; i < sides; i++) {
-      const a = (Math.PI * 2 / sides) * i + time * 0.2;
-      ctx.arc(cx + Math.cos(a) * r * 0.5, cy + Math.sin(a) * r * 0.5, r * 0.5, 0, Math.PI * 2);
+      const a = (TAU / sides) * i + rot;
+      ctx.arc(cx + Math.cos(a) * r * 0.5, cy + Math.sin(a) * r * 0.5, r * 0.5, 0, TAU);
     }
     ctx.stroke();
-    ctx.restore();
-  }
-
-  function drawChillBarrier() {
-    if (!chillMode) return;
-    const sy = H - 20;
-    ctx.save();
-    ctx.strokeStyle = rgb(theme.accent, 0.4 + Math.sin(time * 3) * 0.1);
-    ctx.lineWidth = 3;
-    ctx.setLineDash([10, 5]);
-    ctx.beginPath();
-    ctx.moveTo(0, sy);
-    ctx.lineTo(W, sy);
-    ctx.stroke();
-    
-    // Geometric patterns on barrier
-    ctx.setLineDash([]);
-    ctx.lineWidth = 1;
-    for (let x = 0; x < W + 100; x += 100) {
-      const cx = x - (time * 50) % 100;
-      drawSg(cx, sy, 30, 0.15, 6);
-    }
     ctx.restore();
   }
 
   function drawBackground() {
-    const g = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H));
-    g.addColorStop(0, '#0a0815');
-    g.addColorStop(1, theme.bg);
-    ctx.fillStyle = g;
+    const depth = -cameraY;
+    
+    // Sky Color Gradient
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
+    let topColor = '#87CEEB', botColor = '#E0F6FF';
+    
+    if (depth > 5000) { // Leaving atmosphere
+      const f = Math.min((depth - 5000) / 10000, 1);
+      topColor = lerpColor('#87CEEB', '#020005', f);
+      botColor = lerpColor('#E0F6FF', '#08060f', f);
+    }
+    if (depth > 15000) { // Deep space
+      topColor = '#010003'; botColor = '#050010';
+    }
+    skyGrad.addColorStop(0, topColor);
+    skyGrad.addColorStop(1, botColor);
+    ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, W, H);
 
-    for (const p of bgParticles) {
-      const sy = (p.y + cameraY * p.s) % H;
-      ctx.fillStyle = rgb(theme.accent, p.a);
-      ctx.beginPath(); ctx.arc(p.x, sy, p.r, 0, Math.PI * 2); ctx.fill();
+    // Mountains (First layer)
+    if (depth < 8000) {
+      const mAlpha = Math.max(0, 1 - depth / 6000);
+      ctx.save();
+      ctx.globalAlpha = mAlpha;
+      mountains.forEach(m => {
+        const mx = (m.x - cameraY * 0.05) % (W + 400) - 200;
+        ctx.fillStyle = `rgba(${m.c},${m.c+20},${m.c+40}, 0.8)`;
+        ctx.beginPath();
+        ctx.moveTo(mx, H);
+        ctx.lineTo(mx + m.w/2, H - m.h);
+        ctx.lineTo(mx + m.w, H);
+        ctx.fill();
+      });
+      ctx.restore();
     }
 
-    for (let i = 0; i < 3; i++) {
-      const r = (150 + i * 100) * sphereSizeScale;
-      const tx = W/2 + Math.sin(time * 0.1 + i) * 50;
-      const ty = H/2 + Math.cos(time * 0.15 + i) * 50;
-      drawSg(tx, ty, r, 0.03 + i * 0.01, 6 + i);
+    // Clouds
+    if (depth > 1000 && depth < 15000) {
+      const cAlpha = depth < 5000 ? (depth-1000)/4000 : Math.max(0, 1-(depth-10000)/5000);
+      ctx.save();
+      ctx.globalAlpha = cAlpha;
+      clouds.forEach(c => {
+        const cy = (c.y - cameraY * c.s) % (H + 400) - 200;
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.beginPath(); ctx.arc(c.x, cy, c.r, 0, TAU); ctx.fill();
+      });
+      ctx.restore();
+    }
+
+    // Stars & Deep Space SG
+    if (depth > 8000) {
+      const sAlpha = Math.min(1, (depth - 8000) / 5000);
+      ctx.save();
+      ctx.globalAlpha = sAlpha;
+      bgParticles.forEach(p => {
+        const sy = (p.y - cameraY * p.s) % H;
+        ctx.fillStyle = rgb(theme.accent, p.a);
+        ctx.beginPath(); ctx.arc(p.x, sy, p.r, 0, TAU); ctx.fill();
+      });
+      
+      // Cosmic SG
+      for (let i = 0; i < 3; i++) {
+        const r = (200 + i * 150) * sphereSizeScale;
+        const tx = W/2 + Math.sin(time * 0.1 + i) * 100;
+        const ty = H/2 + Math.cos(time * 0.15 + i) * 100;
+        drawSg(tx, ty, r, 0.04 * sAlpha, 6 + i, time * 0.1);
+      }
+      ctx.restore();
     }
     
-    drawChillBarrier();
+    if (chillMode) drawChillBarrier();
+  }
+
+  function lerpColor(a, b, f) {
+    const c1 = hexToRgb(a), c2 = hexToRgb(b);
+    return `rgb(${c1[0]+(c2[0]-c1[0])*f}, ${c1[1]+(c2[1]-c1[1])*f}, ${c1[2]+(c2[2]-c1[2])*f})`;
+  }
+  function hexToRgb(h){
+    const i = parseInt(h.slice(1), 16);
+    return [i>>16&255, i>>8&255, i&255];
+  }
+
+  function drawChillBarrier() {
+    const sy = H - 25;
+    ctx.save();
+    ctx.strokeStyle = rgb(theme.accent, 0.5 + Math.sin(time * 4) * 0.2);
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
+    ctx.lineWidth = 1;
+    for (let x = -50; x < W + 100; x += 100) {
+      drawSg(x - (time * 40)%100, sy, 40, 0.2, 6, time);
+    }
+    ctx.restore();
+  }
+
+  function drawPowerUp(p) {
+    if (!p.alive) return;
+    const sy = p.y - cameraY;
+    if (sy < -50 || sy > H + 50) return;
+    ctx.save();
+    const bob = Math.sin(time * 5 + p.phase) * 10;
+    const color = p.type === 'aura' ? [100,255,200] : p.type === 'nova' ? [255,100,100] : [255,220,50];
+    
+    ctx.shadowColor = rgb(color, 0.8);
+    ctx.shadowBlur = 15;
+    drawSg(p.x, sy + bob, 20, 0.8, p.type === 'aura' ? 6 : p.type === 'nova' ? 8 : 4, time * 2);
+    ctx.restore();
   }
 
   function drawPlayer(x, y) {
@@ -297,11 +379,21 @@
     ctx.rotate(player.rotation);
     const pW = player.width * sphereSizeScale;
 
+    // PowerUp Auras
+    if (player.powerUp) {
+      ctx.save();
+      const pc = player.powerUp === 'aura' ? [100,255,200] : player.powerUp === 'nova' ? [255,100,100] : [255,220,50];
+      ctx.strokeStyle = rgb(pc, 0.4 + Math.sin(time*10)*0.2);
+      ctx.lineWidth = 2;
+      drawSg(0, 0, pW * 2.5, 0.5, 6, -time * 3);
+      ctx.restore();
+    }
+
     const g = ctx.createRadialGradient(0,0,0, 0,0, pW * 1.5);
-    g.addColorStop(0, rgb(theme.secondary, 0.4));
+    g.addColorStop(0, rgb(theme.secondary, 0.5));
     g.addColorStop(1, 'transparent');
     ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(0,0, pW * 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0,0, pW * 1.5, 0, TAU); ctx.fill();
 
     ctx.strokeStyle = rgb(theme.primary, 0.9);
     ctx.lineWidth = 2;
@@ -309,15 +401,15 @@
       ctx.beginPath();
       const rot = j === 0 ? time * 2 : -time * 1.5;
       for (let i = 0; i < 3; i++) {
-        const a = (Math.PI * 2 / 3) * i + rot;
-        const px = Math.cos(a) * pW * 0.6;
-        const py = Math.sin(a) * pW * 0.6;
+        const a = (TAU / 3) * i + rot;
+        const px = Math.cos(a) * pW * 0.7;
+        const py = Math.sin(a) * pW * 0.7;
         if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
       }
       ctx.closePath(); ctx.stroke();
     }
     ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(0,0, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0,0, 3, 0, TAU); ctx.fill();
     ctx.restore();
   }
 
@@ -325,7 +417,6 @@
     if (!p.alive) return;
     ctx.save();
     ctx.globalAlpha = p.opacity;
-    
     let color = theme.primary;
     if (p.type === 'spring') color = [255, 220, 50];
     if (p.type === 'fragile') color = [255, 100, 100];
@@ -337,19 +428,11 @@
     ctx.strokeStyle = rgb(color, 0.8);
     ctx.lineWidth = 2;
     if (p.type === 'fragile') ctx.setLineDash([4, 2]);
-    
-    ctx.beginPath();
-    ctx.roundRect(p.x, sy, p.w, 10, 5);
-    ctx.stroke();
-    ctx.fillStyle = rgb(color, 0.15);
-    ctx.fill();
+    ctx.beginPath(); ctx.roundRect(p.x, sy, p.w, 10, 5); ctx.stroke();
+    ctx.fillStyle = rgb(color, 0.15); ctx.fill();
 
     if (p.type === 'spring') {
-      ctx.beginPath();
-      ctx.moveTo(p.x + p.w/2 - 10, sy);
-      ctx.lineTo(p.x + p.w/2, sy - 8);
-      ctx.lineTo(p.x + p.w/2 + 10, sy);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(p.x + p.w/2 - 10, sy); ctx.lineTo(p.x + p.w/2, sy - 8); ctx.lineTo(p.x + p.w/2 + 10, sy); ctx.stroke();
     }
     ctx.restore();
   }
@@ -358,8 +441,9 @@
   function update() {
     if (!playing) return;
     time += 0.016;
+    const TAU = Math.PI * 2;
 
-    const targetIdx = Math.floor(maxHeight / 8000) % themes.length;
+    const targetIdx = Math.min(themes.length-1, Math.floor(maxHeight / 10000));
     if (themeIndex !== targetIdx) {
       themeIndex = targetIdx;
       theme.bg = themes[themeIndex].bg;
@@ -376,105 +460,95 @@
     if (touchDir !== 0) move = touchDir;
     if (Math.abs(tiltX) > 0.1) move = tiltX;
 
-    player.vx += move * 0.8 * (sphereSizeScale < 1 ? 1 : 1.2);
+    player.vx += move * 0.85 * (sphereSizeScale < 1 ? 1 : 1.25);
     player.vx *= FRICTION;
     player.vy += GRAVITY;
     player.x += player.vx;
     player.y += player.vy;
-    player.rotation += player.vx * 0.05;
+    player.rotation += player.vx * 0.06;
 
     if (player.x < 0) player.x = W;
     if (player.x > W) player.x = 0;
 
     const targetCam = player.y - H * 0.45;
-    if (targetCam < cameraY) cameraY += (targetCam - cameraY) * 0.1;
+    if (targetCam < cameraY) cameraY += (targetCam - cameraY) * 0.12;
 
     if (-player.y > maxHeight) {
       maxHeight = -player.y;
       score = Math.floor(maxHeight / 10);
     }
 
-    // Chill mode safety barrier
-    if (chillMode && player.y - cameraY > H - 35) {
-      player.y = cameraY + H - 35;
-      player.vy = JUMP_VEL;
-      playJumpSound(false);
-      burst(player.x, H - 20, theme.accent, 10, 'spark');
+    // PowerUp Update
+    if (player.powerUp) {
+      player.powerTimer -= 0.016;
+      if (player.powerTimer <= 0) player.powerUp = null;
+      if (player.powerUp === 'nova' && time % 0.2 < 0.02) burst(player.x, player.y - cameraY, [255,100,100], 2, 'spark');
+    }
+
+    powerUps.forEach(p => {
+      if (!p.alive) return;
+      if (Math.hypot(player.x - p.x, (player.y - cameraY) - (p.y - cameraY)) < 40) {
+        p.alive = false;
+        player.powerUp = p.type;
+        player.powerTimer = 8;
+        addShockwave(p.x, p.y - cameraY, [255,255,255]);
+        playNote(880, 'sine', 0.4, 1);
+        if (p.type === 'nova') player.vy = SPRING_VEL * 1.5;
+      }
+    });
+
+    if (chillMode && player.y - cameraY > H - 40) {
+      player.y = cameraY + H - 40; player.vy = JUMP_VEL; playJumpSound(false);
+      burst(player.x, H - 25, theme.accent, 15, 'spark');
     }
 
     if (player.vy > 0) {
       for (const p of platforms) {
         if (!p.alive) continue;
-        const pW = p.w;
         if (player.y + 12 > p.y && player.y < p.y + 10 &&
-            player.x > p.x && player.x < p.x + pW) {
+            player.x > p.x && player.x < p.x + p.w) {
           let jump = JUMP_VEL;
-          if (p.type === 'spring') {
-            jump = SPRING_VEL;
+          if (p.type === 'spring' || player.powerUp === 'aura') {
+            jump = player.powerUp === 'aura' ? SPRING_VEL * 1.2 : SPRING_VEL;
             addShockwave(player.x, p.y - cameraY, [255, 220, 50]);
-            burst(player.x, p.y - cameraY, [255, 255, 150], 15, 'spark');
+            burst(player.x, p.y - cameraY, [255, 255, 150], 20, 'spark');
           }
-          if (p.type === 'fragile') {
-            p.alive = false;
-            burst(p.x + pW/2, p.y - cameraY, [255, 100, 100], 10);
-          }
+          if (p.type === 'fragile') { p.alive = false; burst(p.x + p.w/2, p.y - cameraY, [255, 100, 100], 12); }
           if (p.type === 'vanishing') p.fade = 1;
-
-          player.vy = jump;
-          playJumpSound(p.type === 'spring');
-          burst(player.x, p.y - cameraY, theme.secondary, 8);
+          player.vy = jump; playJumpSound(p.type === 'spring');
+          burst(player.x, p.y - cameraY, theme.secondary, 10);
           break;
         }
       }
     }
 
-    for (const p of platforms) {
-      if (p.type === 'moving') {
-        p.x += p.vx;
-        if (p.x < 0 || p.x + p.w > W) p.vx *= -1;
-      }
-      if (p.fade > 0) {
-        p.fade += 0.05;
-        p.opacity = Math.max(0, 1 - p.fade);
-        if (p.opacity <= 0) p.alive = false;
-      }
-    }
+    platforms.forEach(p => {
+      if (p.type === 'moving') { p.x += p.vx; if (p.x < 0 || p.x + p.w > W) p.vx *= -1; }
+      if (p.fade > 0) { p.fade += 0.05; p.opacity = Math.max(0, 1 - p.fade); if (p.opacity <= 0) p.alive = false; }
+    });
 
     trail.push({ x: player.x, y: player.y, a: 1.0 });
-    if (trail.length > 20) trail.shift();
-    for (const t of trail) t.a *= 0.92;
+    if (trail.length > 25) trail.shift();
+    trail.forEach(t => t.a *= 0.9);
 
     for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i];
-      p.x += p.vx; p.y += p.vy;
-      if (p.type === 'spark') p.vy += 0.15;
-      p.life -= p.decay;
-      if (p.life <= 0) particles.splice(i, 1);
+      const p = particles[i]; p.x += p.vx; p.y += p.vy;
+      if (p.type === 'spark') p.vy += 0.18;
+      p.life -= p.decay; if (p.life <= 0) particles.splice(i, 1);
     }
 
     for (let i = shockwaves.length - 1; i >= 0; i--) {
-      const s = shockwaves[i];
-      s.radius += 4;
-      s.alpha *= 0.9;
-      if (s.alpha < 0.01) shockwaves.splice(i, 1);
+      const s = shockwaves[i]; s.radius += 5; s.alpha *= 0.92; if (s.alpha < 0.01) shockwaves.splice(i, 1);
     }
 
-    if (platforms[platforms.length - 1].y > cameraY - 1000) {
-      generatePlatforms(platforms[platforms.length - 1].y, cameraY - 3000);
-    }
-    
+    if (platforms[platforms.length - 1].y > cameraY - 1000) generatePlatforms(platforms[platforms.length - 1].y, cameraY - 3000);
     if (time % 3 < 0.02) saveGame();
-
-    if (!chillMode && player.y - cameraY > H + 100) endGame();
+    if (!chillMode && player.y - cameraY > H + 120) endGame();
   }
 
   function endGame() {
-    playing = false;
-    gameOver = true;
-    if (score > highScore) {
-      highScore = score;
-      localStorage.setItem('trippyJumpHigh', highScore);
-    }
+    playing = false; gameOver = true;
+    if (score > highScore) { highScore = score; localStorage.setItem('trippyJumpHigh', highScore); }
     document.getElementById('final-score').textContent = score;
     document.getElementById('final-high').textContent = 'BEST: ' + highScore;
     document.getElementById('game-over').classList.add('is-active');
@@ -483,35 +557,14 @@
   function render() {
     ctx.clearRect(0, 0, W, H);
     drawBackground();
-
     if (playing || gameOver) {
-      for (const p of platforms) {
-        const sy = p.y - cameraY;
-        if (sy > -50 && sy < H + 50) drawPlatform(p, sy);
-      }
-      for (let i = 0; i < trail.length - 1; i++) {
-        const t = trail[i];
-        ctx.fillStyle = rgb(theme.primary, t.a * 0.3);
-        ctx.beginPath(); ctx.arc(t.x, t.y - cameraY, 4 * t.a, 0, Math.PI * 2); ctx.fill();
-      }
-      for (const p of particles) {
-        ctx.fillStyle = rgb(p.color, p.life);
-        ctx.beginPath();
-        const size = p.type === 'spark' ? p.size * (0.5 + p.life) : p.size;
-        ctx.arc(p.x, p.y - cameraY, size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      for (const s of shockwaves) {
-        ctx.strokeStyle = rgb(s.color, s.alpha);
-        ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2); ctx.stroke();
-      }
+      powerUps.forEach(drawPowerUp);
+      platforms.forEach(p => { const sy = p.y - cameraY; if (sy > -50 && sy < H + 50) drawPlatform(p, sy); });
+      trail.forEach(t => { ctx.fillStyle = rgb(theme.primary, t.a * 0.4); ctx.beginPath(); ctx.arc(t.x, t.y - cameraY, 5 * t.a, 0, TAU); ctx.fill(); });
+      particles.forEach(p => { ctx.fillStyle = rgb(p.color, p.life); ctx.beginPath(); ctx.arc(p.x, p.y - cameraY, p.type === 'spark' ? p.size*(0.5+p.life) : p.size, 0, TAU); ctx.fill(); });
+      shockwaves.forEach(s => { ctx.strokeStyle = rgb(s.color, s.alpha); ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(s.x, s.y, s.radius, 0, TAU); ctx.stroke(); });
       drawPlayer(player.x, player.y - cameraY);
-
-      ctx.fillStyle = 'rgba(255,255,255,0.6)';
-      ctx.font = `200 ${2.5 * sphereSizeScale}rem sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(score, W/2, 60);
+      ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = `200 ${2.8 * sphereSizeScale}rem sans-serif`; ctx.textAlign = 'center'; ctx.fillText(score, W/2, 70);
     }
     requestAnimationFrame(render);
     update();
@@ -525,53 +578,21 @@
   canvas.addEventListener('mousedown', e => { touchDir = e.clientX < W/2 ? -1 : 1; initAudio(); initAccel(); });
   canvas.addEventListener('mouseup', () => touchDir = 0);
 
-  document.getElementById('start-btn').onclick = () => {
-    document.getElementById('start-screen').classList.add('hidden');
-    initGame();
-  };
-  document.getElementById('play-again').onclick = () => {
-    document.getElementById('game-over').classList.remove('is-active');
-    initGame();
-  };
-  document.getElementById('theme-btn').onclick = () => {
-    themeIndex = (themeIndex + 1) % themes.length;
-    theme = { ...themes[themeIndex] };
-  };
-  document.getElementById('chill-btn').onclick = function() {
-    chillMode = !chillMode;
-    this.classList.toggle('is-on', chillMode);
-  };
-  document.getElementById('mute-btn').onclick = function() {
-    muted = !muted;
-    this.textContent = muted ? '🔇' : '🔊';
-    this.classList.toggle('is-on', !muted);
-    initAudio();
-  };
-  document.getElementById('info-btn').onclick = () => {
-    document.getElementById('info-panel').classList.toggle('is-open');
-  };
-  document.getElementById('close-panel').onclick = () => {
-    document.getElementById('info-panel').classList.remove('is-open');
-  };
+  document.getElementById('start-btn').onclick = () => { document.getElementById('start-screen').classList.add('hidden'); initGame(); };
+  document.getElementById('play-again').onclick = () => { document.getElementById('game-over').classList.remove('is-active'); initGame(); };
+  document.getElementById('theme-btn').onclick = () => { themeIndex = (themeIndex + 1) % themes.length; theme = { ...themes[themeIndex] }; };
+  document.getElementById('chill-btn').onclick = function() { chillMode = !chillMode; this.classList.toggle('is-on', chillMode); };
+  document.getElementById('mute-btn').onclick = function() { muted = !muted; this.textContent = muted ? '🔇' : '🔊'; this.classList.toggle('is-on', !muted); initAudio(); };
+  document.getElementById('info-btn').onclick = () => document.getElementById('info-panel').classList.toggle('is-open');
+  document.getElementById('close-panel').onclick = () => document.getElementById('info-panel').classList.remove('is-open');
 
-  // Check for resume
   const saved = loadGame();
-  if (saved && saved.score > 10) {
-    const startBtn = document.getElementById('start-btn');
-    startBtn.textContent = 'RESUME JOURNEY';
-    const sub = document.querySelector('#start-screen .sub');
-    if (sub) sub.textContent = `last height: ${saved.score}`;
-    
-    const restart = document.createElement('p');
-    restart.style.cssText = 'margin-top:1rem;font-size:0.7rem;color:rgba(140,100,255,0.6);cursor:pointer;text-decoration:underline';
-    restart.textContent = 'start fresh';
-    restart.onclick = (e) => {
-      e.stopPropagation();
-      localStorage.removeItem(SAVE_KEY);
-      location.reload();
-    };
-    document.getElementById('start-screen').appendChild(restart);
+  if (saved && saved.score > 20) {
+    document.getElementById('start-btn').textContent = 'RESUME JOURNEY';
+    const sub = document.querySelector('#start-screen .sub'); if (sub) sub.textContent = `last height: ${saved.score}`;
+    const r = document.createElement('p'); r.style.cssText = 'margin-top:1rem;font-size:0.7rem;color:rgba(140,100,255,0.6);cursor:pointer;text-decoration:underline'; r.textContent = 'start fresh';
+    r.onclick = (e) => { e.stopPropagation(); localStorage.removeItem(SAVE_KEY); location.reload(); };
+    document.getElementById('start-screen').appendChild(r);
   }
-
   requestAnimationFrame(render);
 })();
