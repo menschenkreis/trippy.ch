@@ -1681,7 +1681,7 @@
         const elapsed = maxLife - life;
         const fadeIn = Math.min(elapsed / 0.8, 1);
         const fadeOut = Math.min(life / 1.5, 1);
-        const alpha = fadeIn * fadeOut * 0.9;
+        const alpha = fadeIn * fadeOut * 0.7;
         
         ctx.save();
         ctx.globalAlpha = alpha;
@@ -1705,41 +1705,25 @@
         const totalTextH = lines.length * lineH;
         const bubbleW = 340 * sphereSizeScale;
         const bubbleH = (totalTextH + 60) * sphereSizeScale;
-        const bx = W/2, by = H * 0.72; // Center position
+        const bx = W/2, by = H * 0.28; // Upper area
         
-        // Draw the cloud-like thought bubble
-        ctx.fillStyle = 'rgba(10, 10, 20, 0.85)';
-        ctx.strokeStyle = rgb(theme.accent, 0.4);
-        ctx.lineWidth = 2;
-        
-        // Simple procedural cloud: overlapping circles
-        const lobes = 10;
-        const timeScale = time * 2;
-        ctx.beginPath();
-        for (let i = 0; i < lobes; i++) {
-          const a = (TAU / lobes) * i;
-          const wobble = Math.sin(timeScale + i) * 5;
-          const lx = bx + Math.cos(a) * (bubbleW/2 + wobble);
-          const ly = by + Math.sin(a) * (bubbleH/2 + wobble);
-          ctx.arc(lx, ly, 40 * sphereSizeScale, 0, TAU);
-        }
+        // Draw the thought bubble — soft rounded rect, not too bubbly
+        const br = 24 * sphereSizeScale;
+        ctx.fillStyle = 'rgba(10, 10, 20, 0.45)';
+        ctx.strokeStyle = rgb(theme.accent, 0.25);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.roundRect(bx - bubbleW/2, by - bubbleH/2, bubbleW, bubbleH, br);
         ctx.fill();
         ctx.stroke();
-        
-        // Inner fill to clear overlap artifacts
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.beginPath();
-        ctx.ellipse(bx, by, bubbleW/2, bubbleH/2, 0, 0, TAU);
-        ctx.fill();
 
-        // Small thought circles
+        // Small thought circles — gentle, leading down toward player
+        const thoughtY = by + bubbleH/2;
         for (let i = 0; i < 3; i++) {
-          const a = Math.PI * 0.7; // toward player
-          const d = 80 + i * 30;
-          const r = 12 - i * 3;
-          const wobble = Math.sin(timeScale + i) * 3;
+          const ty = thoughtY + 12 + i * 18;
+          const tr = (9 - i * 2.5) * sphereSizeScale;
+          const wobble = Math.sin(time * 1.5 + i) * 2;
           ctx.beginPath();
-          ctx.arc(bx + Math.cos(a) * d + wobble, by + Math.sin(a) * d + wobble, r * sphereSizeScale, 0, TAU);
+          ctx.arc(bx + wobble, ty, tr, 0, TAU);
           ctx.fill();
           ctx.stroke();
         }
