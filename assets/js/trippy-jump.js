@@ -809,6 +809,11 @@
     chillMode = saved ? saved.chillMode : false;
     document.getElementById('chill-btn').classList.toggle('is-on', chillMode);
 
+    // Hide overlays gently
+    document.getElementById('start-screen').classList.remove('is-active');
+    document.getElementById('game-over').classList.remove('is-active');
+    document.getElementById('chill-suggestion').classList.remove('is-active');
+
     gameOver = false;
     playing = true;
     particles = [];
