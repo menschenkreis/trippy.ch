@@ -16,7 +16,7 @@
     .ctrl-btn:hover{border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.8)}
     .ctrl-btn.is-on{color:rgba(180,140,255,0.9);border-color:rgba(180,140,255,0.4);box-shadow:0 0 15px rgba(140,100,255,0.2)}
     .ctrl-btn-sound{width:48px!important;height:48px!important;font-size:1.2rem!important;border-color:rgba(180,140,255,0.3)!important;color:rgba(200,180,255,0.85)!important;box-shadow:0 0 12px rgba(140,100,255,0.15)!important}
-    #theme-btn,#tilt-btn,#mute-btn,#reset-btn,#info-btn{position:static!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;width:44px!important;height:44px!important;border-radius:50%!important;font-size:0.9rem!important;animation:none!important}
+    #theme-btn,#tilt-btn,#mute-btn,#reset-btn,#info-btn,#chill-btn{position:static!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;width:44px!important;height:44px!important;border-radius:50%!important;font-size:0.9rem!important;animation:none!important}
     .back-link{position:fixed;top:1rem;left:1rem;z-index:200;font-size:0.85rem;color:rgba(255,255,255,0.3);text-decoration:none;letter-spacing:0.05em;transition:color 0.25s;backdrop-filter:blur(6px);background:rgba(0,0,0,0.3);padding:0.6rem 1rem;border-radius:20px;border:1px solid rgba(255,255,255,0.06);min-height:44px;min-width:44px;display:inline-flex;align-items:center}
     .back-link:hover{color:rgba(180,140,255,0.8)}
     .bottom-left{position:fixed;bottom:1.5rem;left:1.5rem;z-index:200;pointer-events:none}
@@ -67,6 +67,17 @@
     #landscape-hint p{font-size:2rem;margin:0 0 1rem}
     #landscape-hint span{font-size:0.85rem;color:rgba(140,100,255,0.6);letter-spacing:0.12em;text-transform:uppercase}
     @media (orientation:landscape) and (max-height:500px){#landscape-hint{display:flex}}
+
+    /* Chill Mode Suggestion Modal */
+    #chill-suggestion{position:fixed;inset:0;z-index:400;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(8,6,15,0.92);backdrop-filter:blur(15px);text-align:center;padding:2rem}
+    #chill-suggestion.is-active{display:flex}
+    #chill-suggestion h2{font-size:1.4rem;font-weight:200;letter-spacing:0.1em;color:rgba(255,255,255,0.8);margin-bottom:1rem}
+    #chill-suggestion p{font-size:0.9rem;color:rgba(255,255,255,0.4);margin-bottom:2rem;line-height:1.6;max-width:300px}
+    .modal-btns{display:flex;gap:1rem}
+    #activate-chill-btn{padding:0.8rem 1.5rem;border-radius:25px;border:1px solid rgba(140,100,255,0.4);background:rgba(140,100,255,0.15);color:rgba(200,180,255,0.9);cursor:pointer;font-family:inherit;font-size:0.85rem;letter-spacing:0.05em;transition:all 0.3s}
+    #activate-chill-btn:hover{background:rgba(140,100,255,0.25);color:#fff}
+    #decline-chill-btn{padding:0.8rem 1.5rem;border-radius:25px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.4);cursor:pointer;font-family:inherit;font-size:0.85rem;letter-spacing:0.05em;transition:all 0.3s}
+    #decline-chill-btn:hover{color:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.2)}
   </style>
 </head>
 <body class="experiment-view">
@@ -76,6 +87,7 @@
 
   <div class="top-controls">
     <button id="theme-btn" class="ctrl-btn" title="Theme">✦</button>
+    <button id="tilt-btn" class="ctrl-btn is-on" title="Tilt Controls">📱</button>
     <button id="chill-btn" class="ctrl-btn" title="Chill Mode">🛡️</button>
     <button id="mute-btn" class="ctrl-btn ctrl-btn-sound" title="Toggle sound">🔇</button>
     <button id="reset-btn" class="ctrl-btn" title="Reset">⟳</button>
@@ -133,6 +145,15 @@
     <div class="score-display" id="final-score">0</div>
     <div class="high-score" id="final-high">BEST: 0</div>
     <button id="play-again">ASCEND AGAIN</button>
+  </div>
+
+  <div id="chill-suggestion">
+    <h2>RELAX THE ASCENT?</h2>
+    <p>You've fallen a few times. Want to activate <strong>Chill Mode</strong>? It adds a safety floor so you can climb without falling.</p>
+    <div class="modal-btns">
+      <button id="activate-chill-btn">ACTIVATE CHILL</button>
+      <button id="decline-chill-btn">NO THANKS</button>
+    </div>
   </div>
 
 <script src="../assets/js/trippy-jump-content.js"></script>

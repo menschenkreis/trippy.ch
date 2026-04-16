@@ -113,8 +113,8 @@
   let muted = localStorage.getItem('trippy-muted') !== '0'; // default: muted; '0' = user explicitly unmuted
   let time = 0;
   let chillMode = false;
-
-  const player = {
+  let tiltEnabled = localStorage.getItem('tj-tilt') !== '0'; // default: on
+  let fallHistory = []; // timestamps of recent falls
     x: 0, y: 0, vx: 0, vy: 0,
     width: 24, height: 24,
     rotation: 0,
@@ -1465,7 +1465,8 @@
     let move = 0;
     if (keys['ArrowLeft'] || keys['a']) move = -1;
     if (keys['ArrowRight'] || keys['d']) move = 1;
-    // Touch and tilt only override when actively engaged (not stale values)
+    if (touchDir !== 0) move = touchDir;
+
     // Smooth tilt input with deadzone
     if (Math.abs(rawTilt) > TILT_DEADZONE) {
       tiltActive = true;
@@ -1475,12 +1476,12 @@
       tiltActive = false;
       smoothTilt *= 0.8; // quick decay to zero
     }
-    if (touchDir !== 0) move = touchDir;
-    else if (tiltActive && Math.abs(smoothTilt) > 0.05) move = smoothTilt;
-
-    // Movement tuning for better control
     const accel = sphereSizeScale < 1 ? 0.5 : 0.68; 
     player.vx += move * accel;
+    // Add tilt movement only if enabled and no other input (keys/touch) is active
+    if (tiltEnabled && move === 0) {
+       if (tiltActive && Math.abs(smoothTilt) > 0.05) player.vx += smoothTilt * accel;
+    }
     player.vx *= FRICTION;
     player.vy += player.powerUp === 'merkaba' ? GRAVITY * 0.5 : GRAVITY;
     player.x += player.vx;
@@ -1680,6 +1681,19 @@
     document.getElementById('final-high').textContent = 'BEST: ' + highScore + 'm';
     document.getElementById('game-over').classList.add('is-active');
     playGameOverSound();
+
+    // Track falls for chill mode suggestion
+    if (!chillMode) {
+      const now = Date.now();
+      fallHistory.push(now);
+      // Filter for last 60 seconds
+      fallHistory = fallHistory.filter(t => now - t < 60000);
+      if (fallHistory.length > 4) {
+        // Show chill mode suggestion modal
+        document.getElementById('chill-suggestion').classList.add('is-active');
+        fallHistory = []; // Reset so it doesn't nag every single fall thereafter
+      }
+    }
   }
 
   function render() {
@@ -1878,6 +1892,20 @@
     themeIndex = (themeIndex + 1) % themes.length; 
   };
   document.getElementById('chill-btn').onclick = function() { chillMode = !chillMode; this.classList.toggle('is-on', chillMode); };
+  document.getElementById('tilt-btn').onclick = function() {
+    tiltEnabled = !tiltEnabled;
+    this.classList.toggle('is-on', tiltEnabled);
+    localStorage.setItem('tj-tilt', tiltEnabled ? '1' : '0');
+    if (tiltEnabled) initAccel();
+  };
+  document.getElementById('activate-chill-btn').onclick = () => {
+    chillMode = true;
+    document.getElementById('chill-btn').classList.add('is-on');
+    document.getElementById('chill-suggestion').classList.remove('is-active');
+  };
+  document.getElementById('decline-chill-btn').onclick = () => {
+    document.getElementById('chill-suggestion').classList.remove('is-active');
+  };
   document.getElementById('mute-btn').onclick = function() {
     muted = !muted;
     this.textContent = muted ? '🔇' : '🔊';
@@ -1927,10 +1955,12 @@
     }
   });
 
-  // Sync mute button visual with restored localStorage preference
+  // Sync buttons visual with restored localStorage preference
   { const mb = document.getElementById('mute-btn');
     mb.textContent = muted ? '🔇' : '🔊';
     mb.classList.toggle('is-on', !muted); }
+  { const tb = document.getElementById('tilt-btn');
+    tb.classList.toggle('is-on', tiltEnabled); }
 
   // Tailor the start-screen hint to the detected input method
   const startHintEl = document.getElementById('start-hint');
