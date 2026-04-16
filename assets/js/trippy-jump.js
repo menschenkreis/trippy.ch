@@ -183,10 +183,9 @@
   const CHORD_WINDOW_S = 3.5;
   const CHORD_COOLDOWN_S = 10.0;
 
-  // Just Intonation Major Pentatonic ratios (C D E G A)
-  // These provide pure, harmonic intervals that feel much more "Zen" than standard tuning.
-  const pentatonicRatios = [1, 1.125, 1.25, 1.5, 1.666]; 
-  const BASE_FREQ = 165; // E3
+  // Pentatonic scale (C D E G A across 2 octaves) — same as Falling Emy
+  const pentatonicScale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
+  const BASE_FREQ = 165; // E3 — warm, grounded
 
   // Melodic patterns per platform type — each defines how melodyStep advances
   // and which octave offset to apply, so special platforms feel distinct
@@ -265,24 +264,24 @@
   function pickMelodicNote(platformType) {
     const map = MELODY_MAP[platformType] || MELODY_MAP.normal;
 
-    // ~12 % chance: fill, ~8 % chance: resolution
+    // ~12 % chance: run ahead one extra step (creates a small melodic fill)
+    // ~8 %  chance: pull back one step (adds contrast / resolution feeling)
     let step = map.step;
     const rnd = Math.random();
     if      (rnd < 0.12) step += 1;
     else if (rnd < 0.20) step = Math.max(1, step - 1);
 
-    const idx = (melodyStep + map.octaveShift) % pentatonicRatios.length;
-    const ratio = pentatonicRatios[idx];
+    const idx = (melodyStep + map.octaveShift) % pentatonicScale.length;
+    const semitone = pentatonicScale[idx];
     melodyStep += step;
 
-    // Octave logic: keep it procedural and restricted to 1 octave up
-    const octave = Math.min(Math.floor(melodyStep / pentatonicRatios.length), 1);
-    const octaveMult = Math.pow(2, octave);
+    const octaveRange = Math.min(Math.floor(melodyStep / pentatonicScale.length), 1);
+    const octaveShift = octaveRange * 12;
 
-    // ~15 % chance: drop an octave for tonal colour
-    const colorMult = Math.random() < 0.15 ? 0.5 : 1.0;
+    // ~15 % chance: drop an octave for tonal colour / keeps things warm
+    const colorShift = Math.random() < 0.15 ? -12 : 0;
 
-    const freq = BASE_FREQ * ratio * octaveMult * colorMult;
+    const freq = BASE_FREQ * Math.pow(2, (semitone + octaveShift + colorShift) / 12);
     return { idx: idx % 5, freq, pitchClass: idx % 5 };
   }
 
@@ -308,7 +307,8 @@
   function playChordBloom() {
     if (muted || !audioCtx) return;
     const now = audioCtx.currentTime;
-    [1.0, 1.125, 1.25, 1.5, 1.666, 2.0].forEach((ratio, i) => {
+    const pentatonicRatios = [1.0, 1.2599, 1.4983, 1.6818, 2.0]; // C D E G A
+    pentatonicRatios.forEach((ratio, i) => {
       const osc = audioCtx.createOscillator();
       const g = audioCtx.createGain();
       const startT = now + i * 0.1;
@@ -342,7 +342,7 @@
       // Spring: lush ascending arpeggio (root → third → fifth → octave)
       const now = audioCtx.currentTime;
       const panner = getPanner();
-      const notes = [note.freq, note.freq * 1.25, note.freq * 1.5, note.freq * 2.0];
+      const notes = [note.freq, note.freq * 1.25, note.freq * 1.498, note.freq * 2.0];
       notes.forEach((f, i) => {
         const osc = audioCtx.createOscillator();
         const g = audioCtx.createGain();
@@ -432,8 +432,8 @@
       g1.gain.linearRampToValueAtTime(0.17, now + 0.04);
       g1.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
 
-      // Warm harmonic interval — pure Just Intonation ratios (Maj3, P4, P5, Maj6)
-      const intervals = [1.25, 1.333, 1.5, 1.666];
+      // Warm harmonic interval — random from min3, maj3, perfect 4th, perfect 5th
+      const intervals = [1.2, 1.2599, 1.3348, 1.4983];
       const harmInterval = intervals[Math.floor(Math.random() * intervals.length)];
       osc2.type = 'sine';
       osc2.frequency.setValueAtTime(note.freq * harmInterval, now);
@@ -458,7 +458,7 @@
 
     if (type === 'nova') {
       // Nova: crystalline arpeggio — root, third, fifth, octave
-      const notes = [note.freq, note.freq * 1.25, note.freq * 1.5, note.freq * 2];
+      const notes = [note.freq, note.freq * 1.25, note.freq * 1.498, note.freq * 2];
       notes.forEach((f, i) => {
         const osc = audioCtx.createOscillator();
         const g = audioCtx.createGain();
@@ -474,8 +474,8 @@
       });
     } else if (type === 'aura') {
       // Aura: soft pentatonic wash — all 5 notes, slow stagger, long sustain
-      const auraRatios = [1.0, 1.125, 1.25, 1.5, 1.666, 2.0];
-      auraRatios.forEach((ratio, i) => {
+      const pentatonicRatios = [1.0, 1.2599, 1.4983, 1.6818, 2.0];
+      pentatonicRatios.forEach((ratio, i) => {
         const osc = audioCtx.createOscillator();
         const g = audioCtx.createGain();
         const startT = now + i * 0.1;
@@ -505,7 +505,7 @@
       osc2.start(now); osc2.stop(now + 1.4);
     } else if (type === 'merkaba') {
       // Crystal arpeggio: root, third, fifth, octave
-      const notes = [note.freq, note.freq * 1.25, note.freq * 1.5, note.freq * 2];
+      const notes = [note.freq, note.freq * 1.26, note.freq * 1.5, note.freq * 2];
       notes.forEach((f, i) => {
         const osc = audioCtx.createOscillator();
         const g = audioCtx.createGain();
@@ -546,7 +546,7 @@
       osc.start(now); osc.stop(now + 1.4);
     } else if (type === 'seed') {
       // Quick bright ascending triad
-      [note.freq, note.freq * 1.25, note.freq * 1.5].forEach((f, i) => {
+      [note.freq, note.freq * 1.26, note.freq * 1.5].forEach((f, i) => {
         const osc = audioCtx.createOscillator();
         const g = audioCtx.createGain();
         const t = now + i * 0.06;
@@ -559,7 +559,7 @@
       });
     } else if (type === 'star') {
       // Bright major chord shimmer
-      [1.0, 1.25, 1.5, 2.0].forEach(ratio => {
+      [1.0, 1.26, 1.5, 2.0].forEach(ratio => {
         const osc = audioCtx.createOscillator();
         const g = audioCtx.createGain();
         osc.type = 'sine'; osc.frequency.setValueAtTime(note.freq * ratio, now);
@@ -572,17 +572,17 @@
     }
   }
 
-  // Game over sound — gentle descending pentatonic cascade (Just Intonation)
+  // Game over sound — gentle descending pentatonic cascade
   function playGameOverSound() {
     if (muted || !audioCtx) return;
     const now = audioCtx.currentTime;
-    // Descend through: 1/1, 8/9, 4/5, 2/3, 3/5 (A G E D C relative)
-    const descRatios = [1.0, 0.888, 0.8, 0.666, 0.6];
-    descRatios.forEach((ratio, i) => {
+    // Descend through the pentatonic scale: A G E D C (relative)
+    const descSemitones = [0, -2, -4, -7, -9];
+    descSemitones.forEach((semi, i) => {
       const osc = audioCtx.createOscillator();
       const g = audioCtx.createGain();
       const startT = now + i * 0.22;
-      const freq = BASE_FREQ * ratio;
+      const freq = BASE_FREQ * Math.pow(2, semi / 12);
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, startT);
       g.gain.setValueAtTime(0, startT);
@@ -600,7 +600,7 @@
   function playMilestoneChord() {
     if (muted || !audioCtx) return;
     const now = audioCtx.currentTime;
-    [BASE_FREQ, BASE_FREQ * 1.25, BASE_FREQ * 1.5, BASE_FREQ * 2].forEach((f, i) => {
+    [BASE_FREQ, BASE_FREQ * 1.2599, BASE_FREQ * 1.4983, BASE_FREQ * 2].forEach((f, i) => {
       const osc = audioCtx.createOscillator();
       const g = audioCtx.createGain();
       const t = now + i * 0.15;
