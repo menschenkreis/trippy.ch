@@ -902,10 +902,21 @@
         let gamma = e.gamma;
         if (gamma === null) return;
         let angle = (window.screen && window.screen.orientation) ? window.screen.orientation.angle : (window.orientation || 0);
-        let tilt = gamma;
-        if (angle === 90) tilt = e.beta;
-        else if (angle === -90) tilt = -e.beta;
-        rawTilt = -tilt;
+        // Normalise angle to 0–360 range
+        angle = ((angle % 360) + 360) % 360;
+        let tilt;
+        if (angle === 90) {
+          tilt = e.beta;
+        } else if (angle === 270) {
+          tilt = -e.beta;
+        } else if (angle === 180) {
+          // Portrait upside-down: gamma is inverted
+          tilt = -gamma;
+        } else {
+          // Portrait (angle 0): gamma positive = tilt right = move right
+          tilt = gamma;
+        }
+        rawTilt = tilt;
       }, {passive: true});
       accelInited = true;
     };
