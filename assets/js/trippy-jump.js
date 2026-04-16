@@ -158,7 +158,7 @@
 
   // Pentatonic scale (C D E G A across 2 octaves) — same as Falling Emy
   const pentatonicScale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
-  const BASE_FREQ = 165; // E3 — warm, grounded
+  const BASE_FREQ = 131; // C3 — deeper, warmer base
 
   // Melodic patterns per platform type — each defines how melodyStep advances
   // and which octave offset to apply, so special platforms feel distinct
@@ -187,7 +187,13 @@
 
     masterGain = audioCtx.createGain();
     masterGain.gain.value = 0.55; // slightly lower for smoothness
-    masterGain.connect(audioCtx.destination);
+    // Soft low-pass to tame high frequencies — warm, never harsh
+    const masterFilter = audioCtx.createBiquadFilter();
+    masterFilter.type = 'lowpass';
+    masterFilter.frequency.value = 3500;
+    masterFilter.Q.value = 0.5;
+    masterGain.connect(masterFilter);
+    masterFilter.connect(audioCtx.destination);
 
     // Primary delay — warm echo with lowpass filter
     delayNode = audioCtx.createDelay();
@@ -242,11 +248,11 @@
     const semitone = pentatonicScale[idx];
     melodyStep += step;
 
-    const octaveRange = Math.min(Math.floor(melodyStep / pentatonicScale.length), 2);
+    const octaveRange = Math.min(Math.floor(melodyStep / pentatonicScale.length), 1);
     const octaveShift = octaveRange * 12;
 
-    // ~9 % chance: drop an octave for tonal colour / avoids shrillness at altitude
-    const colorShift = Math.random() < 0.09 ? -12 : 0;
+    // ~15 % chance: drop an octave for tonal colour / keeps things warm
+    const colorShift = Math.random() < 0.15 ? -12 : 0;
 
     const freq = BASE_FREQ * Math.pow(2, (semitone + octaveShift + colorShift) / 12);
     return { idx: idx % 5, freq, pitchClass: idx % 5 };
@@ -425,7 +431,7 @@
 
     if (type === 'nova') {
       // Nova: crystalline arpeggio — root, third, fifth, octave
-      const notes = [note.freq * 2, note.freq * 2 * 1.25, note.freq * 2 * 1.498, note.freq * 4];
+      const notes = [note.freq, note.freq * 1.25, note.freq * 1.498, note.freq * 2];
       notes.forEach((f, i) => {
         const osc = audioCtx.createOscillator();
         const g = audioCtx.createGain();
@@ -472,7 +478,7 @@
       osc2.start(now); osc2.stop(now + 1.4);
     } else if (type === 'merkaba') {
       // Crystal arpeggio: root, third, fifth, octave
-      const notes = [note.freq * 2, note.freq * 2 * 1.26, note.freq * 2 * 1.5, note.freq * 4];
+      const notes = [note.freq, note.freq * 1.26, note.freq * 1.5, note.freq * 2];
       notes.forEach((f, i) => {
         const osc = audioCtx.createOscillator();
         const g = audioCtx.createGain();
@@ -513,7 +519,7 @@
       osc.start(now); osc.stop(now + 1.4);
     } else if (type === 'seed') {
       // Quick bright ascending triad
-      [note.freq * 2, note.freq * 2 * 1.26, note.freq * 2 * 1.5].forEach((f, i) => {
+      [note.freq, note.freq * 1.26, note.freq * 1.5].forEach((f, i) => {
         const osc = audioCtx.createOscillator();
         const g = audioCtx.createGain();
         const t = now + i * 0.06;
@@ -549,7 +555,7 @@
       const osc = audioCtx.createOscillator();
       const g = audioCtx.createGain();
       const startT = now + i * 0.22;
-      const freq = BASE_FREQ * 2 * Math.pow(2, semi / 12);
+      const freq = BASE_FREQ * Math.pow(2, semi / 12);
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, startT);
       g.gain.setValueAtTime(0, startT);
@@ -574,7 +580,7 @@
       osc.type = 'sine';
       osc.frequency.setValueAtTime(f, t);
       g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.065, t + 0.14);
+      g.gain.linearRampToValueAtTime(0.08, t + 0.14);
       g.gain.exponentialRampToValueAtTime(0.001, t + 3.0);
       osc.connect(g); g.connect(masterGain);
       if (reverbNode) g.connect(reverbNode);
@@ -587,14 +593,14 @@
   function playPadNote() {
     if (muted || !audioCtx) return;
     const now = audioCtx.currentTime;
-    [BASE_FREQ, BASE_FREQ * 0.5].forEach(f => {
+    [BASE_FREQ, BASE_FREQ * 0.5, BASE_FREQ * 0.25].forEach(f => {
       const osc = audioCtx.createOscillator();
       const g = audioCtx.createGain();
       osc.type = 'sine';
       osc.frequency.setValueAtTime(f, now);
       g.gain.setValueAtTime(0, now);
-      g.gain.linearRampToValueAtTime(0.028, now + 2.5); // very slow attack
-      g.gain.setValueAtTime(0.028, now + 7.0);
+      g.gain.linearRampToValueAtTime(0.035, now + 2.5);
+      g.gain.setValueAtTime(0.035, now + 7.0);
       g.gain.exponentialRampToValueAtTime(0.001, now + 11.0);
       osc.connect(g);
       if (reverbNode) g.connect(reverbNode); else g.connect(masterGain);
