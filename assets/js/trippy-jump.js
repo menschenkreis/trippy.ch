@@ -1693,6 +1693,40 @@
       ctx.textAlign = 'center';
       ctx.fillText(score + 'm', W/2, 130);
 
+      // Milestone quote — gentle fade-in/out text overlay
+      if (milestoneDisplay) {
+        const { text, label, life, maxLife } = milestoneDisplay;
+        const elapsed = maxLife - life;
+        const fadeIn = Math.min(elapsed / 0.8, 1);
+        const fadeOut = Math.min(life / 1.5, 1);
+        const alpha = fadeIn * fadeOut * 0.75;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.textAlign = 'center';
+        // Label (small, accent)
+        ctx.fillStyle = rgb(theme.accent, 1);
+        ctx.font = `${Math.round(13 * sphereSizeScale)}px sans-serif`;
+        ctx.fillText(label, W/2, H * 0.78 - 20);
+        // Quote (larger, white)
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.font = `${Math.round(16 * sphereSizeScale)}px sans-serif`;
+        // Word-wrap if needed (max ~35 chars per line)
+        const words = text.split(' ');
+        let line = '', ly = H * 0.78;
+        for (const w of words) {
+          const test = line + w + ' ';
+          if (test.length > 38 && line) {
+            ctx.fillText(line.trim(), W/2, ly);
+            line = w + ' ';
+            ly += 22 * sphereSizeScale;
+          } else {
+            line = test;
+          }
+        }
+        if (line) ctx.fillText(line.trim(), W/2, ly);
+        ctx.restore();
+      }
+
       // Touch zone hints: shown briefly at game start on touch devices, then fade out
       if (isTouch && time < 8) {
         const hintAlpha = time < 5 ? 0.22 : (1 - (time - 5) / 3) * 0.22;
