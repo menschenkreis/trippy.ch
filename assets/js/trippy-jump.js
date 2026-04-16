@@ -49,17 +49,35 @@
 
   // ── Color Themes ──
   const themes = [
-    { name: 'deepsky', primary: [40,150,255], secondary: [255,255,255], accent: [200,230,255], bg: '#0a0d14' },
-    { name: 'violet',  primary: [180,100,255], secondary: [255,80,200], accent: [220,180,255], bg: '#08060f' },
-    { name: 'cyan',    primary: [0,220,255],  secondary: [255,255,255], accent: [100,255,220], bg: '#060d12' },
-    { name: 'ember',   primary: [255,120,40],  secondary: [255,220,100], accent: [255,180,80], bg: '#120806' },
-    { name: 'jade',    primary: [40,255,140],  secondary: [200,255,200], accent: [180,255,100], bg: '#061208' },
-    { name: 'void',    primary: [255,60,180],  secondary: [150,200,255], accent: [255,100,255], bg: '#020005' }
+    { name:'deepsky', primary:[40,150,255], secondary:[255,255,255], accent:[200,230,255], bg:'#0a0d14', bgTop:'#0e1520', platTypes:{ spring:[255,220,50], fragile:[255,80,100], moving:[100,255,200], vanishing:[220,120,255] } },
+    { name:'violet',  primary:[180,100,255], secondary:[255,80,200], accent:[220,180,255], bg:'#08060f', bgTop:'#0d0815', platTypes:{ spring:[255,200,80], fragile:[255,100,130], moving:[120,220,255], vanishing:[255,160,200] } },
+    { name:'cyan',    primary:[0,220,255],  secondary:[255,255,255], accent:[100,255,220], bg:'#060d12', bgTop:'#0a1218', platTypes:{ spring:[255,230,60], fragile:[255,100,90], moving:[80,255,180], vanishing:[180,140,255] } },
+    { name:'ember',   primary:[255,120,40],  secondary:[255,220,100], accent:[255,180,80], bg:'#120806', bgTop:'#1a0e08', platTypes:{ spring:[255,240,80], fragile:[255,60,80], moving:[80,255,160], vanishing:[200,130,255] } },
+    { name:'jade',    primary:[40,255,140],  secondary:[200,255,200], accent:[180,255,100], bg:'#061208', bgTop:'#0a1a0e', platTypes:{ spring:[255,220,50], fragile:[255,100,120], moving:[100,200,255], vanishing:[220,100,255] } },
+    { name:'void',    primary:[255,60,180],  secondary:[150,200,255], accent:[255,100,255], bg:'#020005', bgTop:'#080410', platTypes:{ spring:[255,210,60], fragile:[255,90,110], moving:[80,255,200], vanishing:[180,160,255] } }
   ];
   let themeIndex = 0;
   let theme = { ...themes[0] };
-  
+  let manualTheme = false;
+  let lastAutoIdx = 0;
+
   function rgb(c, a) { return a !== undefined ? `rgba(${c[0]},${c[1]},${c[2]},${a})` : `rgb(${c[0]},${c[1]},${c[2]})`; }
+
+  // Compute a hue offset from theme primary so power-ups & player aura shift with theme
+  function themeHueOffset() {
+    const c = theme.primary;
+    // RGB → hue (0-360)
+    const r = c[0]/255, g = c[1]/255, b = c[2]/255;
+    const max = Math.max(r,g,b), min = Math.min(r,g,b), d = max - min;
+    if (d === 0) return 0;
+    let h;
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h = ((h * 60) + 360) % 360;
+    // Map theme hue to a coarse bucket so changes feel intentional
+    return h;
+  }
 
   // ── Persistence ──
   const SAVE_KEY = 'trippy-jump-save-v3';
@@ -81,6 +99,7 @@
   let playing = false;
   let gameOver = false;
   let score = 0;
+  let sessionStartScore = 0;
   let highScore = parseInt(localStorage.getItem('trippyJumpHigh') || '0');
   let cameraY = 0;
   let maxHeight = 0;
@@ -754,9 +773,11 @@
   function initGame(restore = false) {
     const saved = restore ? loadGame() : null;
     score = saved ? saved.score : 0;
+    sessionStartScore = score;
     cameraY = saved ? saved.cameraY : 0;
     maxHeight = saved ? saved.maxHeight : 0;
-    themeIndex = saved ? saved.themeIndex : 0;
+    lastAutoIdx = Math.min(themes.length-1, Math.floor(maxHeight / 10000));
+    themeIndex = saved ? saved.themeIndex : lastAutoIdx;
     theme = { ...themes[themeIndex] };
     chillMode = saved ? saved.chillMode : false;
     document.getElementById('chill-btn').classList.toggle('is-on', chillMode);
@@ -869,7 +890,7 @@
       newPlatforms.push(p);
       prevP = p; // next platform must be reachable from this one
 
-      if (score >= 100 && Math.random() < 0.09) {
+      if (-y / 10 >= sessionStartScore + 100 && Math.random() < 0.09) {
         const pTypes = ['aura', 'nova', 'magnet', 'merkaba', 'lotus', 'vesica', 'seed', 'star'];
         powerUps.push({ x: x + w/2, y: y - 35, type: pTypes[Math.floor(Math.random()*pTypes.length)], alive: true, phase: Math.random()*TAU });
       }
@@ -896,11 +917,11 @@
     const depth = -cameraY;
     const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
     
-    let topColor = '#050a12', botColor = '#0f1420';
+    let topColor = theme.bgTop || '#0e1520', botColor = theme.bg;
     if (depth < 8000) {
        const f = depth / 8000;
-       topColor = lerpColor('#1e3a5f', '#050a12', f);
-       botColor = lerpColor('#2b5876', '#0f1420', f);
+       topColor = lerpColor('#1e3a5f', topColor, f);
+       botColor = lerpColor('#2b5876', botColor, f);
     } else if (depth > 12000) {
        const f = Math.min((depth - 12000) / 10000, 1);
        topColor = lerpColor('#050a12', '#020005', f);
@@ -1049,6 +1070,7 @@
     const sy = p.y - cameraY;
     if (sy < -50 || sy > H + 50) return;
     ctx.save();
+    const th = themeHueOffset(); // shift hues with theme
     const bob = Math.sin(time * 6 + p.phase) * 12;
     const cx = p.x, cy = sy + bob;
     const r = 22;
@@ -1058,7 +1080,7 @@
 
     if (p.type === 'aura') {
       // Iridescent triple-ring + 8 sparkle rays
-      const hue = (time * 60 + p.phase * 57.3) % 360;
+      const hue = (time * 60 + p.phase * 57.3 + th) % 360;
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 2);
       g.addColorStop(0, `hsla(${hue}, 90%, 70%, 0.4)`);
       g.addColorStop(1, 'transparent');
@@ -1082,7 +1104,7 @@
 
     } else if (p.type === 'nova') {
       // 8 primary + 8 secondary rays, bright core
-      const hue = 185 + Math.sin(time * 4) * 20;
+      const hue = (185 + th + Math.sin(time * 4) * 20) % 360;
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 2);
       g.addColorStop(0, `hsla(${hue}, 80%, 90%, 0.5)`);
       g.addColorStop(0.5, `hsla(${hue}, 90%, 60%, 0.15)`);
@@ -1105,7 +1127,7 @@
 
     } else if (p.type === 'magnet') {
       // Horseshoe with field lines
-      const hue = 210 + Math.sin(time * 3) * 30;
+      const hue = (210 + th + Math.sin(time * 3) * 30) % 360;
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.8);
       g.addColorStop(0, `hsla(${hue}, 80%, 70%, 0.3)`);
       g.addColorStop(1, 'transparent');
@@ -1127,7 +1149,7 @@
 
     } else if (p.type === 'merkaba') {
       // Two counter-rotating triangles, inner hexagon, vertex dots
-      const hue = 45 + Math.sin(time * 2) * 15;
+      const hue = (45 + th + Math.sin(time * 2) * 15) % 360;
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.8);
       g.addColorStop(0, `hsla(${hue}, 80%, 70%, 0.35)`);
       g.addColorStop(1, 'transparent');
@@ -1156,7 +1178,7 @@
 
     } else if (p.type === 'lotus') {
       // 8 outer petals + 8 inner petals + center
-      const hue = 320 + Math.sin(time * 2) * 20;
+      const hue = (320 + th + Math.sin(time * 2) * 20) % 360;
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.6);
       g.addColorStop(0, `hsla(${hue}, 70%, 75%, 0.3)`);
       g.addColorStop(1, 'transparent');
@@ -1187,7 +1209,7 @@
 
     } else if (p.type === 'vesica') {
       // Two overlapping circles
-      const hue = 265 + Math.sin(time * 1.5) * 15;
+      const hue = (265 + th + Math.sin(time * 1.5) * 15) % 360;
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.6);
       g.addColorStop(0, `hsla(${hue}, 70%, 65%, 0.3)`);
       g.addColorStop(1, 'transparent');
@@ -1210,7 +1232,7 @@
 
     } else if (p.type === 'seed') {
       // Seed of life: 7 circles
-      const hue = 140 + Math.sin(time * 2.5) * 25;
+      const hue = (140 + th + Math.sin(time * 2.5) * 25) % 360;
       const breath = 1 + Math.sin(time * 2 + p.phase) * 0.06;
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.5);
       g.addColorStop(0, `hsla(${hue}, 70%, 60%, 0.3)`);
@@ -1230,7 +1252,7 @@
 
     } else if (p.type === 'star') {
       // 5-pointed star + rays
-      const hue = 50 + Math.sin(time * 3) * 15;
+      const hue = (50 + th + Math.sin(time * 3) * 15) % 360;
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.8);
       g.addColorStop(0, `hsla(${hue}, 80%, 85%, 0.4)`);
       g.addColorStop(1, 'transparent');
@@ -1275,25 +1297,26 @@
 
     if (player.powerUp) {
       ctx.save();
+      const th = themeHueOffset();
       const ar = pW * 2.8;
       const ap = 1 + Math.sin(time * 4) * 0.06;
       const AR = ar * ap;
       ctx.lineCap = 'round';
       if (player.powerUp === 'aura') {
-        const hue = (time * 60) % 360;
+        const hue = (time * 60 + th) % 360;
         for (let ring = 0; ring < 3; ring++) {
           ctx.strokeStyle = `hsla(${(hue + ring * 120) % 360}, 85%, 65%, ${0.35 - ring * 0.08})`;
           ctx.lineWidth = 1.8 - ring * 0.4;
           ctx.beginPath(); ctx.arc(0, 0, AR * (0.7 + ring * 0.2), 0, TAU); ctx.stroke();
         }
       } else if (player.powerUp === 'nova') {
-        ctx.strokeStyle = 'hsla(190, 90%, 70%, 0.5)'; ctx.lineWidth = 1.5;
+        ctx.strokeStyle = `hsla(${(190 + th) % 360}, 90%, 70%, 0.5)`; ctx.lineWidth = 1.5;
         for (let i = 0; i < 8; i++) {
           const a = (TAU / 8) * i + time * 2;
           ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * AR, Math.sin(a) * AR); ctx.stroke();
         }
       } else if (player.powerUp === 'magnet') {
-        ctx.strokeStyle = 'hsla(210, 80%, 60%, 0.4)'; ctx.lineWidth = 1;
+        ctx.strokeStyle = `hsla(${(210 + th) % 360}, 80%, 60%, 0.4)`; ctx.lineWidth = 1;
         for (let i = 0; i < 6; i++) {
           const spread = (i + 1) * AR * 0.15;
           ctx.beginPath(); ctx.moveTo(-AR * 0.5, 0);
@@ -1302,7 +1325,7 @@
           ctx.quadraticCurveTo(0, spread * 1.5, AR * 0.5, 0); ctx.stroke();
         }
       } else if (player.powerUp === 'merkaba') {
-        ctx.strokeStyle = 'hsla(50, 80%, 65%, 0.45)'; ctx.lineWidth = 1.4;
+        ctx.strokeStyle = `hsla(${(50 + th) % 360}, 80%, 65%, 0.45)`; ctx.lineWidth = 1.4;
         ctx.beginPath();
         for (let i = 0; i < 3; i++) { const a = (TAU / 3) * i + time * 0.4; i === 0 ? ctx.moveTo(Math.cos(a) * AR, Math.sin(a) * AR) : ctx.lineTo(Math.cos(a) * AR, Math.sin(a) * AR); }
         ctx.closePath(); ctx.stroke();
@@ -1310,7 +1333,7 @@
         for (let i = 0; i < 3; i++) { const a = (TAU / 3) * i - time * 0.4 + Math.PI; i === 0 ? ctx.moveTo(Math.cos(a) * AR, Math.sin(a) * AR) : ctx.lineTo(Math.cos(a) * AR, Math.sin(a) * AR); }
         ctx.closePath(); ctx.stroke();
       } else if (player.powerUp === 'lotus') {
-        ctx.strokeStyle = 'hsla(320, 75%, 65%, 0.4)'; ctx.lineWidth = 1.2;
+        ctx.strokeStyle = `hsla(${(320 + th) % 360}, 75%, 65%, 0.4)`; ctx.lineWidth = 1.2;
         for (let i = 0; i < 8; i++) {
           const a = (TAU / 8) * i + time * 0.8;
           ctx.beginPath(); ctx.moveTo(0, 0);
@@ -1320,16 +1343,16 @@
         }
       } else if (player.powerUp === 'vesica') {
         const off = AR * 0.3;
-        ctx.strokeStyle = 'hsla(265, 70%, 65%, 0.4)'; ctx.lineWidth = 1.2;
+        ctx.strokeStyle = `hsla(${(265 + th) % 360}, 70%, 65%, 0.4)`; ctx.lineWidth = 1.2;
         ctx.beginPath(); ctx.arc(-off, 0, AR * 0.6, 0, TAU); ctx.stroke();
         ctx.beginPath(); ctx.arc(off, 0, AR * 0.6, 0, TAU); ctx.stroke();
       } else if (player.powerUp === 'seed') {
         const cr = AR * 0.35;
-        ctx.strokeStyle = 'hsla(140, 70%, 55%, 0.4)'; ctx.lineWidth = 0.9;
+        ctx.strokeStyle = `hsla(${(140 + th) % 360}, 70%, 55%, 0.4)`; ctx.lineWidth = 0.9;
         ctx.beginPath(); ctx.arc(0, 0, cr, 0, TAU); ctx.stroke();
         for (let i = 0; i < 6; i++) { const a = (TAU / 6) * i + time * 0.4; ctx.beginPath(); ctx.arc(Math.cos(a) * cr, Math.sin(a) * cr, cr, 0, TAU); ctx.stroke(); }
       } else if (player.powerUp === 'star') {
-        ctx.strokeStyle = 'hsla(50, 85%, 75%, 0.5)'; ctx.lineWidth = 1.4;
+        ctx.strokeStyle = `hsla(${(50 + th) % 360}, 85%, 75%, 0.5)`; ctx.lineWidth = 1.4;
         ctx.beginPath();
         for (let i = 0; i < 10; i++) {
           const a = (TAU / 10) * i - Math.PI / 2 + time * 0.6;
@@ -1370,10 +1393,11 @@
     ctx.save();
     ctx.globalAlpha = p.opacity;
     let color = theme.primary;
-    if (p.type === 'spring') color = [255, 220, 50];
-    if (p.type === 'fragile') color = [255, 80, 100];
-    if (p.type === 'moving') color = [100, 255, 200];
-    if (p.type === 'vanishing') color = [220, 120, 255];
+    const pt = theme.platTypes || {};
+    if (p.type === 'spring') color = pt.spring || [255, 220, 50];
+    if (p.type === 'fragile') color = pt.fragile || [255, 80, 100];
+    if (p.type === 'moving') color = pt.moving || [100, 255, 200];
+    if (p.type === 'vanishing') color = pt.vanishing || [220, 120, 255];
 
     ctx.strokeStyle = rgb(color, 0.9);
     ctx.lineWidth = 2.5;
@@ -1392,10 +1416,12 @@
     if (!playing) return;
     time += 0.016;
 
-    const targetIdx = Math.min(themes.length-1, Math.floor(maxHeight / 10000));
-    if (themeIndex !== targetIdx) {
-      themeIndex = targetIdx;
-      theme.bg = themes[themeIndex].bg;
+    const autoIdx = Math.min(themes.length-1, Math.floor(maxHeight / 10000));
+    if (autoIdx !== lastAutoIdx) {
+      lastAutoIdx = autoIdx;
+      themeIndex = autoIdx;
+      theme = { ...themes[themeIndex] };
+      manualTheme = false;
     }
     const targetTheme = themes[themeIndex];
     for (let i = 0; i < 3; i++) {
@@ -1815,7 +1841,11 @@
 
   document.getElementById('start-btn').onclick = (e) => { e.preventDefault(); document.getElementById('start-screen').classList.add('hidden'); initGame(false); };
   document.getElementById('play-again').onclick = (e) => { e.preventDefault(); document.getElementById('game-over').classList.remove('is-active'); initGame(false); };
-  document.getElementById('theme-btn').onclick = () => { themeIndex = (themeIndex + 1) % themes.length; theme = { ...themes[themeIndex] }; };
+  document.getElementById('theme-btn').onclick = () => { 
+    manualTheme = true;
+    themeIndex = (themeIndex + 1) % themes.length; 
+    theme = { ...themes[themeIndex] }; 
+  };
   document.getElementById('chill-btn').onclick = function() { chillMode = !chillMode; this.classList.toggle('is-on', chillMode); };
   document.getElementById('mute-btn').onclick = function() {
     muted = !muted;
