@@ -531,7 +531,7 @@
         let tilt = gamma;
         if (angle === 90) tilt = e.beta;
         else if (angle === -90) tilt = -e.beta;
-        tiltX = Math.max(-1, Math.min(1, tilt / 30));
+        tiltX = Math.max(-1, Math.min(1, -tilt / 30));
       }, {passive: true});
       accelInited = true;
     };
