@@ -114,45 +114,328 @@
   let audioCtx;
   let masterGain;
   let delayNode;
+  let lastNoteTime = 0;
+  // Pentatonic harmony tracking — when all 5 pitch classes are hit within
+  // a rolling window, fire a chord bloom (inspired by Falling Emy)
+  const HARMONY_UNSET = -1e9;
+  const harmonyNotes = [HARMONY_UNSET, HARMONY_UNSET, HARMONY_UNSET, HARMONY_UNSET, HARMONY_UNSET];
+  let chordBloomCooldown = 0;
+  let chordBloomFlash = 0;
+  const CHORD_WINDOW_S = 3.5;
+  const CHORD_COOLDOWN_S = 10.0;
+
+  // Pentatonic scale (C D E G A across 2 octaves) — same as Falling Emy
+  const pentatonicScale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
+  const BASE_FREQ = 165; // E3 — warm, grounded
 
   function initAudio() {
     if (audioCtx) return;
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) return;
     audioCtx = new Ctx();
+    audioCtx.resume().catch(() => {});
+
+    // iOS Web Audio unlock: play a 1-frame silent buffer
+    try {
+      const buf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf; src.connect(audioCtx.destination); src.start(0);
+    } catch(e) {}
+
     masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0.6;
+    masterGain.gain.value = 0.7;
     masterGain.connect(audioCtx.destination);
+
+    // Reverb/delay with lowpass filter for spatial depth (inspired by Falling Emy)
     delayNode = audioCtx.createDelay();
-    delayNode.delayTime.value = 0.4;
+    delayNode.delayTime.value = 0.38;
     const feedback = audioCtx.createGain();
-    feedback.gain.value = 0.4;
-    delayNode.connect(feedback);
+    feedback.gain.value = 0.42;
+    const delayFilter = audioCtx.createBiquadFilter();
+    delayFilter.type = 'lowpass';
+    delayFilter.frequency.value = 1400;
+    delayNode.connect(delayFilter);
+    delayFilter.connect(feedback);
     feedback.connect(delayNode);
     delayNode.connect(masterGain);
   }
 
-  function playNote(freq, type = 'sine', vol = 0.4, dur = 0.5) {
+  // Stereo panning helper — pans sound based on player X position
+  function getPanner() {
+    if (!audioCtx) return null;
+    const panner = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : audioCtx.createGain();
+    if (panner.pan) panner.pan.value = Math.max(-1, Math.min(1, (player.x / W) * 2 - 1));
+    return panner;
+  }
+
+  // Generic note player with stereo panning and delay
+  function playNote(freq, type = 'sine', vol = 0.4, dur = 0.5, usePanner = true) {
     if (muted || !audioCtx) return;
     const now = audioCtx.currentTime;
+    if (now - lastNoteTime < 0.035) return; // throttle overlapping sounds
+    lastNoteTime = now;
     const osc = audioCtx.createOscillator();
     const g = audioCtx.createGain();
     osc.type = type;
     osc.frequency.setValueAtTime(freq, now);
     g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(vol, now + 0.02);
+    g.gain.linearRampToValueAtTime(vol, now + 0.015);
     g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+    const panner = usePanner ? getPanner() : null;
     osc.connect(g);
-    g.connect(masterGain);
+    g.connect(panner || masterGain);
+    if (panner) panner.connect(masterGain);
     if (delayNode) g.connect(delayNode);
     osc.start(now);
     osc.stop(now + dur + 0.1);
   }
 
-  function playJumpSound(isSpring) {
-    const base = isSpring ? 150 : 220;
-    const freq = base + Math.min(score / 10, 600);
-    playNote(freq, 'sine', 0.3, isSpring ? 1.2 : 0.6);
+  // ── Pentatonic note selection ──
+  // Picks a note from the pentatonic scale based on platform type + altitude
+  // for musical variety while staying harmonically cohesive
+  function pickPentatonic(platformType) {
+    // Use score and platform type to pick a note index
+    const offset = platformType === 'spring' ? 5 : platformType === 'fragile' ? 3 : platformType === 'moving' ? 1 : platformType === 'vanishing' ? 2 : 0;
+    const idx = (Math.floor(score / 8) + offset) % pentatonicScale.length;
+    const semitone = pentatonicScale[idx];
+    return { idx, freq: BASE_FREQ * Math.pow(2, semitone / 12) };
+  }
+
+  // Track harmony — record when a pitch class is played, check for bloom
+  function recordHarmonyHit(noteIdx) {
+    if (!audioCtx) return;
+    const now = audioCtx.currentTime;
+    harmonyNotes[noteIdx % 5] = now;
+    if (chordBloomCooldown > 0) return;
+    // Check if all 5 pitch classes were hit within the window
+    for (let i = 0; i < 5; i++) {
+      if (now - harmonyNotes[i] > CHORD_WINDOW_S) return;
+    }
+    // Bloom! All 5 pitch classes hit within window
+    chordBloomCooldown = CHORD_COOLDOWN_S;
+    chordBloomFlash = 1.0;
+    playChordBloom();
+    // Visual: add shockwave at player position
+    addShockwave(player.x, player.y - cameraY, [255, 255, 255]);
+  }
+
+  // Soft resolving chord — plays all 5 pentatonic notes as a shimmer
+  function playChordBloom() {
+    if (muted || !audioCtx) return;
+    const now = audioCtx.currentTime;
+    const pentatonicRatios = [1.0, 1.2599, 1.4983, 1.6818, 2.0]; // C D E G A
+    pentatonicRatios.forEach((ratio, i) => {
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      const startT = now + i * 0.08;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(BASE_FREQ * ratio, startT);
+      g.gain.setValueAtTime(0, startT);
+      g.gain.linearRampToValueAtTime(0.12, startT + 0.15);
+      g.gain.exponentialRampToValueAtTime(0.001, startT + 2.5);
+      osc.connect(g); g.connect(masterGain);
+      if (delayNode) g.connect(delayNode);
+      osc.start(startT); osc.stop(startT + 2.6);
+    });
+  }
+
+  // ── Jump sounds per platform type ──
+  function playJumpSound(platformType) {
+    const note = pickPentatonic(platformType);
+    recordHarmonyHit(note.idx);
+
+    if (platformType === 'spring') {
+      // Spring: bright ascending arpeggio (root → fifth → octave)
+      const now = audioCtx.currentTime;
+      const notes = [note.freq, note.freq * 1.498, note.freq * 2.0];
+      const panner = getPanner();
+      notes.forEach((f, i) => {
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        const startT = now + i * 0.07;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, startT);
+        g.gain.setValueAtTime(0, startT);
+        g.gain.linearRampToValueAtTime(0.3 - i * 0.04, startT + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.001, startT + 0.9);
+        osc.connect(g); g.connect(panner || masterGain);
+        if (panner) panner.connect(masterGain);
+        if (delayNode) g.connect(delayNode);
+        osc.start(startT); osc.stop(startT + 1.0);
+      });
+
+    } else if (platformType === 'fragile') {
+      // Fragile: short percussive pluck with pitch drop (breaking sound)
+      const now = audioCtx.currentTime;
+      const panner = getPanner();
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(note.freq * 1.5, now);
+      osc.frequency.exponentialRampToValueAtTime(note.freq * 0.5, now + 0.15);
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(0.25, now + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc.connect(g); g.connect(panner || masterGain);
+      if (panner) panner.connect(masterGain);
+      if (delayNode) g.connect(delayNode);
+      osc.start(now); osc.stop(now + 0.35);
+
+    } else if (platformType === 'moving') {
+      // Moving: warm filtered sweep with gentle vibrato
+      const now = audioCtx.currentTime;
+      const panner = getPanner();
+      const osc = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      const filter = audioCtx.createBiquadFilter();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(note.freq, now);
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(note.freq * 2.005, now); // slight chorus shimmer
+      filter.type = 'bandpass'; filter.frequency.value = note.freq * 1.5; filter.Q.value = 3;
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(0.22, now + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+      osc.connect(filter); osc2.connect(filter);
+      filter.connect(g); g.connect(panner || masterGain);
+      if (panner) panner.connect(masterGain);
+      if (delayNode) g.connect(delayNode);
+      osc.start(now); osc.stop(now + 0.8);
+      osc2.start(now); osc2.stop(now + 0.8);
+
+    } else if (platformType === 'vanishing') {
+      // Vanishing: ethereal fading bell — soft attack, long decay
+      const now = audioCtx.currentTime;
+      const panner = getPanner();
+      const osc = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(note.freq, now);
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(note.freq * 0.99, now); // beat frequency for warmth
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(0.2, now + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+      osc.connect(g); osc2.connect(g);
+      g.connect(panner || masterGain);
+      if (panner) panner.connect(masterGain);
+      if (delayNode) g.connect(delayNode);
+      osc.start(now); osc.stop(now + 1.5);
+      osc2.start(now); osc2.stop(now + 1.5);
+
+    } else {
+      // Normal: warm crystalline pluck with random harmonic interval
+      const now = audioCtx.currentTime;
+      const panner = getPanner();
+      const intervals = [1.2, 1.25, 1.335, 1.5]; // min3, maj3, p4, p5
+      const interval = intervals[Math.floor(Math.random() * intervals.length)];
+      const osc1 = audioCtx.createOscillator();
+      const g1 = audioCtx.createGain();
+      const osc2 = audioCtx.createOscillator();
+      const g2 = audioCtx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(note.freq, now);
+      g1.gain.setValueAtTime(0, now);
+      g1.gain.linearRampToValueAtTime(0.22, now + 0.01);
+      g1.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(note.freq * interval, now);
+      g2.gain.setValueAtTime(0, now);
+      g2.gain.linearRampToValueAtTime(0.13, now + 0.01);
+      g2.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      osc1.connect(g1); osc2.connect(g2);
+      g1.connect(panner || masterGain);
+      g2.connect(panner || masterGain);
+      if (panner) panner.connect(masterGain);
+      if (delayNode) { g1.connect(delayNode); g2.connect(delayNode); }
+      osc1.start(now); osc1.stop(now + 0.65);
+      osc2.start(now); osc2.stop(now + 0.45);
+    }
+  }
+
+  // Power-up collect sounds
+  function playPowerUpSound(type) {
+    if (muted || !audioCtx) return;
+    const now = audioCtx.currentTime;
+    const panner = getPanner();
+    const note = pickPentatonic('normal');
+
+    if (type === 'nova') {
+      // Nova: bright crystalline burst — root, fifth, double octave
+      const notes = [note.freq * 2, note.freq * 2.998, note.freq * 4];
+      notes.forEach((f, i) => {
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        const startT = now + i * 0.05;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, startT);
+        g.gain.setValueAtTime(0, startT);
+        g.gain.linearRampToValueAtTime(0.35 - i * 0.05, startT + 0.008);
+        g.gain.exponentialRampToValueAtTime(0.001, startT + 0.6);
+        osc.connect(g); g.connect(panner || masterGain);
+        if (panner) panner.connect(masterGain);
+        if (delayNode) g.connect(delayNode);
+        osc.start(startT); osc.stop(startT + 0.7);
+      });
+    } else if (type === 'aura') {
+      // Aura: soft pentatonic shimmer — all 5 notes float upward
+      const pentatonicRatios = [1.0, 1.2599, 1.4983, 1.6818, 2.0];
+      pentatonicRatios.forEach((ratio, i) => {
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        const startT = now + i * 0.07;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(note.freq * ratio, startT);
+        g.gain.setValueAtTime(0, startT);
+        g.gain.linearRampToValueAtTime(0.2, startT + 0.04);
+        g.gain.exponentialRampToValueAtTime(0.001, startT + 1.5);
+        osc.connect(g); g.connect(panner || masterGain);
+        if (panner) panner.connect(masterGain);
+        if (delayNode) g.connect(delayNode);
+        osc.start(startT); osc.stop(startT + 1.6);
+      });
+    } else if (type === 'magnet') {
+      // Magnet: deep electromagnetic hum with beat frequency
+      const osc1 = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      osc1.type = 'sine'; osc2.type = 'sine';
+      osc1.frequency.setValueAtTime(note.freq * 0.5, now);
+      osc2.frequency.setValueAtTime(note.freq * 0.5 + 2, now);
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(0.2, now + 0.06);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+      osc1.connect(g); osc2.connect(g);
+      g.connect(panner || masterGain);
+      if (panner) panner.connect(masterGain);
+      if (delayNode) g.connect(delayNode);
+      osc1.start(now); osc1.stop(now + 1.1);
+      osc2.start(now); osc2.stop(now + 1.1);
+    }
+  }
+
+  // Game over sound — descending minor pentatonic tumble
+  function playGameOverSound() {
+    if (muted || !audioCtx) return;
+    const now = audioCtx.currentTime;
+    // Minor pentatonic descent: A G E D C
+    const descSemitones = [0, -2, -5, -7, -9];
+    descSemitones.forEach((semi, i) => {
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      const startT = now + i * 0.15;
+      const freq = BASE_FREQ * 2 * Math.pow(2, semi / 12);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, startT);
+      g.gain.setValueAtTime(0, startT);
+      g.gain.linearRampToValueAtTime(0.2, startT + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.001, startT + 1.2);
+      osc.connect(g); g.connect(masterGain);
+      if (delayNode) g.connect(delayNode);
+      osc.start(startT); osc.stop(startT + 1.3);
+    });
   }
 
   // ── Haptic Feedback ──
@@ -268,6 +551,10 @@
     shakeX = 0; shakeY = 0; shakeMag = 0;
     trailLaunchColor = null;
     debris = [];
+    lastNoteTime = 0;
+    for (let i = 0; i < 5; i++) harmonyNotes[i] = HARMONY_UNSET;
+    chordBloomCooldown = 0;
+    chordBloomFlash = 0;
 
     if (saved) {
       player.x = saved.player.x; player.y = saved.player.y;
@@ -614,7 +901,7 @@
         player.powerUp = p.type;
         player.powerTimer = 10;
         addShockwave(p.x, p.y - cameraY, [255,255,255]);
-        playNote(880, 'sine', 0.5, 1.2);
+        playPowerUpSound(p.type);
         vibrate([15, 8, 15, 8, 40]);
         if (p.type === 'nova') {
           player.vy = SPRING_VEL * 1.6;
@@ -625,7 +912,7 @@
     }
 
     if (chillMode && player.y - cameraY > H - 40) {
-      player.y = cameraY + H - 40; player.vy = JUMP_VEL; playJumpSound(false);
+      player.y = cameraY + H - 40; player.vy = JUMP_VEL; playJumpSound('normal');
       burst(player.x, H - 25, theme.accent, 20, 'spark');
     }
 
@@ -648,7 +935,7 @@
           }
           if (p.type === 'fragile') { p.alive = false; burst(p.x + p.w/2, p.y - cameraY, [255, 80, 100], 15); vibrate(8); }
           if (p.type === 'vanishing') p.fade = 1;
-          player.vy = jump; playJumpSound(p.type === 'spring');
+          player.vy = jump; playJumpSound(p.type);
           if (p.type !== 'spring' && player.powerUp !== 'aura') vibrate(18);
           burst(player.x, p.y - cameraY, theme.secondary, 12);
           triggerSquish(); // landing squash — springs back via lerp
@@ -690,6 +977,10 @@
     } else { shakeMag = 0; shakeX = 0; shakeY = 0; }
 
     if (platforms.length > 0 && platforms[platforms.length - 1].y > cameraY - 1200) generatePlatforms(platforms[platforms.length - 1].y, cameraY - 3500);
+    // Chord bloom timers
+    if (chordBloomCooldown > 0) chordBloomCooldown -= 0.016;
+    if (chordBloomFlash > 0) chordBloomFlash -= 0.016 * 0.8;
+
     if (time % 5 < 0.02) saveGame();
     if (!chillMode && player.y - cameraY > H + 120) endGame();
   }
@@ -700,6 +991,7 @@
     document.getElementById('final-score').textContent = score;
     document.getElementById('final-high').textContent = 'BEST: ' + highScore;
     document.getElementById('game-over').classList.add('is-active');
+    playGameOverSound();
   }
 
   function render() {
@@ -772,6 +1064,21 @@
     }
 
     ctx.restore(); // remove shake offset
+
+    // Chord bloom flash — subtle full-screen halo when all 5 pentatonics are hit
+    if (chordBloomFlash > 0) {
+      const cf = Math.min(chordBloomFlash, 1);
+      const bloomAlpha = cf * cf * 0.15; // bell curve fade
+      ctx.save();
+      ctx.globalAlpha = bloomAlpha;
+      const bloom = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, H * 0.7);
+      bloom.addColorStop(0, rgb(theme.accent, 1));
+      bloom.addColorStop(0.5, rgb(theme.primary, 0.5));
+      bloom.addColorStop(1, 'transparent');
+      ctx.fillStyle = bloom;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
 
     requestAnimationFrame(render);
     update();
