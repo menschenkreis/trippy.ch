@@ -96,6 +96,7 @@
   let powerUps = [];
   let mountains = [];
   let clouds = [];
+  let debris = [];
 
   // ── Juiciness State ──
   // Squish/stretch: axes lerp back to 1 each frame
@@ -196,6 +197,23 @@
     for (let i = 0; i < 120; i++) {
       bgParticles.push({ x: Math.random() * W, y: Math.random() * H, r: Math.random() * 1.8 + 0.5, s: Math.random() * 0.6 + 0.1, a: Math.random() * 0.9 + 0.2 });
     }
+
+    // Mid-ground geometric debris — 40 triangles and hexagons that tile
+    // vertically as the player ascends, each at its own parallax speed.
+    debris = [];
+    for (let i = 0; i < 40; i++) {
+      debris.push({
+        x:        Math.random() * W,
+        yOffset:  Math.random() * (H * 1.5),   // position within one scroll cycle
+        rot:      Math.random() * TAU,
+        rotSpeed: (Math.random() - 0.5) * 0.018,
+        driftX:   (Math.random() - 0.5) * 0.12, // gentle horizontal float
+        size:     10 + Math.random() * 26,
+        sides:    Math.random() < 0.5 ? 3 : 6,
+        s:        0.18 + Math.random() * 0.52,  // parallax factor (lower = slower)
+        alpha:    0.05 + Math.random() * 0.09
+      });
+    }
   }
 
   // ── Helpers ──
@@ -249,6 +267,7 @@
     squishX = 1; squishY = 1;
     shakeX = 0; shakeY = 0; shakeMag = 0;
     trailLaunchColor = null;
+    debris = [];
 
     if (saved) {
       player.x = saved.player.x; player.y = saved.player.y;
@@ -361,6 +380,47 @@
       ctx.restore();
     }
 
+    // Mid-ground geometric debris (depth 3 500 – 20 000)
+    // Pieces tile vertically using a tiling-parallax formula: each layer scrolls
+    // at rate (1 − s) relative to the camera, so different speeds never sync.
+    if (depth > 3500 && depth < 20000 && debris.length > 0) {
+      const dAlpha = depth < 6500  ? (depth - 3500) / 3000      // fade in
+                   : depth > 16000 ? Math.max(0, 1 - (depth - 16000) / 4000) // fade out
+                   : 1;
+      ctx.save();
+      const period = H * 1.5; // vertical tile period in screen pixels
+      for (let i = 0; i < debris.length; i++) {
+        const d = debris[i];
+        // How far has this parallax layer scrolled in screen space?
+        const scrolled = -cameraY * (1 - d.s);
+        const sy = ((scrolled + d.yOffset) % period + period) % period - H * 0.25;
+        if (sy < -d.size - 4 || sy > H + d.size + 4) continue;
+
+        d.rot += d.rotSpeed;
+        d.x   += d.driftX;
+        if (d.x < -d.size) d.x = W + d.size;
+        if (d.x >  W + d.size) d.x = -d.size;
+
+        ctx.save();
+        ctx.globalAlpha = dAlpha * d.alpha;
+        ctx.strokeStyle = rgb(theme.accent, 1);
+        ctx.lineWidth = 1;
+        ctx.translate(d.x, sy);
+        ctx.rotate(d.rot);
+        ctx.beginPath();
+        for (let j = 0; j < d.sides; j++) {
+          const a = (TAU / d.sides) * j;
+          j === 0
+            ? ctx.moveTo(Math.cos(a) * d.size, Math.sin(a) * d.size)
+            : ctx.lineTo(Math.cos(a) * d.size, Math.sin(a) * d.size);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+
     // Stars & Deep Space
     if (depth > 8000) {
       const sAlpha = Math.min(1, (depth - 8000) / 4000);
@@ -369,7 +429,10 @@
       for (let i = 0; i < bgParticles.length; i++) {
         const p = bgParticles[i];
         const sy = (p.y - cameraY * p.s) % H;
-        ctx.fillStyle = rgb(theme.accent, p.a);
+        // Each star has its own twinkle frequency driven by its parallax speed,
+        // with a per-star phase offset so they don't all pulse in unison.
+        const twinkle = 0.5 + 0.5 * Math.sin(time * p.s * 8 + p.x * 0.1);
+        ctx.fillStyle = rgb(theme.accent, p.a * twinkle);
         ctx.beginPath(); ctx.arc(p.x, sy, p.r, 0, TAU); ctx.fill();
       }
       for (let i = 0; i < 4; i++) {
@@ -380,6 +443,16 @@
       }
       ctx.restore();
     }
+    // Altitude vignette — radial gradient, transparent at low depth, max 0.62 at top
+    const vigAlpha = Math.min(0.62, depth / 16000);
+    if (vigAlpha > 0.01) {
+      const vig = ctx.createRadialGradient(W / 2, H / 2, H * 0.18, W / 2, H / 2, H * 0.92);
+      vig.addColorStop(0, 'transparent');
+      vig.addColorStop(1, `rgba(0,0,0,${vigAlpha.toFixed(3)})`);
+      ctx.fillStyle = vig;
+      ctx.fillRect(0, 0, W, H);
+    }
+
     if (chillMode) drawChillBarrier();
   }
 
