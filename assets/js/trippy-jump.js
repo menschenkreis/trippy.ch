@@ -114,7 +114,11 @@
   let audioCtx;
   let masterGain;
   let delayNode;
+  let reverbNode; // second, longer delay for lush reverb tail
   let lastNoteTime = 0;
+  // Melodic progression — each bounce steps through the scale sequentially,
+  // creating an ascending melody as the player climbs
+  let melodyStep = 0;
   // Pentatonic harmony tracking — when all 5 pitch classes are hit within
   // a rolling window, fire a chord bloom (inspired by Falling Emy)
   const HARMONY_UNSET = -1e9;
@@ -127,6 +131,17 @@
   // Pentatonic scale (C D E G A across 2 octaves) — same as Falling Emy
   const pentatonicScale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
   const BASE_FREQ = 165; // E3 — warm, grounded
+
+  // Melodic patterns per platform type — each defines how melodyStep advances
+  // and which octave offset to apply, so special platforms feel distinct
+  // while staying melodically connected to the main line
+  const MELODY_MAP = {
+    normal:    { step:  1, octaveShift: 0 },
+    fragile:   { step:  2, octaveShift: 0 }, // skips ahead — feels like a "glitch"
+    moving:    { step:  1, octaveShift: 0 },
+    vanishing: { step:  1, octaveShift: 0 },
+    spring:    { step:  1, octaveShift: 5 }  // jumps an octave — feels like lift-off
+  };
 
   function initAudio() {
     if (audioCtx) return;
@@ -143,21 +158,34 @@
     } catch(e) {}
 
     masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0.7;
+    masterGain.gain.value = 0.55; // slightly lower for smoothness
     masterGain.connect(audioCtx.destination);
 
-    // Reverb/delay with lowpass filter for spatial depth (inspired by Falling Emy)
+    // Primary delay — warm echo with lowpass filter
     delayNode = audioCtx.createDelay();
-    delayNode.delayTime.value = 0.38;
-    const feedback = audioCtx.createGain();
-    feedback.gain.value = 0.42;
+    delayNode.delayTime.value = 0.35;
+    const feedback1 = audioCtx.createGain();
+    feedback1.gain.value = 0.35;
     const delayFilter = audioCtx.createBiquadFilter();
     delayFilter.type = 'lowpass';
-    delayFilter.frequency.value = 1400;
+    delayFilter.frequency.value = 1200; // warmer cutoff
     delayNode.connect(delayFilter);
-    delayFilter.connect(feedback);
-    feedback.connect(delayNode);
+    delayFilter.connect(feedback1);
+    feedback1.connect(delayNode);
     delayNode.connect(masterGain);
+
+    // Reverb tail — longer, softer delay for lush sustain
+    reverbNode = audioCtx.createDelay();
+    reverbNode.delayTime.value = 0.55;
+    const feedback2 = audioCtx.createGain();
+    feedback2.gain.value = 0.3;
+    const reverbFilter = audioCtx.createBiquadFilter();
+    reverbFilter.type = 'lowpass';
+    reverbFilter.frequency.value = 900; // even warmer
+    reverbNode.connect(reverbFilter);
+    reverbFilter.connect(feedback2);
+    feedback2.connect(reverbNode);
+    reverbNode.connect(masterGain);
   }
 
   // Stereo panning helper — pans sound based on player X position
@@ -168,44 +196,26 @@
     return panner;
   }
 
-  // Generic note player with stereo panning and delay
-  function playNote(freq, type = 'sine', vol = 0.4, dur = 0.5, usePanner = true) {
-    if (muted || !audioCtx) return;
-    const now = audioCtx.currentTime;
-    if (now - lastNoteTime < 0.035) return; // throttle overlapping sounds
-    lastNoteTime = now;
-    const osc = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, now);
-    g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(vol, now + 0.015);
-    g.gain.exponentialRampToValueAtTime(0.001, now + dur);
-    const panner = usePanner ? getPanner() : null;
-    osc.connect(g);
-    g.connect(panner || masterGain);
-    if (panner) panner.connect(masterGain);
-    if (delayNode) g.connect(delayNode);
-    osc.start(now);
-    osc.stop(now + dur + 0.1);
-  }
-
-  // ── Pentatonic note selection ──
-  // Picks a note from the pentatonic scale based on platform type + altitude
-  // for musical variety while staying harmonically cohesive
-  function pickPentatonic(platformType) {
-    // Use score and platform type to pick a note index
-    const offset = platformType === 'spring' ? 5 : platformType === 'fragile' ? 3 : platformType === 'moving' ? 1 : platformType === 'vanishing' ? 2 : 0;
-    const idx = (Math.floor(score / 8) + offset) % pentatonicScale.length;
+  // ── Melodic note selection ──
+  // Advances melodyStep sequentially through the pentatonic scale,
+  // then shifts up an octave. Creates a flowing ascending melody.
+  function pickMelodicNote(platformType) {
+    const map = MELODY_MAP[platformType] || MELODY_MAP.normal;
+    const idx = (melodyStep + map.octaveShift) % pentatonicScale.length;
     const semitone = pentatonicScale[idx];
-    return { idx, freq: BASE_FREQ * Math.pow(2, semitone / 12) };
+    melodyStep += map.step;
+    // After completing the scale, shift octave range up (capped at 2 octaves)
+    const octaveRange = Math.min(Math.floor(melodyStep / pentatonicScale.length), 2);
+    const octaveShift = octaveRange * 12;
+    const freq = BASE_FREQ * Math.pow(2, (semitone + octaveShift) / 12);
+    return { idx: idx % 5, freq, pitchClass: idx % 5 };
   }
 
   // Track harmony — record when a pitch class is played, check for bloom
-  function recordHarmonyHit(noteIdx) {
+  function recordHarmonyHit(pitchClass) {
     if (!audioCtx) return;
     const now = audioCtx.currentTime;
-    harmonyNotes[noteIdx % 5] = now;
+    harmonyNotes[pitchClass] = now;
     if (chordBloomCooldown > 0) return;
     // Check if all 5 pitch classes were hit within the window
     for (let i = 0; i < 5; i++) {
@@ -227,85 +237,93 @@
     pentatonicRatios.forEach((ratio, i) => {
       const osc = audioCtx.createOscillator();
       const g = audioCtx.createGain();
-      const startT = now + i * 0.08;
+      const startT = now + i * 0.1;
       osc.type = 'sine';
       osc.frequency.setValueAtTime(BASE_FREQ * ratio, startT);
       g.gain.setValueAtTime(0, startT);
-      g.gain.linearRampToValueAtTime(0.12, startT + 0.15);
-      g.gain.exponentialRampToValueAtTime(0.001, startT + 2.5);
+      g.gain.linearRampToValueAtTime(0.09, startT + 0.25);
+      g.gain.exponentialRampToValueAtTime(0.001, startT + 3.0);
       osc.connect(g); g.connect(masterGain);
       if (delayNode) g.connect(delayNode);
-      osc.start(startT); osc.stop(startT + 2.6);
+      if (reverbNode) g.connect(reverbNode);
+      osc.start(startT); osc.stop(startT + 3.1);
     });
+  }
+
+  // Helper: connect a gain node to panner + delays in one place
+  function routeToOutput(gainNode, panner) {
+    gainNode.connect(panner || masterGain);
+    if (panner) panner.connect(masterGain);
+    if (delayNode) gainNode.connect(delayNode);
+    if (reverbNode) gainNode.connect(reverbNode);
   }
 
   // ── Jump sounds per platform type ──
   function playJumpSound(platformType) {
-    const note = pickPentatonic(platformType);
-    recordHarmonyHit(note.idx);
+    const note = pickMelodicNote(platformType);
+    recordHarmonyHit(note.pitchClass);
 
     if (platformType === 'spring') {
-      // Spring: bright ascending arpeggio (root → fifth → octave)
+      // Spring: lush ascending arpeggio (root → third → fifth → octave)
       const now = audioCtx.currentTime;
-      const notes = [note.freq, note.freq * 1.498, note.freq * 2.0];
       const panner = getPanner();
+      const notes = [note.freq, note.freq * 1.25, note.freq * 1.498, note.freq * 2.0];
       notes.forEach((f, i) => {
         const osc = audioCtx.createOscillator();
         const g = audioCtx.createGain();
-        const startT = now + i * 0.07;
+        const startT = now + i * 0.09;
         osc.type = 'sine';
         osc.frequency.setValueAtTime(f, startT);
         g.gain.setValueAtTime(0, startT);
-        g.gain.linearRampToValueAtTime(0.3 - i * 0.04, startT + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.001, startT + 0.9);
-        osc.connect(g); g.connect(panner || masterGain);
-        if (panner) panner.connect(masterGain);
-        if (delayNode) g.connect(delayNode);
-        osc.start(startT); osc.stop(startT + 1.0);
+        g.gain.linearRampToValueAtTime(0.22 - i * 0.03, startT + 0.04);
+        g.gain.exponentialRampToValueAtTime(0.001, startT + 1.4);
+        osc.connect(g);
+        routeToOutput(g, panner);
+        osc.start(startT); osc.stop(startT + 1.5);
       });
 
     } else if (platformType === 'fragile') {
-      // Fragile: short percussive pluck with pitch drop (breaking sound)
+      // Fragile: gentle descending sigh — soft, melancholic
       const now = audioCtx.currentTime;
       const panner = getPanner();
       const osc = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
       const g = audioCtx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(note.freq * 1.5, now);
-      osc.frequency.exponentialRampToValueAtTime(note.freq * 0.5, now + 0.15);
+      osc.frequency.setValueAtTime(note.freq * 1.05, now);
+      osc.frequency.exponentialRampToValueAtTime(note.freq * 0.75, now + 0.6);
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(note.freq * 1.05 * 1.498, now);
+      osc2.frequency.exponentialRampToValueAtTime(note.freq * 0.75 * 1.498, now + 0.6);
       g.gain.setValueAtTime(0, now);
-      g.gain.linearRampToValueAtTime(0.25, now + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-      osc.connect(g); g.connect(panner || masterGain);
-      if (panner) panner.connect(masterGain);
-      if (delayNode) g.connect(delayNode);
-      osc.start(now); osc.stop(now + 0.35);
+      g.gain.linearRampToValueAtTime(0.18, now + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+      osc.connect(g); osc2.connect(g);
+      routeToOutput(g, panner);
+      osc.start(now); osc.stop(now + 1.0);
+      osc2.start(now); osc2.stop(now + 1.0);
 
     } else if (platformType === 'moving') {
-      // Moving: warm filtered sweep with gentle vibrato
+      // Moving: warm pad with gentle chorus — flowing, liquid
       const now = audioCtx.currentTime;
       const panner = getPanner();
       const osc = audioCtx.createOscillator();
       const osc2 = audioCtx.createOscillator();
       const g = audioCtx.createGain();
-      const filter = audioCtx.createBiquadFilter();
       osc.type = 'sine';
       osc.frequency.setValueAtTime(note.freq, now);
       osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(note.freq * 2.005, now); // slight chorus shimmer
-      filter.type = 'bandpass'; filter.frequency.value = note.freq * 1.5; filter.Q.value = 3;
+      osc2.frequency.setValueAtTime(note.freq * 1.003, now); // gentle chorus detune
       g.gain.setValueAtTime(0, now);
-      g.gain.linearRampToValueAtTime(0.22, now + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
-      osc.connect(filter); osc2.connect(filter);
-      filter.connect(g); g.connect(panner || masterGain);
-      if (panner) panner.connect(masterGain);
-      if (delayNode) g.connect(delayNode);
-      osc.start(now); osc.stop(now + 0.8);
-      osc2.start(now); osc2.stop(now + 0.8);
+      g.gain.linearRampToValueAtTime(0.16, now + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 1.1);
+      osc.connect(g); osc2.connect(g);
+      routeToOutput(g, panner);
+      osc.start(now); osc.stop(now + 1.2);
+      osc2.start(now); osc2.stop(now + 1.2);
 
     } else if (platformType === 'vanishing') {
-      // Vanishing: ethereal fading bell — soft attack, long decay
+      // Vanishing: ethereal singing bowl — soft attack, very long ring
       const now = audioCtx.currentTime;
       const panner = getPanner();
       const osc = audioCtx.createOscillator();
@@ -314,23 +332,19 @@
       osc.type = 'sine';
       osc.frequency.setValueAtTime(note.freq, now);
       osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(note.freq * 0.99, now); // beat frequency for warmth
+      osc2.frequency.setValueAtTime(note.freq * 0.997, now); // slow beat for warmth
       g.gain.setValueAtTime(0, now);
-      g.gain.linearRampToValueAtTime(0.2, now + 0.04);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+      g.gain.linearRampToValueAtTime(0.14, now + 0.06);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
       osc.connect(g); osc2.connect(g);
-      g.connect(panner || masterGain);
-      if (panner) panner.connect(masterGain);
-      if (delayNode) g.connect(delayNode);
-      osc.start(now); osc.stop(now + 1.5);
-      osc2.start(now); osc2.stop(now + 1.5);
+      routeToOutput(g, panner);
+      osc.start(now); osc.stop(now + 2.1);
+      osc2.start(now); osc2.stop(now + 2.1);
 
     } else {
-      // Normal: warm crystalline pluck with random harmonic interval
+      // Normal: warm tone + soft harmonic fifth — smooth and melodic
       const now = audioCtx.currentTime;
       const panner = getPanner();
-      const intervals = [1.2, 1.25, 1.335, 1.5]; // min3, maj3, p4, p5
-      const interval = intervals[Math.floor(Math.random() * intervals.length)];
       const osc1 = audioCtx.createOscillator();
       const g1 = audioCtx.createGain();
       const osc2 = audioCtx.createOscillator();
@@ -338,20 +352,19 @@
       osc1.type = 'sine';
       osc1.frequency.setValueAtTime(note.freq, now);
       g1.gain.setValueAtTime(0, now);
-      g1.gain.linearRampToValueAtTime(0.22, now + 0.01);
-      g1.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+      g1.gain.linearRampToValueAtTime(0.18, now + 0.04);
+      g1.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+      // Soft harmonic — always a perfect fifth, no random jumps
       osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(note.freq * interval, now);
+      osc2.frequency.setValueAtTime(note.freq * 1.498, now);
       g2.gain.setValueAtTime(0, now);
-      g2.gain.linearRampToValueAtTime(0.13, now + 0.01);
-      g2.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      g2.gain.linearRampToValueAtTime(0.08, now + 0.05);
+      g2.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
       osc1.connect(g1); osc2.connect(g2);
-      g1.connect(panner || masterGain);
-      g2.connect(panner || masterGain);
-      if (panner) panner.connect(masterGain);
-      if (delayNode) { g1.connect(delayNode); g2.connect(delayNode); }
-      osc1.start(now); osc1.stop(now + 0.65);
-      osc2.start(now); osc2.stop(now + 0.45);
+      routeToOutput(g1, panner);
+      routeToOutput(g2, panner);
+      osc1.start(now); osc1.stop(now + 1.1);
+      osc2.start(now); osc2.stop(now + 0.8);
     }
   }
 
@@ -360,81 +373,78 @@
     if (muted || !audioCtx) return;
     const now = audioCtx.currentTime;
     const panner = getPanner();
-    const note = pickPentatonic('normal');
+    const note = pickMelodicNote('normal');
 
     if (type === 'nova') {
-      // Nova: bright crystalline burst — root, fifth, double octave
-      const notes = [note.freq * 2, note.freq * 2.998, note.freq * 4];
+      // Nova: crystalline arpeggio — root, third, fifth, octave
+      const notes = [note.freq * 2, note.freq * 2 * 1.25, note.freq * 2 * 1.498, note.freq * 4];
       notes.forEach((f, i) => {
         const osc = audioCtx.createOscillator();
         const g = audioCtx.createGain();
-        const startT = now + i * 0.05;
+        const startT = now + i * 0.08;
         osc.type = 'sine';
         osc.frequency.setValueAtTime(f, startT);
         g.gain.setValueAtTime(0, startT);
-        g.gain.linearRampToValueAtTime(0.35 - i * 0.05, startT + 0.008);
-        g.gain.exponentialRampToValueAtTime(0.001, startT + 0.6);
-        osc.connect(g); g.connect(panner || masterGain);
-        if (panner) panner.connect(masterGain);
-        if (delayNode) g.connect(delayNode);
-        osc.start(startT); osc.stop(startT + 0.7);
+        g.gain.linearRampToValueAtTime(0.2 - i * 0.03, startT + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.001, startT + 1.0);
+        osc.connect(g);
+        routeToOutput(g, panner);
+        osc.start(startT); osc.stop(startT + 1.1);
       });
     } else if (type === 'aura') {
-      // Aura: soft pentatonic shimmer — all 5 notes float upward
+      // Aura: soft pentatonic wash — all 5 notes, slow stagger, long sustain
       const pentatonicRatios = [1.0, 1.2599, 1.4983, 1.6818, 2.0];
       pentatonicRatios.forEach((ratio, i) => {
         const osc = audioCtx.createOscillator();
         const g = audioCtx.createGain();
-        const startT = now + i * 0.07;
+        const startT = now + i * 0.1;
         osc.type = 'sine';
         osc.frequency.setValueAtTime(note.freq * ratio, startT);
         g.gain.setValueAtTime(0, startT);
-        g.gain.linearRampToValueAtTime(0.2, startT + 0.04);
-        g.gain.exponentialRampToValueAtTime(0.001, startT + 1.5);
-        osc.connect(g); g.connect(panner || masterGain);
-        if (panner) panner.connect(masterGain);
-        if (delayNode) g.connect(delayNode);
-        osc.start(startT); osc.stop(startT + 1.6);
+        g.gain.linearRampToValueAtTime(0.12, startT + 0.06);
+        g.gain.exponentialRampToValueAtTime(0.001, startT + 2.0);
+        osc.connect(g);
+        routeToOutput(g, panner);
+        osc.start(startT); osc.stop(startT + 2.1);
       });
     } else if (type === 'magnet') {
-      // Magnet: deep electromagnetic hum with beat frequency
+      // Magnet: deep warm drone with gentle beat
       const osc1 = audioCtx.createOscillator();
       const osc2 = audioCtx.createOscillator();
       const g = audioCtx.createGain();
       osc1.type = 'sine'; osc2.type = 'sine';
       osc1.frequency.setValueAtTime(note.freq * 0.5, now);
-      osc2.frequency.setValueAtTime(note.freq * 0.5 + 2, now);
+      osc2.frequency.setValueAtTime(note.freq * 0.5 + 1.2, now);
       g.gain.setValueAtTime(0, now);
-      g.gain.linearRampToValueAtTime(0.2, now + 0.06);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+      g.gain.linearRampToValueAtTime(0.15, now + 0.08);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 1.3);
       osc1.connect(g); osc2.connect(g);
-      g.connect(panner || masterGain);
-      if (panner) panner.connect(masterGain);
-      if (delayNode) g.connect(delayNode);
-      osc1.start(now); osc1.stop(now + 1.1);
-      osc2.start(now); osc2.stop(now + 1.1);
+      routeToOutput(g, panner);
+      osc1.start(now); osc1.stop(now + 1.4);
+      osc2.start(now); osc2.stop(now + 1.4);
     }
   }
 
-  // Game over sound — descending minor pentatonic tumble
+  // Game over sound — gentle descending pentatonic cascade
   function playGameOverSound() {
     if (muted || !audioCtx) return;
     const now = audioCtx.currentTime;
-    // Minor pentatonic descent: A G E D C
-    const descSemitones = [0, -2, -5, -7, -9];
+    // Descend through the pentatonic scale: A G E D C (relative)
+    const descSemitones = [0, -2, -4, -7, -9];
     descSemitones.forEach((semi, i) => {
       const osc = audioCtx.createOscillator();
       const g = audioCtx.createGain();
-      const startT = now + i * 0.15;
+      const startT = now + i * 0.22;
       const freq = BASE_FREQ * 2 * Math.pow(2, semi / 12);
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, startT);
       g.gain.setValueAtTime(0, startT);
-      g.gain.linearRampToValueAtTime(0.2, startT + 0.03);
-      g.gain.exponentialRampToValueAtTime(0.001, startT + 1.2);
+      g.gain.linearRampToValueAtTime(0.14, startT + 0.06);
+      g.gain.exponentialRampToValueAtTime(0.001, startT + 1.8);
       osc.connect(g); g.connect(masterGain);
       if (delayNode) g.connect(delayNode);
-      osc.start(startT); osc.stop(startT + 1.3);
+      if (reverbNode) g.connect(reverbNode);
+      osc.start(startT); osc.stop(startT + 1.9);
     });
   }
 
@@ -552,6 +562,7 @@
     trailLaunchColor = null;
     debris = [];
     lastNoteTime = 0;
+    melodyStep = 0;
     for (let i = 0; i < 5; i++) harmonyNotes[i] = HARMONY_UNSET;
     chordBloomCooldown = 0;
     chordBloomFlash = 0;
