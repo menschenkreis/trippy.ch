@@ -422,6 +422,72 @@
       routeToOutput(g, panner);
       osc1.start(now); osc1.stop(now + 1.4);
       osc2.start(now); osc2.stop(now + 1.4);
+    } else if (type === 'merkaba') {
+      // Crystal arpeggio: root, third, fifth, octave
+      const notes = [note.freq * 2, note.freq * 2 * 1.26, note.freq * 2 * 1.5, note.freq * 4];
+      notes.forEach((f, i) => {
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        const t = now + i * 0.07;
+        osc.type = 'sine'; osc.frequency.setValueAtTime(f, t);
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.18 - i * 0.03, t + 0.04);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
+        osc.connect(g); routeToOutput(g, panner);
+        osc.start(t); osc.stop(t + 1.6);
+      });
+    } else if (type === 'lotus') {
+      // Warm pad: two detuned sines
+      [note.freq, note.freq * 1.005].forEach(f => {
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(f * 0.5, now);
+        g.gain.setValueAtTime(0, now);
+        g.gain.linearRampToValueAtTime(0.12, now + 0.3);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+        osc.connect(g); routeToOutput(g, panner);
+        osc.start(now); osc.stop(now + 1.9);
+      });
+    } else if (type === 'vesica') {
+      // Deep drone with filter sweep
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      const filt = audioCtx.createBiquadFilter();
+      osc.type = 'sine'; osc.frequency.setValueAtTime(note.freq * 0.25, now);
+      filt.type = 'lowpass'; filt.frequency.setValueAtTime(200, now);
+      filt.frequency.linearRampToValueAtTime(2000, now + 0.4);
+      filt.frequency.exponentialRampToValueAtTime(400, now + 1.2);
+      filt.Q.setValueAtTime(5, now);
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(0.15, now + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 1.3);
+      osc.connect(filt); filt.connect(g); routeToOutput(g, panner);
+      osc.start(now); osc.stop(now + 1.4);
+    } else if (type === 'seed') {
+      // Quick bright ascending triad
+      [note.freq * 2, note.freq * 2 * 1.26, note.freq * 2 * 1.5].forEach((f, i) => {
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        const t = now + i * 0.06;
+        osc.type = 'sine'; osc.frequency.setValueAtTime(f, t);
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.2, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+        osc.connect(g); routeToOutput(g, panner);
+        osc.start(t); osc.stop(t + 0.9);
+      });
+    } else if (type === 'star') {
+      // Bright major chord shimmer
+      [1.0, 1.26, 1.5, 2.0].forEach(ratio => {
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(note.freq * ratio, now);
+        g.gain.setValueAtTime(0, now);
+        g.gain.linearRampToValueAtTime(0.1, now + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+        osc.connect(g); routeToOutput(g, panner);
+        osc.start(now); osc.stop(now + 1.3);
+      });
     }
   }
 
@@ -604,8 +670,8 @@
 
       newPlatforms.push({ x, y, w, h: 10, type, alive: true, opacity: 1, vx: (Math.random() - 0.5) * 4, fade: 0 });
 
-      if (Math.random() < 0.06) {
-        const pTypes = ['aura', 'nova', 'magnet'];
+      if (Math.random() < 0.09) {
+        const pTypes = ['aura', 'nova', 'magnet', 'merkaba', 'lotus', 'vesica', 'seed', 'star'];
         powerUps.push({ x: x + w/2, y: y - 35, type: pTypes[Math.floor(Math.random()*pTypes.length)], alive: true, phase: Math.random()*TAU });
       }
     }
@@ -785,10 +851,217 @@
     if (sy < -50 || sy > H + 50) return;
     ctx.save();
     const bob = Math.sin(time * 6 + p.phase) * 12;
-    const color = p.type === 'aura' ? [100,255,200] : p.type === 'nova' ? [255,80,100] : [255,220,50];
-    ctx.shadowColor = rgb(color, 0.9);
-    ctx.shadowBlur = 15;
-    drawSg(ctx, p.x, sy + bob, 22, 0.9, p.type === 'aura' ? 6 : p.type === 'nova' ? 8 : 4, time * 2.5);
+    const cx = p.x, cy = sy + bob;
+    const r = 22;
+    const pulse = 1 + Math.sin(time * 3 + p.phase) * 0.08;
+    const R = r * pulse;
+    ctx.lineCap = 'round';
+
+    if (p.type === 'aura') {
+      // Iridescent triple-ring + 8 sparkle rays
+      const hue = (time * 60 + p.phase * 57.3) % 360;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 2);
+      g.addColorStop(0, `hsla(${hue}, 90%, 70%, 0.4)`);
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 2, 0, TAU); ctx.fill();
+      for (let ring = 0; ring < 3; ring++) {
+        const rh = (hue + ring * 120) % 360;
+        ctx.strokeStyle = `hsla(${rh}, 85%, 65%, ${0.7 - ring * 0.15})`;
+        ctx.lineWidth = 1.2 - ring * 0.2;
+        ctx.beginPath(); ctx.arc(cx, cy, R * (0.6 + ring * 0.25), 0, TAU); ctx.stroke();
+      }
+      ctx.strokeStyle = `hsla(${hue}, 90%, 80%, 0.6)`;
+      ctx.lineWidth = 0.8;
+      for (let i = 0; i < 8; i++) {
+        const a = (TAU / 8) * i + time * 1.5;
+        const len = R * (0.9 + Math.sin(time * 5 + i) * 0.3);
+        ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * R * 0.3, cy + Math.sin(a) * R * 0.3);
+        ctx.lineTo(cx + Math.cos(a) * len, cy + Math.sin(a) * len); ctx.stroke();
+      }
+      ctx.fillStyle = `hsla(${hue}, 90%, 90%, 0.9)`;
+      ctx.beginPath(); ctx.arc(cx, cy, 3, 0, TAU); ctx.fill();
+
+    } else if (p.type === 'nova') {
+      // 8 primary + 8 secondary rays, bright core
+      const hue = 185 + Math.sin(time * 4) * 20;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 2);
+      g.addColorStop(0, `hsla(${hue}, 80%, 90%, 0.5)`);
+      g.addColorStop(0.5, `hsla(${hue}, 90%, 60%, 0.15)`);
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 2, 0, TAU); ctx.fill();
+      ctx.strokeStyle = `hsla(${hue}, 90%, 75%, 0.8)`; ctx.lineWidth = 1.4;
+      for (let i = 0; i < 8; i++) {
+        const a = (TAU / 8) * i + time * 0.8;
+        ctx.beginPath(); ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(a) * R * 1.1, cy + Math.sin(a) * R * 1.1); ctx.stroke();
+      }
+      ctx.strokeStyle = `hsla(${hue}, 80%, 80%, 0.4)`; ctx.lineWidth = 0.8;
+      for (let i = 0; i < 8; i++) {
+        const a = (TAU / 8) * i + TAU / 16 + time * 0.8;
+        ctx.beginPath(); ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(a) * R * 0.65, cy + Math.sin(a) * R * 0.65); ctx.stroke();
+      }
+      ctx.fillStyle = `hsla(${hue}, 60%, 95%, 0.9)`;
+      ctx.beginPath(); ctx.arc(cx, cy, 3.5, 0, TAU); ctx.fill();
+
+    } else if (p.type === 'magnet') {
+      // Horseshoe with field lines
+      const hue = 210 + Math.sin(time * 3) * 30;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.8);
+      g.addColorStop(0, `hsla(${hue}, 80%, 70%, 0.3)`);
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 1.8, 0, TAU); ctx.fill();
+      ctx.strokeStyle = `hsla(${hue}, 90%, 65%, 0.8)`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.5, 0.3, Math.PI - 0.3); ctx.stroke();
+      ctx.strokeStyle = `hsla(${hue}, 80%, 60%, 0.5)`; ctx.lineWidth = 0.8;
+      for (let i = 0; i < 4; i++) {
+        const sx = cx - R * 0.5 + Math.cos(0.3) * R * 0.5;
+        const ex = cx + R * 0.5 + Math.cos(Math.PI - 0.3) * R * 0.5;
+        const spread = (i + 1) * R * 0.25;
+        ctx.beginPath(); ctx.moveTo(sx, cy - R * 0.35);
+        ctx.quadraticCurveTo(cx, cy - spread * 1.2, ex, cy - R * 0.35); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(sx, cy + R * 0.35);
+        ctx.quadraticCurveTo(cx, cy + spread * 1.2, ex, cy + R * 0.35); ctx.stroke();
+      }
+      ctx.fillStyle = '#ff4444'; ctx.beginPath(); ctx.arc(cx - R * 0.42, cy - R * 0.35, 2.5, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#4488ff'; ctx.beginPath(); ctx.arc(cx + R * 0.42, cy - R * 0.35, 2.5, 0, TAU); ctx.fill();
+
+    } else if (p.type === 'merkaba') {
+      // Two counter-rotating triangles, inner hexagon, vertex dots
+      const hue = 45 + Math.sin(time * 2) * 15;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.8);
+      g.addColorStop(0, `hsla(${hue}, 80%, 70%, 0.35)`);
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 1.8, 0, TAU); ctx.fill();
+      // Triangle CW
+      ctx.strokeStyle = `hsla(${hue}, 85%, 65%, 0.8)`; ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      for (let i = 0; i < 3; i++) { const a = (TAU / 3) * i + time * 0.6; const px = cx + Math.cos(a) * R; const py = cy + Math.sin(a) * R; i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py); }
+      ctx.closePath(); ctx.stroke();
+      // Triangle CCW
+      ctx.strokeStyle = `hsla(${hue + 30}, 80%, 70%, 0.7)`; ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      for (let i = 0; i < 3; i++) { const a = (TAU / 3) * i - time * 0.6 + Math.PI; const px = cx + Math.cos(a) * R; const py = cy + Math.sin(a) * R; i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py); }
+      ctx.closePath(); ctx.stroke();
+      // Inner hexagon
+      ctx.strokeStyle = `hsla(${hue}, 70%, 60%, 0.4)`; ctx.lineWidth = 0.7;
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) { const a = (TAU / 6) * i + time * 0.3; const px = cx + Math.cos(a) * R * 0.5; const py = cy + Math.sin(a) * R * 0.5; i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py); }
+      ctx.closePath(); ctx.stroke();
+      // Vertex dots
+      ctx.fillStyle = `hsla(${hue}, 90%, 80%, 0.8)`;
+      for (let i = 0; i < 6; i++) { const a = (TAU / 6) * i + time * 0.3; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * R * 0.5, cy + Math.sin(a) * R * 0.5, 1.8, 0, TAU); ctx.fill(); }
+      // Radial spokes
+      ctx.strokeStyle = `hsla(${hue}, 60%, 55%, 0.25)`; ctx.lineWidth = 0.5;
+      for (let i = 0; i < 6; i++) { const a = (TAU / 6) * i; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R * 0.85, cy + Math.sin(a) * R * 0.85); ctx.stroke(); }
+
+    } else if (p.type === 'lotus') {
+      // 8 outer petals + 8 inner petals + center
+      const hue = 320 + Math.sin(time * 2) * 20;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.6);
+      g.addColorStop(0, `hsla(${hue}, 70%, 75%, 0.3)`);
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 1.6, 0, TAU); ctx.fill();
+      // Outer petals
+      ctx.strokeStyle = `hsla(${hue}, 80%, 65%, 0.7)`; ctx.lineWidth = 1.1;
+      for (let i = 0; i < 8; i++) {
+        const a = (TAU / 8) * i + Math.sin(time * 1.5) * 0.1;
+        const tipX = cx + Math.cos(a) * R;
+        const tipY = cy + Math.sin(a) * R;
+        const cp1a = a - 0.4, cp2a = a + 0.4;
+        ctx.beginPath(); ctx.moveTo(cx, cy);
+        ctx.quadraticCurveTo(cx + Math.cos(cp1a) * R * 1.1, cy + Math.sin(cp1a) * R * 1.1, tipX, tipY);
+        ctx.quadraticCurveTo(cx + Math.cos(cp2a) * R * 1.1, cy + Math.sin(cp2a) * R * 1.1, cx, cy);
+        ctx.stroke();
+      }
+      // Inner petals (rotated 22.5°)
+      ctx.strokeStyle = `hsla(${hue + 20}, 75%, 70%, 0.5)`; ctx.lineWidth = 0.8;
+      for (let i = 0; i < 8; i++) {
+        const a = (TAU / 8) * i + TAU / 16 + Math.sin(time * 2) * 0.08;
+        ctx.beginPath(); ctx.moveTo(cx, cy);
+        ctx.quadraticCurveTo(cx + Math.cos(a - 0.3) * R * 0.6, cy + Math.sin(a - 0.3) * R * 0.6, cx + Math.cos(a) * R * 0.55, cy + Math.sin(a) * R * 0.55);
+        ctx.quadraticCurveTo(cx + Math.cos(a + 0.3) * R * 0.6, cy + Math.sin(a + 0.3) * R * 0.6, cx, cy);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = `hsla(${hue}, 60%, 70%, 0.6)`; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.18, 0, TAU); ctx.stroke();
+
+    } else if (p.type === 'vesica') {
+      // Two overlapping circles
+      const hue = 265 + Math.sin(time * 1.5) * 15;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.6);
+      g.addColorStop(0, `hsla(${hue}, 70%, 65%, 0.3)`);
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 1.6, 0, TAU); ctx.fill();
+      const offset = R * 0.4;
+      ctx.strokeStyle = `hsla(${hue}, 75%, 65%, 0.6)`; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(cx - offset, cy, R * 0.7, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx + offset, cy, R * 0.7, 0, TAU); ctx.stroke();
+      // Vesica intersection fill
+      ctx.fillStyle = `hsla(${hue}, 60%, 50%, 0.2)`;
+      ctx.beginPath(); ctx.arc(cx - offset, cy, R * 0.7, 0, TAU); ctx.fill();
+      ctx.save(); ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = 'rgba(0,0,0,1)';
+      ctx.beginPath(); ctx.arc(cx - offset * 2, cy, R * 0.7, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + offset * 2, cy, R * 0.7, 0, TAU); ctx.fill();
+      ctx.restore();
+      // Inner point
+      ctx.fillStyle = `hsla(${hue}, 80%, 85%, 0.8)`;
+      ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, TAU); ctx.fill();
+
+    } else if (p.type === 'seed') {
+      // Seed of life: 7 circles
+      const hue = 140 + Math.sin(time * 2.5) * 25;
+      const breath = 1 + Math.sin(time * 2 + p.phase) * 0.06;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.5);
+      g.addColorStop(0, `hsla(${hue}, 70%, 60%, 0.3)`);
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 1.5, 0, TAU); ctx.fill();
+      const cr = R * 0.45 * breath;
+      ctx.strokeStyle = `hsla(${hue}, 75%, 60%, 0.7)`; ctx.lineWidth = 1;
+      // Center
+      ctx.beginPath(); ctx.arc(cx, cy, cr, 0, TAU); ctx.stroke();
+      // 6 around
+      for (let i = 0; i < 6; i++) {
+        const a = (TAU / 6) * i + time * 0.3;
+        ctx.beginPath(); ctx.arc(cx + Math.cos(a) * cr, cy + Math.sin(a) * cr, cr, 0, TAU); ctx.stroke();
+      }
+      ctx.fillStyle = `hsla(${hue}, 80%, 80%, 0.8)`;
+      ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, TAU); ctx.fill();
+
+    } else if (p.type === 'star') {
+      // 5-pointed star + rays
+      const hue = 50 + Math.sin(time * 3) * 15;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.8);
+      g.addColorStop(0, `hsla(${hue}, 80%, 85%, 0.4)`);
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 1.8, 0, TAU); ctx.fill();
+      // 5 primary rays
+      ctx.strokeStyle = `hsla(${hue}, 85%, 75%, 0.7)`; ctx.lineWidth = 1.2;
+      for (let i = 0; i < 5; i++) {
+        const a = (TAU / 5) * i - Math.PI / 2 + time * 0.5;
+        ctx.beginPath(); ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(a) * R * 1.15, cy + Math.sin(a) * R * 1.15); ctx.stroke();
+      }
+      // 5 secondary rays
+      ctx.strokeStyle = `hsla(${hue}, 70%, 70%, 0.4)`; ctx.lineWidth = 0.8;
+      for (let i = 0; i < 5; i++) {
+        const a = (TAU / 5) * i - Math.PI / 2 + TAU / 10 + time * 0.5;
+        ctx.beginPath(); ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(a) * R * 0.6, cy + Math.sin(a) * R * 0.6); ctx.stroke();
+      }
+      // Star outline
+      ctx.strokeStyle = `hsla(${hue}, 80%, 70%, 0.8)`; ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = (TAU / 10) * i - Math.PI / 2 + time * 0.5;
+        const sr = i % 2 === 0 ? R * 0.9 : R * 0.4;
+        i === 0 ? ctx.moveTo(cx + Math.cos(a) * sr, cy + Math.sin(a) * sr) : ctx.lineTo(cx + Math.cos(a) * sr, cy + Math.sin(a) * sr);
+      }
+      ctx.closePath(); ctx.stroke();
+      ctx.fillStyle = `hsla(${hue}, 60%, 95%, 0.9)`;
+      ctx.beginPath(); ctx.arc(cx, cy, 3, 0, TAU); ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -803,10 +1076,69 @@
 
     if (player.powerUp) {
       ctx.save();
-      const pc = player.powerUp === 'aura' ? [100,255,200] : player.powerUp === 'nova' ? [255,80,100] : [255,220,50];
-      ctx.strokeStyle = rgb(pc, 0.5 + Math.sin(time*12)*0.3);
-      ctx.lineWidth = 3;
-      drawSg(ctx, 0, 0, pW * 2.8, 0.6, 6, -time * 4);
+      const ar = pW * 2.8;
+      const ap = 1 + Math.sin(time * 4) * 0.06;
+      const AR = ar * ap;
+      ctx.lineCap = 'round';
+      if (player.powerUp === 'aura') {
+        const hue = (time * 60) % 360;
+        for (let ring = 0; ring < 3; ring++) {
+          ctx.strokeStyle = `hsla(${(hue + ring * 120) % 360}, 85%, 65%, ${0.35 - ring * 0.08})`;
+          ctx.lineWidth = 1.8 - ring * 0.4;
+          ctx.beginPath(); ctx.arc(0, 0, AR * (0.7 + ring * 0.2), 0, TAU); ctx.stroke();
+        }
+      } else if (player.powerUp === 'nova') {
+        ctx.strokeStyle = 'hsla(190, 90%, 70%, 0.5)'; ctx.lineWidth = 1.5;
+        for (let i = 0; i < 8; i++) {
+          const a = (TAU / 8) * i + time * 2;
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * AR, Math.sin(a) * AR); ctx.stroke();
+        }
+      } else if (player.powerUp === 'magnet') {
+        ctx.strokeStyle = 'hsla(210, 80%, 60%, 0.4)'; ctx.lineWidth = 1;
+        for (let i = 0; i < 6; i++) {
+          const spread = (i + 1) * AR * 0.15;
+          ctx.beginPath(); ctx.moveTo(-AR * 0.5, 0);
+          ctx.quadraticCurveTo(0, -spread * 1.5, AR * 0.5, 0); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(-AR * 0.5, 0);
+          ctx.quadraticCurveTo(0, spread * 1.5, AR * 0.5, 0); ctx.stroke();
+        }
+      } else if (player.powerUp === 'merkaba') {
+        ctx.strokeStyle = 'hsla(50, 80%, 65%, 0.45)'; ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) { const a = (TAU / 3) * i + time * 0.4; i === 0 ? ctx.moveTo(Math.cos(a) * AR, Math.sin(a) * AR) : ctx.lineTo(Math.cos(a) * AR, Math.sin(a) * AR); }
+        ctx.closePath(); ctx.stroke();
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) { const a = (TAU / 3) * i - time * 0.4 + Math.PI; i === 0 ? ctx.moveTo(Math.cos(a) * AR, Math.sin(a) * AR) : ctx.lineTo(Math.cos(a) * AR, Math.sin(a) * AR); }
+        ctx.closePath(); ctx.stroke();
+      } else if (player.powerUp === 'lotus') {
+        ctx.strokeStyle = 'hsla(320, 75%, 65%, 0.4)'; ctx.lineWidth = 1.2;
+        for (let i = 0; i < 8; i++) {
+          const a = (TAU / 8) * i + time * 0.8;
+          ctx.beginPath(); ctx.moveTo(0, 0);
+          ctx.quadraticCurveTo(Math.cos(a - 0.35) * AR * 1.05, Math.sin(a - 0.35) * AR * 1.05, Math.cos(a) * AR, Math.sin(a) * AR);
+          ctx.quadraticCurveTo(Math.cos(a + 0.35) * AR * 1.05, Math.sin(a + 0.35) * AR * 1.05, 0, 0);
+          ctx.stroke();
+        }
+      } else if (player.powerUp === 'vesica') {
+        const off = AR * 0.3;
+        ctx.strokeStyle = 'hsla(265, 70%, 65%, 0.4)'; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(-off, 0, AR * 0.6, 0, TAU); ctx.stroke();
+        ctx.beginPath(); ctx.arc(off, 0, AR * 0.6, 0, TAU); ctx.stroke();
+      } else if (player.powerUp === 'seed') {
+        const cr = AR * 0.35;
+        ctx.strokeStyle = 'hsla(140, 70%, 55%, 0.4)'; ctx.lineWidth = 0.9;
+        ctx.beginPath(); ctx.arc(0, 0, cr, 0, TAU); ctx.stroke();
+        for (let i = 0; i < 6; i++) { const a = (TAU / 6) * i + time * 0.4; ctx.beginPath(); ctx.arc(Math.cos(a) * cr, Math.sin(a) * cr, cr, 0, TAU); ctx.stroke(); }
+      } else if (player.powerUp === 'star') {
+        ctx.strokeStyle = 'hsla(50, 85%, 75%, 0.5)'; ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+          const a = (TAU / 10) * i - Math.PI / 2 + time * 0.6;
+          const sr = i % 2 === 0 ? AR * 0.9 : AR * 0.4;
+          i === 0 ? ctx.moveTo(Math.cos(a) * sr, Math.sin(a) * sr) : ctx.lineTo(Math.cos(a) * sr, Math.sin(a) * sr);
+        }
+        ctx.closePath(); ctx.stroke();
+      }
       ctx.restore();
     }
 
@@ -882,7 +1214,7 @@
     const accel = sphereSizeScale < 1 ? 0.65 : 0.85; 
     player.vx += move * accel;
     player.vx *= FRICTION;
-    player.vy += GRAVITY;
+    player.vy += player.powerUp === 'merkaba' ? GRAVITY * 0.5 : GRAVITY;
     player.x += player.vx;
     player.y += player.vy;
     player.rotation += player.vx * 0.08;
@@ -895,13 +1227,24 @@
 
     if (-player.y > maxHeight) {
       maxHeight = -player.y;
-      score = Math.floor(maxHeight / 10);
+      score = Math.floor(maxHeight / 10) * (player.powerUp === 'star' ? 2 : 1);
     }
 
     if (player.powerUp) {
       player.powerTimer -= 0.016;
       if (player.powerTimer <= 0) player.powerUp = null;
       if (player.powerUp === 'nova' && time % 0.15 < 0.02) burst(player.x, player.y - cameraY, [255,80,100], 3, 'spark');
+      if (player.powerUp === 'lotus') {
+        for (let i = 0; i < platforms.length; i++) {
+          const p = platforms[i];
+          if (!p.alive) continue;
+          const sy = p.y - cameraY;
+          if (sy < -100 || sy > H + 100) continue;
+          const dx = player.x - (p.x + p.w/2);
+          if (Math.abs(dx) < 200) p.x += dx * 0.01;
+        }
+      }
+      if (player.powerUp === 'star' && time % 0.2 < 0.02) burst(player.x, player.y - cameraY, [255, 240, 180], 2, 'spark');
     }
 
     for (let i = 0; i < powerUps.length; i++) {
@@ -909,8 +1252,27 @@
       if (!p.alive) continue;
       if (Math.hypot(player.x - p.x, (player.y - cameraY) - (p.y - cameraY)) < 45) {
         p.alive = false;
+        if (p.type === 'vesica') {
+          player.y -= 500;
+          addShockwave(player.x, player.y - cameraY, [140, 100, 255]);
+          burst(player.x, player.y - cameraY, [180, 140, 255], 30, 'spark');
+          player.powerUp = null; player.powerTimer = 0;
+          playPowerUpSound(p.type);
+          vibrate([15, 8, 15, 8, 40]);
+          continue;
+        }
+        if (p.type === 'seed') {
+          for (let s = 0; s < 3; s++) {
+            platforms.push({ x: player.x - 50 + Math.random() * 100, y: player.y - 100 - s * 80, w: 80, h: 10, type: 'normal', alive: true, opacity: 1, vx: 0, fade: 0 });
+          }
+          burst(player.x, player.y - cameraY, [100, 255, 140], 20, 'spark');
+          player.powerUp = null; player.powerTimer = 0;
+          playPowerUpSound(p.type);
+          vibrate([15, 8, 15, 8, 40]);
+          continue;
+        }
         player.powerUp = p.type;
-        player.powerTimer = 10;
+        player.powerTimer = p.type === 'merkaba' ? 8 : p.type === 'lotus' ? 6 : p.type === 'star' ? 10 : 10;
         addShockwave(p.x, p.y - cameraY, [255,255,255]);
         playPowerUpSound(p.type);
         vibrate([15, 8, 15, 8, 40]);
