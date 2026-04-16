@@ -71,7 +71,7 @@
   let highScore = parseInt(localStorage.getItem('trippyJumpHigh') || '0');
   let cameraY = 0;
   let maxHeight = 0;
-  let muted = true;
+  let muted = localStorage.getItem('trippy-muted') !== '0'; // default: muted; '0' = user explicitly unmuted
   let time = 0;
   let chillMode = false;
 
@@ -109,6 +109,11 @@
   const keys = {};
   let touchDir = 0;
   let tiltX = 0;
+
+  // Ambient & milestone state
+  let ambientMotes = [];
+  let lastMilestone = 0;
+  let padNoteTimer = 15; // seconds until first ambient pad note
 
   // ── Audio Engine ──
   let audioCtx;
@@ -197,17 +202,30 @@
   }
 
   // ── Melodic note selection ──
-  // Advances melodyStep sequentially through the pentatonic scale,
-  // then shifts up an octave. Creates a flowing ascending melody.
+  // Advances melodyStep through the pentatonic scale with subtle randomness
+  // inspired by Falling Emy — occasional fills (step+1), pullbacks (step-1),
+  // and rare octave drops keep the melody feeling alive rather than mechanical.
   function pickMelodicNote(platformType) {
     const map = MELODY_MAP[platformType] || MELODY_MAP.normal;
+
+    // ~12 % chance: run ahead one extra step (creates a small melodic fill)
+    // ~8 %  chance: pull back one step (adds contrast / resolution feeling)
+    let step = map.step;
+    const rnd = Math.random();
+    if      (rnd < 0.12) step += 1;
+    else if (rnd < 0.20) step = Math.max(1, step - 1);
+
     const idx = (melodyStep + map.octaveShift) % pentatonicScale.length;
     const semitone = pentatonicScale[idx];
-    melodyStep += map.step;
-    // After completing the scale, shift octave range up (capped at 2 octaves)
+    melodyStep += step;
+
     const octaveRange = Math.min(Math.floor(melodyStep / pentatonicScale.length), 2);
     const octaveShift = octaveRange * 12;
-    const freq = BASE_FREQ * Math.pow(2, (semitone + octaveShift) / 12);
+
+    // ~9 % chance: drop an octave for tonal colour / avoids shrillness at altitude
+    const colorShift = Math.random() < 0.09 ? -12 : 0;
+
+    const freq = BASE_FREQ * Math.pow(2, (semitone + octaveShift + colorShift) / 12);
     return { idx: idx % 5, freq, pitchClass: idx % 5 };
   }
 
@@ -260,6 +278,7 @@
 
   // ── Jump sounds per platform type ──
   function playJumpSound(platformType) {
+    if (muted || !audioCtx) return; // guard: safe even if audioCtx was never created
     const note = pickMelodicNote(platformType);
     recordHarmonyHit(note.pitchClass);
 
@@ -304,23 +323,22 @@
       osc2.start(now); osc2.stop(now + 1.0);
 
     } else if (platformType === 'moving') {
-      // Moving: warm pad with gentle chorus — flowing, liquid
+      // Moving: warm pad with gentle chorus — three detuned sines for a lush, liquid pad
       const now = audioCtx.currentTime;
       const panner = getPanner();
-      const osc = audioCtx.createOscillator();
-      const osc2 = audioCtx.createOscillator();
+      const detunes = [0, 0.003, -0.002]; // chorus spread
       const g = audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(note.freq, now);
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(note.freq * 1.003, now); // gentle chorus detune
       g.gain.setValueAtTime(0, now);
-      g.gain.linearRampToValueAtTime(0.16, now + 0.05);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 1.1);
-      osc.connect(g); osc2.connect(g);
+      g.gain.linearRampToValueAtTime(0.14, now + 0.06);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+      detunes.forEach(d => {
+        const osc = audioCtx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(note.freq * (1 + d), now);
+        osc.connect(g);
+        osc.start(now); osc.stop(now + 1.3);
+      });
       routeToOutput(g, panner);
-      osc.start(now); osc.stop(now + 1.2);
-      osc2.start(now); osc2.stop(now + 1.2);
 
     } else if (platformType === 'vanishing') {
       // Vanishing: ethereal singing bowl — soft attack, very long ring
@@ -342,29 +360,36 @@
       osc2.start(now); osc2.stop(now + 2.1);
 
     } else {
-      // Normal: warm tone + soft harmonic fifth — smooth and melodic
+      // Normal: warm tone + randomly-chosen harmonic interval (inspired by Falling Emy).
+      // Cycling through min3 / maj3 / p4 / p5 keeps the melody feeling fresh
+      // while staying consonant. Triangle wave (~25% chance) adds extra warmth.
       const now = audioCtx.currentTime;
       const panner = getPanner();
       const osc1 = audioCtx.createOscillator();
       const g1 = audioCtx.createGain();
       const osc2 = audioCtx.createOscillator();
       const g2 = audioCtx.createGain();
-      osc1.type = 'sine';
+
+      osc1.type = Math.random() < 0.25 ? 'triangle' : 'sine'; // triangle = warmer timbre
       osc1.frequency.setValueAtTime(note.freq, now);
       g1.gain.setValueAtTime(0, now);
-      g1.gain.linearRampToValueAtTime(0.18, now + 0.04);
+      g1.gain.linearRampToValueAtTime(0.17, now + 0.04);
       g1.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
-      // Soft harmonic — always a perfect fifth, no random jumps
+
+      // Warm harmonic interval — random from min3, maj3, perfect 4th, perfect 5th
+      const intervals = [1.2, 1.2599, 1.3348, 1.4983];
+      const harmInterval = intervals[Math.floor(Math.random() * intervals.length)];
       osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(note.freq * 1.498, now);
+      osc2.frequency.setValueAtTime(note.freq * harmInterval, now);
       g2.gain.setValueAtTime(0, now);
-      g2.gain.linearRampToValueAtTime(0.08, now + 0.05);
-      g2.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+      g2.gain.linearRampToValueAtTime(0.07, now + 0.05);
+      g2.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
+
       osc1.connect(g1); osc2.connect(g2);
       routeToOutput(g1, panner);
       routeToOutput(g2, panner);
       osc1.start(now); osc1.stop(now + 1.1);
-      osc2.start(now); osc2.stop(now + 0.8);
+      osc2.start(now); osc2.stop(now + 0.85);
     }
   }
 
@@ -514,6 +539,46 @@
     });
   }
 
+  // Gentle milestone chord — plays at score milestones, inspired by Falling Emy's milestone events.
+  // Four-note major spread (root, maj3, p5, octave) with slow stagger for a warm resolve.
+  function playMilestoneChord() {
+    if (muted || !audioCtx) return;
+    const now = audioCtx.currentTime;
+    [BASE_FREQ, BASE_FREQ * 1.2599, BASE_FREQ * 1.4983, BASE_FREQ * 2].forEach((f, i) => {
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      const t = now + i * 0.15;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, t);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.065, t + 0.14);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 3.0);
+      osc.connect(g); g.connect(masterGain);
+      if (reverbNode) g.connect(reverbNode);
+      osc.start(t); osc.stop(t + 3.1);
+    });
+  }
+
+  // Quiet sustaining pad note — warm root + sub-octave sine that fades in and out
+  // over ~11 s, providing an atmospheric "breath" under the melodic layer.
+  function playPadNote() {
+    if (muted || !audioCtx) return;
+    const now = audioCtx.currentTime;
+    [BASE_FREQ, BASE_FREQ * 0.5].forEach(f => {
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, now);
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(0.028, now + 2.5); // very slow attack
+      g.gain.setValueAtTime(0.028, now + 7.0);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 11.0);
+      osc.connect(g);
+      if (reverbNode) g.connect(reverbNode); else g.connect(masterGain);
+      osc.start(now); osc.stop(now + 11.1);
+    });
+  }
+
   // ── Haptic Feedback ──
   function vibrate(pattern) {
     if (isTouch && navigator.vibrate) navigator.vibrate(pattern);
@@ -571,6 +636,22 @@
         sides:    Math.random() < 0.5 ? 3 : 6,
         s:        0.18 + Math.random() * 0.52,  // parallax factor (lower = slower)
         alpha:    0.05 + Math.random() * 0.09
+      });
+    }
+
+    // Ambient motes — 38 tiny screen-space specks that drift upward gently,
+    // giving the scene an atmospheric, living quality (similar to Falling Emy's feel).
+    ambientMotes = [];
+    for (let i = 0; i < 38; i++) {
+      ambientMotes.push({
+        x:         Math.random() * W,
+        y:         Math.random() * H,
+        vx:        (Math.random() - 0.5) * 0.22,
+        vy:        -(Math.random() * 0.32 + 0.07), // gently upward
+        size:      Math.random() * 1.5 + 0.25,
+        phase:     Math.random() * TAU,
+        speed:     Math.random() * 0.5 + 0.18,     // individual oscillation speed
+        baseAlpha: Math.random() * 0.11 + 0.03
       });
     }
   }
@@ -632,6 +713,8 @@
     for (let i = 0; i < 5; i++) harmonyNotes[i] = HARMONY_UNSET;
     chordBloomCooldown = 0;
     chordBloomFlash = 0;
+    lastMilestone = 0;
+    padNoteTimer = 15 + Math.random() * 5; // stagger first pad note
 
     if (saved) {
       player.x = saved.player.x; player.y = saved.player.y;
@@ -1389,9 +1472,37 @@
     } else { shakeMag = 0; shakeX = 0; shakeY = 0; }
 
     if (platforms.length > 0 && platforms[platforms.length - 1].y > cameraY - 1200) generatePlatforms(platforms[platforms.length - 1].y, cameraY - 3500);
-    // Chord bloom timers
+    // Chord bloom timers — slower decay (0.45×) so expanding rings have time to unfurl
     if (chordBloomCooldown > 0) chordBloomCooldown -= 0.016;
-    if (chordBloomFlash > 0) chordBloomFlash -= 0.016 * 0.8;
+    if (chordBloomFlash > 0) chordBloomFlash -= 0.016 * 0.45;
+
+    // Score milestone chords — gentle musical reward at key heights (inspired by Falling Emy)
+    const _scoreSteps = [100, 200, 500, 1000, 2000, 5000];
+    for (let _si = 0; _si < _scoreSteps.length; _si++) {
+      if (score >= _scoreSteps[_si] && lastMilestone < _scoreSteps[_si]) {
+        lastMilestone = _scoreSteps[_si];
+        playMilestoneChord();
+        chordBloomFlash = Math.max(chordBloomFlash, 0.55); // subtle visual bloom
+        break;
+      }
+    }
+
+    // Ambient pad note — atmospheric warmth every 12-18 seconds
+    padNoteTimer -= 0.016;
+    if (padNoteTimer <= 0) {
+      playPadNote();
+      padNoteTimer = 12 + Math.random() * 6;
+    }
+
+    // Ambient motes — gentle screen-space specks drifting upward
+    for (let _mi = 0; _mi < ambientMotes.length; _mi++) {
+      const m = ambientMotes[_mi];
+      m.x += m.vx + Math.sin(time * m.speed + m.phase) * 0.06;
+      m.y += m.vy;
+      if (m.y < -5) m.y = H + 5;
+      if (m.x < -5) m.x = W + 5;
+      else if (m.x > W + 5) m.x = -5;
+    }
 
     if (time % 5 < 0.02) saveGame();
     if (!chillMode && player.y - cameraY > H + 120) endGame();
@@ -1416,6 +1527,20 @@
     if (shakeMag > 0.1) ctx.translate(shakeX, shakeY);
 
     drawBackground();
+
+    // Ambient motes — gentle screen-space specks for atmospheric warmth
+    if (ambientMotes.length > 0) {
+      ctx.save();
+      for (let i = 0; i < ambientMotes.length; i++) {
+        const m = ambientMotes[i];
+        const alpha = m.baseAlpha * (0.5 + 0.5 * Math.sin(time * m.speed + m.phase));
+        ctx.fillStyle = rgb(theme.accent, alpha);
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, m.size, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
 
     if (playing || gameOver) {
       const camY = cameraY;
@@ -1477,18 +1602,49 @@
 
     ctx.restore(); // remove shake offset
 
-    // Chord bloom flash — subtle full-screen halo when all 5 pentatonics are hit
+    // Chord bloom flash — expanding sacred-geometry polygon rings (inspired by Falling Emy).
+    // 5 rings, one per pentatonic pitch class, triangle → heptagon, hue-shifted.
     if (chordBloomFlash > 0) {
       const cf = Math.min(chordBloomFlash, 1);
-      const bloomAlpha = cf * cf * 0.15; // bell curve fade
+      const expand = 1 - cf;                         // 0 → 1 as flash fades
+      const env = cf * Math.sin(expand * Math.PI + 0.01); // bell curve
+
+      // Soft radial background glow
+      if (cf > 0.02) {
+        ctx.save();
+        ctx.globalAlpha = cf * cf * 0.07;
+        const bloom = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, H * 0.7);
+        bloom.addColorStop(0, rgb(theme.accent, 1));
+        bloom.addColorStop(0.5, rgb(theme.primary, 0.4));
+        bloom.addColorStop(1, 'transparent');
+        ctx.fillStyle = bloom;
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+      }
+
+      // Expanding polygon rings — one per pentatonic pitch class (3–7 sides)
+      const bx = W / 2, by = H / 2;
+      const pentatonicHues = [0, 72, 144, 216, 288]; // evenly spaced around hue wheel
       ctx.save();
-      ctx.globalAlpha = bloomAlpha;
-      const bloom = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, H * 0.7);
-      bloom.addColorStop(0, rgb(theme.accent, 1));
-      bloom.addColorStop(0.5, rgb(theme.primary, 0.5));
-      bloom.addColorStop(1, 'transparent');
-      ctx.fillStyle = bloom;
-      ctx.fillRect(0, 0, W, H);
+      for (let ri = 0; ri < 5; ri++) {
+        const sides = ri + 3;
+        const radius = expand * Math.min(W, H) * (0.17 + ri * 0.1);
+        if (radius <= 0) continue;
+        const hue = (pentatonicHues[ri] + time * 22) % 360;
+        const alpha = env * (0.17 - ri * 0.022);
+        if (alpha < 0.004) continue;
+        ctx.strokeStyle = `hsla(${hue}, 88%, 72%, ${alpha.toFixed(3)})`;
+        ctx.lineWidth = 2.2 - ri * 0.28;
+        ctx.beginPath();
+        for (let j = 0; j <= sides; j++) {
+          const a = (TAU / sides) * j + time * 0.28 + ri * 0.38;
+          j === 0
+            ? ctx.moveTo(bx + Math.cos(a) * radius, by + Math.sin(a) * radius)
+            : ctx.lineTo(bx + Math.cos(a) * radius, by + Math.sin(a) * radius);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
       ctx.restore();
     }
 
@@ -1515,7 +1671,16 @@
   document.getElementById('play-again').onclick = (e) => { e.preventDefault(); document.getElementById('game-over').classList.remove('is-active'); initGame(false); };
   document.getElementById('theme-btn').onclick = () => { themeIndex = (themeIndex + 1) % themes.length; theme = { ...themes[themeIndex] }; };
   document.getElementById('chill-btn').onclick = function() { chillMode = !chillMode; this.classList.toggle('is-on', chillMode); };
-  document.getElementById('mute-btn').onclick = function() { muted = !muted; this.textContent = muted ? '🔇' : '🔊'; this.classList.toggle('is-on', !muted); initAudio(); };
+  document.getElementById('mute-btn').onclick = function() {
+    muted = !muted;
+    this.textContent = muted ? '🔇' : '🔊';
+    this.classList.toggle('is-on', !muted);
+    localStorage.setItem('trippy-muted', muted ? '1' : '0');
+    if (!muted) {
+      initAudio(); // create context if needed (valid user-gesture here)
+      if (audioCtx && audioCtx.state !== 'running') audioCtx.resume().catch(() => {});
+    }
+  };
   document.getElementById('info-btn').onclick = () => document.getElementById('info-panel').classList.toggle('is-open');
   document.getElementById('close-panel').onclick = () => document.getElementById('info-panel').classList.remove('is-open');
 
@@ -1536,6 +1701,18 @@
   }
 
   checkResume();
+
+  // Restore AudioContext when the tab becomes visible again (mobile browsers suspend it on tab-switch)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && audioCtx && !muted && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
+  });
+
+  // Sync mute button visual with restored localStorage preference
+  { const mb = document.getElementById('mute-btn');
+    mb.textContent = muted ? '🔇' : '🔊';
+    mb.classList.toggle('is-on', !muted); }
 
   // Tailor the start-screen hint to the detected input method
   const startHintEl = document.getElementById('start-hint');
