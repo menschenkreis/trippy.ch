@@ -1,0 +1,166 @@
+{
+  "ui": {
+    "journeyTitle": {
+      "context": "Heading for the milestone history section inside the info panel",
+      "en": "Your Ascent",
+      "de": "Dein Aufstieg"
+    },
+    "journeyEmpty": {
+      "context": "Placeholder shown in the journey log before any milestone has been reached",
+      "en": "The ascent just began…",
+      "de": "Der Aufstieg hat gerade erst begonnen…"
+    }
+  },
+  "milestones": [
+    {
+      "id": "score-5",
+      "context": "Very first milestone — a few jumps in. Sets the tone of wonder and beginning.",
+      "score": 5,
+      "label": { "en": "first light", "de": "erstes Licht" },
+      "text": {
+        "en": "the first jump is the bravest. everything after is momentum.",
+        "de": "der erste Sprung ist der mutigste. alles danach ist Schwung."
+      }
+    },
+    {
+      "id": "score-40",
+      "context": "Early milestone — the player is finding a rhythm. Theme: being met by the path.",
+      "score": 40,
+      "label": { "en": "rising", "de": "Aufstieg" },
+      "text": {
+        "en": "each platform is a gift the path places beneath you.",
+        "de": "jede Plattform ist ein Geschenk, das der Weg unter dich legt."
+      }
+    },
+    {
+      "id": "score-100",
+      "context": "First major score milestone. Theme: entering flow state, body wisdom.",
+      "score": 100,
+      "label": { "en": "flow", "de": "Fluss" },
+      "text": {
+        "en": "when the mind quiets, the body knows exactly where to land.",
+        "de": "wenn der Geist sich beruhigt, weiß der Körper genau, wo er landen soll."
+      }
+    },
+    {
+      "id": "score-200",
+      "context": "Theme: remembering innate potential rather than striving toward it.",
+      "score": 200,
+      "label": { "en": "remembering", "de": "Erinnern" },
+      "text": {
+        "en": "you are not climbing. you are remembering how high you already are.",
+        "de": "du kletterst nicht. du erinnerst dich daran, wie hoch du schon immer warst."
+      }
+    },
+    {
+      "id": "score-350",
+      "context": "Theme: trust and commitment — the universe meets you at the point of decision.",
+      "score": 350,
+      "label": { "en": "trust", "de": "Vertrauen" },
+      "text": {
+        "en": "the platform appears the moment you commit to the leap.",
+        "de": "die Plattform erscheint in dem Moment, in dem du dich zum Sprung entschließt."
+      }
+    },
+    {
+      "id": "score-500",
+      "context": "Theme: the sacred space of potential — the gap between where we are and could be.",
+      "score": 500,
+      "label": { "en": "courage", "de": "Mut" },
+      "text": {
+        "en": "the gap between where you are and where you could be — that space is sacred.",
+        "de": "der Raum zwischen dem, wo du bist, und dem, wo du sein könntest — dieser Raum ist heilig."
+      }
+    },
+    {
+      "id": "score-750",
+      "context": "Theme: gaining perspective on former fears from a new vantage point.",
+      "score": 750,
+      "label": { "en": "perspective", "de": "Perspektive" },
+      "text": {
+        "en": "from this height, your former fears look like the small shapes they always were.",
+        "de": "aus dieser Höhe sehen deine alten Ängste aus wie die kleinen Formen, die sie immer waren."
+      }
+    },
+    {
+      "id": "score-1100",
+      "context": "Theme: releasing control as the prerequisite for genuine ascent.",
+      "score": 1100,
+      "label": { "en": "release", "de": "Loslassen" },
+      "text": {
+        "en": "control is the last thing you surrender before you truly rise.",
+        "de": "Kontrolle ist das Letzte, was du loslässt, bevor du wirklich aufsteigst."
+      }
+    },
+    {
+      "id": "score-1600",
+      "context": "Theme: the ego's story quiets at the heights awareness reaches.",
+      "score": 1600,
+      "label": { "en": "silence", "de": "Stille" },
+      "text": {
+        "en": "at a certain altitude, the noise of who you think you are simply falls away.",
+        "de": "ab einer gewissen Höhe fällt das Rauschen dessen ab, wer du zu sein glaubst."
+      }
+    },
+    {
+      "id": "score-2300",
+      "context": "Theme: failure as teacher — each stumble refines the aim of the next attempt.",
+      "score": 2300,
+      "label": { "en": "clarity", "de": "Klarheit" },
+      "text": {
+        "en": "every stumble teaches the next leap where to aim.",
+        "de": "jeder Fehltritt lehrt den nächsten Sprung, wohin er zielen soll."
+      }
+    },
+    {
+      "id": "score-3200",
+      "context": "Theme: non-duality — the boundary between mover and movement dissolves.",
+      "score": 3200,
+      "label": { "en": "grace", "de": "Anmut" },
+      "text": {
+        "en": "you have become the motion itself. the separation was never real.",
+        "de": "du bist die Bewegung selbst geworden. die Trennung war nie wirklich."
+      }
+    },
+    {
+      "id": "score-4500",
+      "context": "Theme: shadow work — inner depth as foundation for outer height.",
+      "score": 4500,
+      "label": { "en": "depth", "de": "Tiefe" },
+      "text": {
+        "en": "to rise this high required going this deep within.",
+        "de": "um so hoch zu steigen, musstest du so tief in dich selbst gehen."
+      }
+    },
+    {
+      "id": "score-6500",
+      "context": "Theme: all challenges as teachers; the self as both student and subject.",
+      "score": 6500,
+      "label": { "en": "presence", "de": "Gegenwart" },
+      "text": {
+        "en": "the platforms are teachers. you are the lesson and the student both.",
+        "de": "die Plattformen sind Lehrer. du bist die Lektion und der Schüler zugleich."
+      }
+    },
+    {
+      "id": "score-9000",
+      "context": "Theme: limitlessness — no ceiling, only sky becoming more sky.",
+      "score": 9000,
+      "label": { "en": "infinite", "de": "Unendlich" },
+      "text": {
+        "en": "there is no ceiling. there never was. only sky becoming more sky.",
+        "de": "es gibt keine Decke. es gab sie nie. nur Himmel, der mehr Himmel wird."
+      }
+    },
+    {
+      "id": "score-13000",
+      "context": "Final milestone — all experiences integrated as altitude, not just memory.",
+      "score": 13000,
+      "label": { "en": "radiance", "de": "Leuchten" },
+      "text": {
+        "en": "you carry every jump inside you now — not as memory, but as height.",
+        "de": "du trägst jeden deiner Sprünge in dir — nicht als Erinnerung, sondern als Höhe."
+      }
+    }
+  ]
+}

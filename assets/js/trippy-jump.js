@@ -34,6 +34,19 @@
   resize();
   window.addEventListener('resize', resize);
 
+  // ── Language ──
+  // Detects from localStorage → browser navigator.language → 'en'.
+  // TJ_CONTENT is set synchronously by trippy-jump-content.js before this script runs.
+  {
+    const _avail  = Object.keys(window.TJ_CONTENT || { en: 1 });
+    const _stored = localStorage.getItem('tj-lang') || '';
+    const _browser = (navigator.language || '').slice(0, 2).toLowerCase();
+    window.TJ_LANG = _avail.includes(_stored)  ? _stored  :
+                     _avail.includes(_browser) ? _browser : 'en';
+  }
+  const TJ_MILESTONES = (window.TJ_CONTENT?.[window.TJ_LANG]?.milestones) ||
+                        (window.TJ_CONTENT?.en?.milestones) || [];
+
   // ── Color Themes ──
   const themes = [
     { name: 'deepsky', primary: [40,150,255], secondary: [255,255,255], accent: [200,230,255], bg: '#0a0d14' },
@@ -114,6 +127,11 @@
   let ambientMotes = [];
   let lastMilestone = 0;
   let padNoteTimer = 15; // seconds until first ambient pad note
+
+  // Philosophical milestone system (mirrors Falling Emy's chapter system)
+  let firedMilestones = new Set();
+  let milestoneDisplay = null; // { score, label, text, life, maxLife }
+  let journeyLog = []; // { score, label, text } — newest pushed to end
 
   // ── Audio Engine ──
   let audioCtx;
@@ -579,6 +597,173 @@
     });
   }
 
+  // ── Journey Log (panel) ──
+  // Renders the milestone history inside the info panel, newest first.
+  // SVG icons reflect the altitude tier — circle (birth) → triangles → hexagram.
+  function updateJourneyPanel() {
+    const el = document.getElementById('journey-log');
+    if (!el) return;
+    if (journeyLog.length === 0) {
+      const content = window.TJ_CONTENT?.[window.TJ_LANG];
+      const empty = content?.ui?.journeyEmpty || 'The ascent just began…';
+      el.innerHTML = `<p id="journey-empty" style="font-size:0.82rem;color:rgba(255,255,255,0.2);font-style:italic;margin:0">${empty}</p>`;
+      return;
+    }
+    let html = '';
+    for (let i = journeyLog.length - 1; i >= 0; i--) {
+      const e = journeyLog[i];
+      let svg;
+      if (e.score <= 10) {
+        // Origin — circle with centre dot
+        svg = `<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1" opacity="0.7"/><circle cx="8" cy="8" r="2" fill="currentColor" opacity="0.8"/></svg>`;
+      } else if (e.score <= 500) {
+        // Early ascent — single upward triangle
+        svg = `<svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,2 14,14 2,14" fill="none" stroke="currentColor" stroke-width="1" opacity="0.65"/></svg>`;
+      } else if (e.score <= 2300) {
+        // Mid ascent — nested triangles
+        svg = `<svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,2 14,14 2,14" fill="none" stroke="currentColor" stroke-width="1" opacity="0.65"/><polygon points="8,5 12,13 4,13" fill="none" stroke="currentColor" stroke-width="0.7" opacity="0.35"/></svg>`;
+      } else {
+        // High ascent — hexagram (Star of David / Merkaba)
+        svg = `<svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,1 14,12 2,12" fill="none" stroke="currentColor" stroke-width="0.9" opacity="0.6"/><polygon points="8,15 14,4 2,4" fill="none" stroke="currentColor" stroke-width="0.9" opacity="0.6"/></svg>`;
+      }
+      html += `<div class="journey-entry"><div class="journey-icon">${svg}</div><div class="journey-entry-text"><strong>${e.label}</strong> — ${e.text}</div></div>`;
+    }
+    el.innerHTML = html;
+  }
+
+  // ── Milestone Thought Bubble (canvas) ──
+  // Draws a translucent thought bubble with the milestone quote, word-by-word
+  // reveal, and animated thought dots — inspired by Falling Emy's chapterDisplay.
+  function drawMilestoneDisplay() {
+    if (!milestoneDisplay) return;
+    const { text, label, life, maxLife } = milestoneDisplay;
+    const elapsed = maxLife - life;
+
+    // Smooth alpha envelope: fade in 1.5 s → hold → fade out 1.5 s
+    const fadeDur = 1.5;
+    let alpha = life > maxLife - fadeDur ? (maxLife - life) / fadeDur
+              : life > fadeDur           ? 1.0
+              :                            life / fadeDur;
+    alpha = Math.max(0, Math.min(1, alpha));
+    alpha = alpha * alpha * (3 - 2 * alpha); // smoothstep
+    if (alpha < 0.005) return;
+
+    const bubbleCX = W / 2;
+    const bubbleCY = H * 0.64;
+    const maxBW = Math.min(W * 0.78, 380);
+    const pad = 18;
+    const fSz = Math.max(12, Math.round(13 * Math.min(sphereSizeScale, 1.3)));
+    const lSz = Math.max(9,  Math.round(10 * Math.min(sphereSizeScale, 1.3)));
+    const lnH = fSz * 1.6;
+
+    ctx.save();
+    ctx.font = `300 ${fSz}px sans-serif`;
+
+    // ── Word-wrap the quote ──
+    const words = text.split(' ');
+    const lines = [];
+    let cur = '';
+    for (const w of words) {
+      const test = cur ? cur + ' ' + w : w;
+      if (ctx.measureText(test).width > maxBW - pad * 2.4) { if (cur) lines.push(cur); cur = w; }
+      else cur = test;
+    }
+    if (cur) lines.push(cur);
+
+    const bubbleH = lines.length * lnH + lSz * 2.2 + pad * 2.8;
+    const bubbleW = maxBW;
+    const bubbleX = bubbleCX - bubbleW / 2;
+    const bubbleY = bubbleCY - bubbleH / 2;
+
+    ctx.globalAlpha = alpha;
+
+    // Drop shadow
+    ctx.shadowColor = `rgba(0,0,0,0.4)`;
+    ctx.shadowBlur = 18;
+
+    // Background
+    ctx.fillStyle = 'rgba(6, 5, 14, 0.92)';
+    ctx.beginPath();
+    ctx.roundRect(bubbleX, bubbleY, bubbleW, bubbleH, 16);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Border
+    ctx.strokeStyle = rgb(theme.accent, 0.3);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(bubbleX, bubbleY, bubbleW, bubbleH, 16);
+    ctx.stroke();
+
+    // ── Thought dots below the bubble (pointing toward the player below) ──
+    for (let i = 0; i < 3; i++) {
+      const dr = Math.max(0.5, 3.8 - i * 1.0);
+      const dy = bubbleY + bubbleH + 10 + i * (dr * 2 + 5) + Math.sin(time * 2.2 + i * 0.9) * 1.8;
+      ctx.fillStyle = rgb(theme.accent, Math.max(0, (0.26 - i * 0.07) * alpha));
+      ctx.globalAlpha = 1; // already baked into fillStyle alpha
+      ctx.beginPath();
+      ctx.arc(bubbleCX, dy, dr, 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalAlpha = alpha;
+
+    // ── Milestone label (small caps, accent colour) ──
+    const labelAlpha = Math.min(elapsed / 0.5, 1);
+    ctx.save();
+    ctx.globalAlpha = alpha * labelAlpha;
+    ctx.textAlign = 'center';
+    ctx.font = `500 ${lSz}px sans-serif`;
+    ctx.fillStyle = rgb(theme.accent, 0.9);
+    ctx.fillText(label.toUpperCase(), bubbleCX, bubbleY + pad + lSz);
+    ctx.restore();
+
+    // Thin separator line below label
+    if (labelAlpha > 0.15) {
+      ctx.save();
+      ctx.globalAlpha = alpha * Math.min(labelAlpha, 1) * 0.28;
+      ctx.strokeStyle = rgb(theme.accent, 1);
+      ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(bubbleX + pad * 1.8, bubbleY + pad + lSz + 5);
+      ctx.lineTo(bubbleX + bubbleW - pad * 1.8, bubbleY + pad + lSz + 5);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // ── Quote text — word-by-word staggered appearance with bounce ──
+    const textY0 = bubbleY + pad + lSz * 2.5;
+    ctx.font = `200 ${fSz}px sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+
+    let wIdx = 0;
+    for (let li = 0; li < lines.length; li++) {
+      const lineWords = lines[li].split(' ');
+      const lineW = ctx.measureText(lines[li]).width;
+      let lx = bubbleCX - lineW / 2;
+      const ly = textY0 + li * lnH;
+
+      for (const word of lineWords) {
+        const wW = ctx.measureText(word + ' ').width;
+        const wStart = 0.28 + wIdx * 0.1;
+        const wEl = Math.max(0, elapsed - wStart);
+        const wA = Math.min(wEl / 0.32, 1);
+        const bounce = wA < 1 ? Math.sin((wEl / 0.32) * Math.PI) * 3.5 : 0;
+
+        if (wA > 0.005) {
+          ctx.save();
+          ctx.globalAlpha = alpha * wA;
+          ctx.fillText(word, lx, ly - bounce);
+          ctx.restore();
+        }
+        lx += wW;
+        wIdx++;
+      }
+    }
+
+    ctx.restore();
+  }
+
   // ── Haptic Feedback ──
   function vibrate(pattern) {
     if (isTouch && navigator.vibrate) navigator.vibrate(pattern);
@@ -715,6 +900,16 @@
     chordBloomFlash = 0;
     lastMilestone = 0;
     padNoteTimer = 15 + Math.random() * 5; // stagger first pad note
+
+    // Philosophical milestone reset
+    firedMilestones.clear();
+    milestoneDisplay = null;
+    journeyLog = [];
+    // Pre-fire milestones already behind the starting score (prevents burst on restore)
+    for (let _i = 0; _i < TJ_MILESTONES.length; _i++) {
+      if (TJ_MILESTONES[_i].score <= score) firedMilestones.add(_i);
+    }
+    updateJourneyPanel();
 
     if (saved) {
       player.x = saved.player.x; player.y = saved.player.y;
@@ -1494,6 +1689,25 @@
       padNoteTimer = 12 + Math.random() * 6;
     }
 
+    // ── Philosophical milestone display ──
+    // One milestone at a time; next fires only once the current has expired.
+    if (!milestoneDisplay) {
+      for (let _mi = 0; _mi < TJ_MILESTONES.length; _mi++) {
+        if (!firedMilestones.has(_mi) && score >= TJ_MILESTONES[_mi].score) {
+          firedMilestones.add(_mi);
+          const _m = TJ_MILESTONES[_mi];
+          milestoneDisplay = { score: _m.score, label: _m.label, text: _m.text, life: 6.5, maxLife: 6.5 };
+          journeyLog.push({ score: _m.score, label: _m.label, text: _m.text });
+          updateJourneyPanel();
+          break;
+        }
+      }
+    }
+    if (milestoneDisplay) {
+      milestoneDisplay.life -= 0.016;
+      if (milestoneDisplay.life <= 0) milestoneDisplay = null;
+    }
+
     // Ambient motes — gentle screen-space specks drifting upward
     for (let _mi = 0; _mi < ambientMotes.length; _mi++) {
       const m = ambientMotes[_mi];
@@ -1602,6 +1816,9 @@
 
     ctx.restore(); // remove shake offset
 
+    // Milestone thought bubble — drawn outside the shake offset so it stays stable
+    drawMilestoneDisplay();
+
     // Chord bloom flash — expanding sacred-geometry polygon rings (inspired by Falling Emy).
     // 5 rings, one per pentatonic pitch class, triangle → heptagon, hue-shifted.
     if (chordBloomFlash > 0) {
@@ -1701,6 +1918,17 @@
   }
 
   checkResume();
+
+  // Apply i18n to static info-panel elements (title + empty log placeholder)
+  {
+    const _c = window.TJ_CONTENT?.[window.TJ_LANG];
+    if (_c) {
+      const _jt = document.getElementById('journey-title');
+      if (_jt && _c.ui?.journeyTitle) _jt.textContent = _c.ui.journeyTitle;
+      const _je = document.getElementById('journey-empty');
+      if (_je && _c.ui?.journeyEmpty) _je.textContent = _c.ui.journeyEmpty;
+    }
+  }
 
   // Restore AudioContext when the tab becomes visible again (mobile browsers suspend it on tab-switch)
   document.addEventListener('visibilitychange', () => {

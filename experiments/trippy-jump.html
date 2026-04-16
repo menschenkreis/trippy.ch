@@ -41,6 +41,11 @@
     .platform-legend{display:flex;align-items:center;gap:0.8rem;margin-bottom:0.6rem}
     .legend-color{width:32px;height:6px;border-radius:3px;flex-shrink:0}
     .legend-label{font-size:0.82rem;color:rgba(255,255,255,0.45)}
+    /* Journey log — mirrors Falling Emy's milestone panel */
+    .journey-entry{display:flex;gap:0.75rem;margin-bottom:0.65rem;align-items:flex-start}
+    .journey-icon{width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:rgba(140,100,255,0.5);margin-top:2px}
+    .journey-entry-text{font-size:0.8rem;line-height:1.55;color:rgba(255,255,255,0.38)}
+    .journey-entry-text strong{color:rgba(255,255,255,0.6);font-weight:400}
     /* Game over overlay */
     #game-over{position:fixed;inset:0;z-index:300;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(8,6,15,0.85);backdrop-filter:blur(12px)}
     #game-over.is-active{display:flex}
@@ -102,6 +107,11 @@
     <div class="platform-legend"><span class="legend-color" style="background:rgba(255,255,100,0.8);box-shadow:0 0 8px rgba(255,255,100,0.5)"></span><span class="legend-label"><strong>Spring</strong> — Super boost jump!</span></div>
     <div class="platform-legend"><span class="legend-color" style="background:rgba(255,100,150,0.5);box-shadow:0 0 8px rgba(255,100,150,0.3)"></span><span class="legend-label"><strong>Vanishing</strong> — Fades after landing</span></div>
 
+    <h2 id="journey-title">Your Ascent</h2>
+    <div id="journey-log">
+      <p id="journey-empty" style="font-size:0.82rem;color:rgba(255,255,255,0.2);font-style:italic;margin:0">The ascent just began…</p>
+    </div>
+
     <hr style="border:none;border-top:1px solid rgba(140,100,255,0.1);margin:1.5rem 0">
     <a class="source-link" href="https://github.com/menschenkreis/trippy.ch" target="_blank">view source on github</a>
   </div>
@@ -125,6 +135,7 @@
     <button id="play-again">ASCEND AGAIN</button>
   </div>
 
+<script src="../assets/js/trippy-jump-content.js"></script>
 <script src="../assets/js/trippy-jump.js"></script>
 <script src="../assets/js/main.js"></script>
 </body>
