@@ -651,14 +651,51 @@
     const baseGap = 70;
     const maxDifficultyGap = 70;
     const newPlatforms = [];
-    
+
+    // Seed the reachability check from the last platform already in the world.
+    let prevP = platforms.length > 0 ? platforms[platforms.length - 1] : null;
+
     while (y > toY) {
       const difficultyProgress = Math.min(score / 2000, 1);
-      const currentMaxGap = baseGap + (difficultyProgress * maxDifficultyGap);
-      y -= 50 + Math.random() * (currentMaxGap - 50);
-      
+      const currentMaxGap = baseGap + difficultyProgress * maxDifficultyGap;
+
+      // Desktop gets denser platforms: a 28 % smaller gap means ~39 % more
+      // platforms in view at any time, giving the player more path options.
+      const gapMult = isTouch ? 1.0 : 0.72;
+      y -= gapMult * (50 + Math.random() * (currentMaxGap - 50));
+
       const w = (65 + Math.random() * 25) * sphereSizeScale;
-      const x = Math.random() * (W - w);
+      let x = Math.random() * (W - w);
+
+      // ── Reachability guarantee ──
+      // Physics: after landing on prevP the player launches with vy = JUMP_VEL (-11).
+      // The time to fall back down to height dy above prevP:
+      //   0.16t² - 11t + dy = 0  →  t_land = (11 + √(121 - 0.64·dy)) / 0.32
+      // Maximum horizontal travel in that time at peak vx ≈ 5 px/frame.
+      // If the randomly-placed platform is outside that cone, reposition it.
+      if (prevP) {
+        const dy = prevP.y - y; // px gap upward (always positive here)
+        const disc = 121 - 0.64 * dy;
+        if (disc >= 0) {
+          const tLand    = (11 + Math.sqrt(disc)) / 0.32;       // frames in air
+          const maxHoriz = Math.min(tLand * 5.0, W * 0.49);     // cap at wrap distance
+
+          const srcCx   = prevP.x + prevP.w * 0.5;
+          const dstCx   = x + w * 0.5;
+          const rawDist = Math.abs(dstCx - srcCx);
+          // Minimum distance accounting for screen-wrap shortcut
+          const horizDist  = Math.min(rawDist, W - rawDist);
+          // A platform is reachable if its nearest edge is within maxHoriz
+          const reachable  = horizDist <= maxHoriz + (prevP.w + w) * 0.5;
+
+          if (!reachable) {
+            // Place within a comfortable 75 % of max reach so it never feels borderline.
+            const safeR = Math.min(maxHoriz * 0.75, W * 0.44 - w * 0.5);
+            x = srcCx + (Math.random() * 2 - 1) * safeR - w * 0.5;
+            x = Math.max(0, Math.min(W - w, x));
+          }
+        }
+      }
 
       let type = 'normal';
       const r = Math.random();
@@ -668,7 +705,9 @@
       else if (r < 0.3 + diff * 0.15) type = 'moving';
       else if (r < 0.4 + diff * 0.1) type = 'vanishing';
 
-      newPlatforms.push({ x, y, w, h: 10, type, alive: true, opacity: 1, vx: (Math.random() - 0.5) * 4, fade: 0 });
+      const p = { x, y, w, h: 10, type, alive: true, opacity: 1, vx: (Math.random() - 0.5) * 4, fade: 0 };
+      newPlatforms.push(p);
+      prevP = p; // next platform must be reachable from this one
 
       if (Math.random() < 0.09) {
         const pTypes = ['aura', 'nova', 'magnet', 'merkaba', 'lotus', 'vesica', 'seed', 'star'];
@@ -1458,7 +1497,14 @@
   }
 
   // ── Listeners ──
-  window.addEventListener('keydown', e => keys[e.key] = true);
+  window.addEventListener('keydown', e => {
+    keys[e.key] = true;
+    if (e.key === ' ' && gameOver) {
+      e.preventDefault();
+      document.getElementById('game-over').classList.remove('is-active');
+      initGame(false);
+    }
+  });
   window.addEventListener('keyup', e => keys[e.key] = false);
   canvas.addEventListener('touchstart', e => { e.preventDefault(); touchDir = e.touches[0].clientX < W/2 ? -1 : 1; initAudio(); initAccel(); }, {passive:false});
   canvas.addEventListener('touchend', () => touchDir = 0);
