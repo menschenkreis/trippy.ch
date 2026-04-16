@@ -84,7 +84,7 @@
   const GRAVITY = 0.32;
   const JUMP_VEL = -11;
   const SPRING_VEL = -18;
-  const FRICTION = 0.88;
+  const FRICTION = 0.85; // Slightly higher friction for more precise stopping
 
   let platforms = [];
   let particles = [];
@@ -475,7 +475,9 @@
     if (touchDir !== 0) move = touchDir;
     if (Math.abs(tiltX) > 0.1) move = tiltX;
 
-    player.vx += move * 0.9 * (sphereSizeScale < 1 ? 1 : 1.3);
+    // Movement tuning for better control
+    const accel = sphereSizeScale < 1 ? 0.65 : 0.85; 
+    player.vx += move * accel;
     player.vx *= FRICTION;
     player.vy += GRAVITY;
     player.x += player.vx;
