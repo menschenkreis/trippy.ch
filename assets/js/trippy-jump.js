@@ -1891,8 +1891,8 @@
   canvas.addEventListener('mousedown', e => { if (playing) touchDir = e.clientX < W/2 ? -1 : 1; initAudio(); initAccel(); });
   canvas.addEventListener('mouseup', () => touchDir = 0);
 
-  document.getElementById('start-btn').onclick = (e) => { e.preventDefault(); initGame(false); };
-  document.getElementById('play-again').onclick = (e) => { e.preventDefault(); initGame(false); };
+  document.getElementById('start-btn').onclick = (e) => { e.preventDefault(); initAudio(); initAccel(); initGame(false); };
+  document.getElementById('play-again').onclick = (e) => { e.preventDefault(); initAudio(); initAccel(); initGame(false); };
   document.getElementById('theme-btn').onclick = () => { 
     manualTheme = true;
     themeIndex = (themeIndex + 1) % themes.length; 
@@ -1930,7 +1930,7 @@
     if (saved && saved.score > 200) {
       const startBtn = document.getElementById('start-btn');
       startBtn.textContent = 'RESUME JOURNEY';
-      startBtn.onclick = (e) => { e.preventDefault(); initGame(true); };
+      startBtn.onclick = (e) => { e.preventDefault(); initAudio(); initAccel(); initGame(true); };
       const sub = document.querySelector('#start-screen .sub');
       if (sub) sub.textContent = `last height: ${saved.score}m`;
       const fresh = document.createElement('p');
