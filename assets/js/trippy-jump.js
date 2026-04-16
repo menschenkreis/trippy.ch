@@ -1653,13 +1653,13 @@
     if (Math.abs(rawTilt) > TILT_DEADZONE) {
       tiltActive = true;
       const normalised = Math.max(-1, Math.min(1, (rawTilt - Math.sign(rawTilt) * TILT_DEADZONE) / (TILT_SENSITIVITY - TILT_DEADZONE)));
-      smoothTilt += (normalised - smoothTilt) * 0.15; // exponential smoothing
+      smoothTilt += (normalised - smoothTilt) * 0.45; // fast tracking — feels proportional, not binary
     } else {
       tiltActive = false;
-      smoothTilt *= 0.85; // decay toward zero
+      smoothTilt *= 0.8; // quick decay to zero
     }
     if (touchDir !== 0) move = touchDir;
-    else if (tiltActive && Math.abs(smoothTilt) > 0.08) move = smoothTilt;
+    else if (tiltActive && Math.abs(smoothTilt) > 0.05) move = smoothTilt;
 
     // Movement tuning for better control
     const accel = sphereSizeScale < 1 ? 0.65 : 0.85; 
