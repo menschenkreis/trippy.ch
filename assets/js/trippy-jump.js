@@ -9,6 +9,9 @@
   let sphereSizeScale = 1.0;
   const TAU = Math.PI * 2;
 
+  // Detect touch/pointer type once at module level (used for scaling, hints, haptics)
+  const isTouch = window.matchMedia('(pointer: coarse)').matches;
+
   // Offscreen canvas for static sacred geometry layers (Parallax layers)
   const bgCanvas = document.createElement('canvas');
   const bgCtx = bgCanvas.getContext('2d');
@@ -26,7 +29,6 @@
     bgCanvas.height = H * dpr;
     bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const isTouch = window.matchMedia('(pointer: coarse)').matches;
     sphereSizeScale = isTouch ? 1.0 : Math.min(W / 900, 1.4);
   }
   resize();
@@ -95,6 +97,14 @@
   let mountains = [];
   let clouds = [];
 
+  // ── Juiciness State ──
+  // Squish/stretch: axes lerp back to 1 each frame
+  let squishX = 1, squishY = 1;
+  // Screen shake: random offset per-frame, magnitude decays exponentially
+  let shakeX = 0, shakeY = 0, shakeMag = 0;
+  // Trail tint: colour set by the jump type, stored per trail dot
+  let trailLaunchColor = null;
+
   const keys = {};
   let touchDir = 0;
   let tiltX = 0;
@@ -142,6 +152,11 @@
     const base = isSpring ? 150 : 220;
     const freq = base + Math.min(score / 10, 600);
     playNote(freq, 'sine', 0.3, isSpring ? 1.2 : 0.6);
+  }
+
+  // ── Haptic Feedback ──
+  function vibrate(pattern) {
+    if (isTouch && navigator.vibrate) navigator.vibrate(pattern);
   }
 
   // ── Accelerometer ──
@@ -202,6 +217,17 @@
     shockwaves.push({ x, y, radius: 0, maxRadius: 120, alpha: 0.7, color: color || theme.primary });
   }
 
+  // Kick screen shake; subsequent calls only increase magnitude, never decrease it
+  function triggerShake(mag) {
+    shakeMag = Math.max(shakeMag, mag);
+  }
+
+  // Landing squash (wide+flat) — axes lerp back to 1 automatically in update()
+  function triggerSquish() {
+    squishX = 1.45;
+    squishY = 0.62;
+  }
+
   // ── Init Game ──
   function initGame(restore = false) {
     const saved = restore ? loadGame() : null;
@@ -220,6 +246,9 @@
     shockwaves = [];
     powerUps = [];
     time = 0;
+    squishX = 1; squishY = 1;
+    shakeX = 0; shakeY = 0; shakeMag = 0;
+    trailLaunchColor = null;
 
     if (saved) {
       player.x = saved.player.x; player.y = saved.player.y;
@@ -395,6 +424,9 @@
   function drawPlayer(x, y) {
     ctx.save();
     ctx.translate(x, y);
+    // Scale before rotate so the squish/stretch is always in canvas (screen) space,
+    // not in the player's own rotated space — keeps it readable at any rotation angle.
+    ctx.scale(squishX, squishY);
     ctx.rotate(player.rotation);
     const pW = player.width * sphereSizeScale;
 
@@ -510,7 +542,12 @@
         player.powerTimer = 10;
         addShockwave(p.x, p.y - cameraY, [255,255,255]);
         playNote(880, 'sine', 0.5, 1.2);
-        if (p.type === 'nova') player.vy = SPRING_VEL * 1.6;
+        vibrate([15, 8, 15, 8, 40]);
+        if (p.type === 'nova') {
+          player.vy = SPRING_VEL * 1.6;
+          trailLaunchColor = [255, 80, 100]; // nova = crimson trail
+          triggerShake(6);
+        }
       }
     }
 
@@ -530,11 +567,18 @@
             jump = player.powerUp === 'aura' ? SPRING_VEL * 1.3 : SPRING_VEL;
             addShockwave(player.x, p.y - cameraY, [255, 220, 50]);
             burst(player.x, p.y - cameraY, [255, 255, 150], 25, 'spark');
+            vibrate([12, 5, 30]);
+            triggerShake(p.type === 'spring' ? 5 : 4);
+            trailLaunchColor = p.type === 'spring' ? [255, 220, 50] : [100, 255, 200];
+          } else {
+            trailLaunchColor = null; // normal bounce → use theme colour
           }
-          if (p.type === 'fragile') { p.alive = false; burst(p.x + p.w/2, p.y - cameraY, [255, 80, 100], 15); }
+          if (p.type === 'fragile') { p.alive = false; burst(p.x + p.w/2, p.y - cameraY, [255, 80, 100], 15); vibrate(8); }
           if (p.type === 'vanishing') p.fade = 1;
           player.vy = jump; playJumpSound(p.type === 'spring');
+          if (p.type !== 'spring' && player.powerUp !== 'aura') vibrate(18);
           burst(player.x, p.y - cameraY, theme.secondary, 12);
+          triggerSquish(); // landing squash — springs back via lerp
           break;
         }
       }
@@ -546,8 +590,10 @@
       if (p.fade > 0) { p.fade += 0.05; p.opacity = Math.max(0, 1 - p.fade); if (p.opacity <= 0) p.alive = false; }
     }
 
-    trail.push({ x: player.x, y: player.y, a: 1.0 });
-    if (trail.length > 25) trail.shift();
+    // Trail length stretches to 40 dots after a big jump (spring / nova / aura)
+    const trailMax = trailLaunchColor !== null || Math.abs(player.vy) > 14 ? 40 : 25;
+    trail.push({ x: player.x, y: player.y, a: 1.0, color: trailLaunchColor });
+    if (trail.length > trailMax) trail.shift();
     for (let i = 0; i < trail.length; i++) trail[i].a *= 0.92;
 
     for (let i = particles.length - 1; i >= 0; i--) {
@@ -558,6 +604,17 @@
     for (let i = shockwaves.length - 1; i >= 0; i--) {
       const s = shockwaves[i]; s.radius += 6; s.alpha *= 0.93; if (s.alpha < 0.01) shockwaves.splice(i, 1);
     }
+
+    // Squish spring-back: lerp each axis toward 1.0 (~10 frames to settle)
+    squishX += (1 - squishX) * 0.22;
+    squishY += (1 - squishY) * 0.22;
+
+    // Screen shake: new random offset every frame, magnitude decays ~8 frames
+    if (shakeMag > 0.1) {
+      shakeX = (Math.random() - 0.5) * shakeMag * 2;
+      shakeY = (Math.random() - 0.5) * shakeMag * 2;
+      shakeMag *= 0.82;
+    } else { shakeMag = 0; shakeX = 0; shakeY = 0; }
 
     if (platforms.length > 0 && platforms[platforms.length - 1].y > cameraY - 1200) generatePlatforms(platforms[platforms.length - 1].y, cameraY - 3500);
     if (time % 5 < 0.02) saveGame();
@@ -573,24 +630,33 @@
   }
 
   function render() {
+    // Clear without any transform so we never leave uncleared slivers at screen edges
     ctx.clearRect(0, 0, W, H);
+
+    // Apply screen shake as a translate on top of the DPR transform.
+    // save/restore brackets ALL drawing so the offset is removed before the next frame.
+    ctx.save();
+    if (shakeMag > 0.1) ctx.translate(shakeX, shakeY);
+
     drawBackground();
-    
+
     if (playing || gameOver) {
       const camY = cameraY;
-      
+
       for (let i = 0; i < powerUps.length; i++) drawPowerUp(powerUps[i]);
-      
+
       for (let i = 0; i < platforms.length; i++) {
         const p = platforms[i];
         const sy = p.y - camY;
         if (sy > -100 && sy < H + 100) drawPlatform(p, sy);
       }
 
+      // Trail — each dot stores the launch colour set at the moment of the jump
       ctx.save();
       for (let i = 0; i < trail.length; i++) {
         const t = trail[i];
-        ctx.fillStyle = rgb(theme.primary, t.a * 0.4);
+        const tColor = t.color || theme.primary;
+        ctx.fillStyle = rgb(tColor, t.a * 0.4);
         ctx.beginPath(); ctx.arc(t.x, t.y - camY, 6 * t.a, 0, TAU); ctx.fill();
       }
       ctx.restore();
@@ -611,12 +677,29 @@
       }
       
       drawPlayer(player.x, player.y - camY);
-      
-      ctx.fillStyle = 'rgba(255,255,255,0.8)'; 
-      ctx.font = `200 ${3.0 * sphereSizeScale}rem sans-serif`; 
-      ctx.textAlign = 'center'; 
-      ctx.fillText(score, W/2, 80);
+
+      // Score — positioned below the control buttons to avoid visual overlap
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.font = `200 ${3.0 * sphereSizeScale}rem sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(score, W/2, 130);
+
+      // Touch zone hints: shown briefly at game start on touch devices, then fade out
+      if (isTouch && time < 8) {
+        const hintAlpha = time < 5 ? 0.22 : (1 - (time - 5) / 3) * 0.22;
+        ctx.save();
+        ctx.globalAlpha = hintAlpha;
+        ctx.fillStyle = rgb(theme.accent, 1);
+        ctx.font = `${Math.round(48 * sphereSizeScale)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText('◀', W * 0.12, H - 80);
+        ctx.fillText('▶', W * 0.88, H - 80);
+        ctx.restore();
+      }
     }
+
+    ctx.restore(); // remove shake offset
+
     requestAnimationFrame(render);
     update();
   }
@@ -633,7 +716,7 @@
   document.getElementById('play-again').onclick = (e) => { e.preventDefault(); document.getElementById('game-over').classList.remove('is-active'); initGame(false); };
   document.getElementById('theme-btn').onclick = () => { themeIndex = (themeIndex + 1) % themes.length; theme = { ...themes[themeIndex] }; };
   document.getElementById('chill-btn').onclick = function() { chillMode = !chillMode; this.classList.toggle('is-on', chillMode); };
-  document.getElementById('mute-btn').onclick = function() { muted = !muted; this.textContent = muted ? '🔊' : '🔇'; this.classList.toggle('is-on', !muted); initAudio(); };
+  document.getElementById('mute-btn').onclick = function() { muted = !muted; this.textContent = muted ? '🔇' : '🔊'; this.classList.toggle('is-on', !muted); initAudio(); };
   document.getElementById('info-btn').onclick = () => document.getElementById('info-panel').classList.toggle('is-open');
   document.getElementById('close-panel').onclick = () => document.getElementById('info-panel').classList.remove('is-open');
 
@@ -654,5 +737,14 @@
   }
 
   checkResume();
+
+  // Tailor the start-screen hint to the detected input method
+  const startHintEl = document.getElementById('start-hint');
+  if (startHintEl) {
+    startHintEl.textContent = isTouch
+      ? 'tap left · right to move  ·  tilt to steer'
+      : 'arrow keys or a · d to move';
+  }
+
   requestAnimationFrame(render);
 })();
