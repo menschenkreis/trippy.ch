@@ -1644,8 +1644,9 @@
     let move = 0;
     if (keys['ArrowLeft'] || keys['a']) move = -1;
     if (keys['ArrowRight'] || keys['d']) move = 1;
+    // Touch and tilt only override when actively engaged (not stale values)
     if (touchDir !== 0) move = touchDir;
-    if (Math.abs(tiltX) > 0.1) move = tiltX;
+    else if (Math.abs(tiltX) > 0.15) move = tiltX;
 
     // Movement tuning for better control
     const accel = sphereSizeScale < 1 ? 0.65 : 0.85; 
@@ -1992,17 +1993,22 @@
   // ── Listeners ──
   window.addEventListener('keydown', e => {
     keys[e.key] = true;
+    // Prevent page scroll from arrow keys / space during gameplay
+    if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key) && playing) {
+      e.preventDefault();
+    }
     if (e.key === ' ' && gameOver) {
       e.preventDefault();
       document.getElementById('game-over').classList.remove('is-active');
       initGame(false);
     }
   });
-  window.addEventListener('keyup', e => keys[e.key] = false);
+  window.addEventListener('keyup', e => { keys[e.key] = false; delete keys[e.key]; });
   canvas.addEventListener('touchstart', e => { e.preventDefault(); touchDir = e.touches[0].clientX < W/2 ? -1 : 1; initAudio(); initAccel(); }, {passive:false});
   canvas.addEventListener('touchend', () => touchDir = 0);
-  canvas.addEventListener('mousedown', e => { touchDir = e.clientX < W/2 ? -1 : 1; initAudio(); initAccel(); });
-  canvas.addEventListener('mouseup', () => touchDir = 0);
+  canvas.addEventListener('touchcancel', () => touchDir = 0);
+  window.addEventListener('mousedown', e => { if (playing) touchDir = e.clientX < W/2 ? -1 : 1; initAudio(); initAccel(); });
+  window.addEventListener('mouseup', () => touchDir = 0);
 
   document.getElementById('start-btn').onclick = (e) => { e.preventDefault(); document.getElementById('start-screen').classList.add('hidden'); initGame(false); };
   document.getElementById('play-again').onclick = (e) => { e.preventDefault(); document.getElementById('game-over').classList.remove('is-active'); initGame(false); };
