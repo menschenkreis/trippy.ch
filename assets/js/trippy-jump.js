@@ -158,7 +158,7 @@
 
   // Pentatonic scale (C D E G A across 2 octaves) — same as Falling Emy
   const pentatonicScale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
-  const BASE_FREQ = 131; // C3 — deeper, warmer base
+  const BASE_FREQ = 165; // E3 — warm, grounded
 
   // Melodic patterns per platform type — each defines how melodyStep advances
   // and which octave offset to apply, so special platforms feel distinct
