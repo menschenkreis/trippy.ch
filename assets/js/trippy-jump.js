@@ -99,7 +99,9 @@
   const GRAVITY = 0.32;
   const JUMP_VEL = -11;
   const SPRING_VEL = -18;
-  const FRICTION = 0.85; // Slightly higher friction for more precise stopping
+  const FRICTION = 0.88; // Smooth deceleration
+  const TILT_DEADZONE = 5; // Degrees of tilt ignored (eliminates resting jitter)
+  const TILT_SENSITIVITY = 25; // Degrees for full deflection
 
   let platforms = [];
   let particles = [];
@@ -121,7 +123,9 @@
 
   const keys = {};
   let touchDir = 0;
-  let tiltX = 0;
+  let rawTilt = 0;
+  let smoothTilt = 0;
+  let tiltActive = false;
 
   // Ambient & milestone state
   let ambientMotes = [];
@@ -901,7 +905,7 @@
         let tilt = gamma;
         if (angle === 90) tilt = e.beta;
         else if (angle === -90) tilt = -e.beta;
-        tiltX = Math.max(-1, Math.min(1, -tilt / 30));
+        rawTilt = -tilt;
       }, {passive: true});
       accelInited = true;
     };
@@ -1645,8 +1649,17 @@
     if (keys['ArrowLeft'] || keys['a']) move = -1;
     if (keys['ArrowRight'] || keys['d']) move = 1;
     // Touch and tilt only override when actively engaged (not stale values)
+    // Smooth tilt input with deadzone
+    if (Math.abs(rawTilt) > TILT_DEADZONE) {
+      tiltActive = true;
+      const normalised = Math.max(-1, Math.min(1, (rawTilt - Math.sign(rawTilt) * TILT_DEADZONE) / (TILT_SENSITIVITY - TILT_DEADZONE)));
+      smoothTilt += (normalised - smoothTilt) * 0.15; // exponential smoothing
+    } else {
+      tiltActive = false;
+      smoothTilt *= 0.85; // decay toward zero
+    }
     if (touchDir !== 0) move = touchDir;
-    else if (Math.abs(tiltX) > 0.15) move = tiltX;
+    else if (tiltActive && Math.abs(smoothTilt) > 0.08) move = smoothTilt;
 
     // Movement tuning for better control
     const accel = sphereSizeScale < 1 ? 0.65 : 0.85; 
@@ -2007,8 +2020,8 @@
   canvas.addEventListener('touchstart', e => { e.preventDefault(); touchDir = e.touches[0].clientX < W/2 ? -1 : 1; initAudio(); initAccel(); }, {passive:false});
   canvas.addEventListener('touchend', () => touchDir = 0);
   canvas.addEventListener('touchcancel', () => touchDir = 0);
-  window.addEventListener('mousedown', e => { if (playing) touchDir = e.clientX < W/2 ? -1 : 1; initAudio(); initAccel(); });
-  window.addEventListener('mouseup', () => touchDir = 0);
+  canvas.addEventListener('mousedown', e => { if (playing) touchDir = e.clientX < W/2 ? -1 : 1; initAudio(); initAccel(); });
+  canvas.addEventListener('mouseup', () => touchDir = 0);
 
   document.getElementById('start-btn').onclick = (e) => { e.preventDefault(); document.getElementById('start-screen').classList.add('hidden'); initGame(false); };
   document.getElementById('play-again').onclick = (e) => { e.preventDefault(); document.getElementById('game-over').classList.remove('is-active'); initGame(false); };
