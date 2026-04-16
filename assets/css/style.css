@@ -1131,8 +1131,69 @@ footer a:hover { color: var(--pink); }
 }
 #lang-modal-en:active, #lang-modal-de:active { transform: scale(0.97); }
 
-/* Reduced motion */
-@media (prefers-reduced-motion: reduce) {
+/* ── Support Link (Sacred Geometry) ── */
+.support-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  text-decoration: none;
+  color: var(--fg-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  transition: color 0.4s ease;
+  opacity: 0.7;
+}
+
+.support-link:hover {
+  color: var(--teal);
+  opacity: 1;
+}
+
+.sacred-geo {
+  width: 24px;
+  height: 24px;
+  display: block;
+  color: var(--teal);
+  animation: geoRotate 12s linear infinite;
+  filter: drop-shadow(0 0 5px var(--teal-glow));
+}
+
+.support-link:hover .sacred-geo {
+  animation: geoRotate 4s linear infinite, geoPulse 2s ease-in-out infinite;
+  color: var(--pink);
+  filter: drop-shadow(0 0 8px var(--pink-glow));
+}
+
+@keyframes geoRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes geoPulse {
+  0%, 100% { transform: rotate(var(--current-rot)) scale(1); }
+  50% { transform: rotate(var(--current-rot)) scale(1.2); }
+}
+
+.support-text {
+  position: relative;
+}
+
+.support-text::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: var(--pink);
+  transition: width 0.4s ease;
+}
+
+.support-link:hover .support-text::after {
+  width: 100%;
+}
+
   .scroll-hint { animation: none; }
   .nav-card, .exp-card { transition: none; }
   #theme-btn { animation: none; }
