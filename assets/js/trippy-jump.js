@@ -70,6 +70,34 @@
   // Input
   const keys = {};
   let touchDir = 0;
+  let tiltX = 0;
+
+  // ── Accelerometer (from Falling Emy) ──
+  let accelInited = false;
+  function initAccel() {
+    if (accelInited) return;
+    const setupEvents = () => {
+      window.addEventListener('deviceorientation', e => {
+        let gamma = e.gamma;
+        if (gamma === null) return;
+        // Handle screen orientation
+        let angle = (window.screen && window.screen.orientation) ? window.screen.orientation.angle : (window.orientation || 0);
+        let tilt = gamma;
+        if (angle === 90) tilt = e.beta;
+        else if (angle === -90) tilt = -e.beta;
+        tiltX = Math.max(-1, Math.min(1, tilt / 30));
+      }, {passive: true});
+      accelInited = true;
+    };
+
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().then(perm => {
+        if (perm === 'granted') setupEvents();
+      }).catch(e => console.warn("Orientation permission error:", e));
+    } else {
+      setupEvents();
+    }
+  }
 
   // ── Audio Engine (from Falling Emy) ──
   let audioCtx;
@@ -322,6 +350,7 @@
     if (keys['ArrowLeft'] || keys['a']) move = -1;
     if (keys['ArrowRight'] || keys['d']) move = 1;
     if (touchDir !== 0) move = touchDir;
+    if (Math.abs(tiltX) > 0.1) move = tiltX;
 
     player.vx += move * 0.8;
     player.vx *= FRICTION;
@@ -476,9 +505,9 @@
   // ── Listeners ──
   window.addEventListener('keydown', e => keys[e.key] = true);
   window.addEventListener('keyup', e => keys[e.key] = false);
-  canvas.addEventListener('touchstart', e => { e.preventDefault(); touchDir = e.touches[0].clientX < W/2 ? -1 : 1; initAudio(); }, {passive:false});
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); touchDir = e.touches[0].clientX < W/2 ? -1 : 1; initAudio(); initAccel(); }, {passive:false});
   canvas.addEventListener('touchend', () => touchDir = 0);
-  canvas.addEventListener('mousedown', e => { touchDir = e.clientX < W/2 ? -1 : 1; initAudio(); });
+  canvas.addEventListener('mousedown', e => { touchDir = e.clientX < W/2 ? -1 : 1; initAudio(); initAccel(); });
   canvas.addEventListener('mouseup', () => touchDir = 0);
 
   document.getElementById('start-btn').onclick = () => {
