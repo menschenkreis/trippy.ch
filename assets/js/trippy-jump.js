@@ -632,8 +632,9 @@
   }
 
   // ── Milestone Thought Bubble (canvas) ──
-  // Draws a translucent thought bubble with the milestone quote, word-by-word
-  // reveal, and animated thought dots — inspired by Falling Emy's chapterDisplay.
+  // Draws a milestone thought bubble as a dark glittering parallax portal.
+  // The inner area contains animated stars, sacred geometry fragments, and
+  // depth layers that shift independently — creating a window into another dimension.
   function drawMilestoneDisplay() {
     if (!milestoneDisplay) return;
     const { text, label, life, maxLife } = milestoneDisplay;
@@ -649,8 +650,8 @@
     if (alpha < 0.005) return;
 
     const bubbleCX = W / 2;
-    const bubbleCY = H * 0.64;
-    const maxBW = Math.min(W * 0.78, 380);
+    const bubbleCY = H * 0.76;
+    const maxBW = Math.min(W * 0.82, 400);
     const pad = 18;
     const fSz = Math.max(12, Math.round(13 * Math.min(sphereSizeScale, 1.3)));
     const lSz = Math.max(9,  Math.round(10 * Math.min(sphereSizeScale, 1.3)));
@@ -674,38 +675,154 @@
     const bubbleW = maxBW;
     const bubbleX = bubbleCX - bubbleW / 2;
     const bubbleY = bubbleCY - bubbleH / 2;
+    const rad = 16;
 
+    // ── Clip to bubble shape for the portal interior ──
+    ctx.save();
     ctx.globalAlpha = alpha;
-
-    // Drop shadow
-    ctx.shadowColor = `rgba(0,0,0,0.4)`;
-    ctx.shadowBlur = 18;
-
-    // Background
-    ctx.fillStyle = 'rgba(6, 5, 14, 0.92)';
     ctx.beginPath();
-    ctx.roundRect(bubbleX, bubbleY, bubbleW, bubbleH, 16);
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    ctx.roundRect(bubbleX, bubbleY, bubbleW, bubbleH, rad);
+    ctx.clip();
 
-    // Border
-    ctx.strokeStyle = rgb(theme.accent, 0.3);
-    ctx.lineWidth = 1;
+    // ── Portal background: deep dark gradient with subtle hue shift ──
+    const portalHue = (time * 8 + 220) % 360;
+    const bgGrad = ctx.createRadialGradient(
+      bubbleCX + Math.sin(time * 0.3) * 20, bubbleCY + Math.cos(time * 0.4) * 15, 0,
+      bubbleCX, bubbleCY, bubbleW * 0.7
+    );
+    bgGrad.addColorStop(0, `hsla(${portalHue}, 40%, 6%, 1)`);
+    bgGrad.addColorStop(0.5, `hsla(${(portalHue + 30) % 360}, 30%, 3%, 1)`);
+    bgGrad.addColorStop(1, `hsla(${(portalHue + 60) % 360}, 20%, 1%, 1)`);
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(bubbleX, bubbleY, bubbleW, bubbleH);
+
+    // ── Layer 1: Deep stars — slow parallax, large, dim ──
+    const seed1 = 42;
+    for (let i = 0; i < 25; i++) {
+      const sx = bubbleX + ((Math.sin(seed1 + i * 7.3) * 0.5 + 0.5) * bubbleW + time * 2 * (i % 3 + 1)) % bubbleW;
+      const sy = bubbleY + ((Math.cos(seed1 + i * 4.1) * 0.5 + 0.5) * bubbleH + time * 1.5 * (i % 2 + 1)) % bubbleH;
+      const twinkle = 0.3 + 0.7 * Math.sin(time * 1.5 + i * 2.1);
+      const sr = 1.0 + (i % 3) * 0.5;
+      ctx.fillStyle = `hsla(${(portalHue + i * 15) % 360}, 60%, 75%, ${twinkle * 0.25})`;
+      ctx.beginPath(); ctx.arc(sx, sy, sr, 0, TAU); ctx.fill();
+    }
+
+    // ── Layer 2: Mid-depth stars — medium parallax ──
+    const seed2 = 137;
+    for (let i = 0; i < 35; i++) {
+      const sx = bubbleX + ((Math.sin(seed2 + i * 5.7) * 0.5 + 0.5) * bubbleW - time * 4 * (i % 3 + 1)) % bubbleW;
+      const sy = bubbleY + ((Math.cos(seed2 + i * 3.3) * 0.5 + 0.5) * bubbleH - time * 3 * (i % 2 + 1)) % bubbleH;
+      const twinkle = 0.2 + 0.8 * Math.sin(time * 2.5 + i * 1.7);
+      const sr = 0.6 + (i % 4) * 0.3;
+      const hue = (portalHue + 60 + i * 10) % 360;
+      ctx.fillStyle = `hsla(${hue}, 70%, 80%, ${twinkle * 0.35})`;
+      ctx.beginPath(); ctx.arc(sx, sy, sr, 0, TAU); ctx.fill();
+    }
+
+    // ── Layer 3: Close glitter — fast parallax, small, bright ──
+    const seed3 = 256;
+    for (let i = 0; i < 50; i++) {
+      const sx = bubbleX + ((Math.sin(seed3 + i * 3.9) * 0.5 + 0.5) * bubbleW + time * 8 * ((i % 5) * 0.3 + 0.5)) % bubbleW;
+      const sy = bubbleY + ((Math.cos(seed3 + i * 2.7) * 0.5 + 0.5) * bubbleH + time * 6 * ((i % 4) * 0.3 + 0.5)) % bubbleH;
+      const twinkle = Math.pow(Math.max(0, Math.sin(time * 4 + i * 3.3)), 3);
+      const sr = 0.3 + (i % 3) * 0.2;
+      ctx.fillStyle = `hsla(${(portalHue + 120 + i * 7) % 360}, 80%, 90%, ${twinkle * 0.6})`;
+      ctx.beginPath(); ctx.arc(sx, sy, sr, 0, TAU); ctx.fill();
+    }
+
+    // ── Layer 4: Sacred geometry fragments — rotating, parallaxing outlines ──
+    // Hexagons at different depths
+    const geoSeed = 88;
+    for (let i = 0; i < 5; i++) {
+      const depth = 0.15 + i * 0.18;
+      const gx = bubbleX + ((Math.sin(geoSeed + i * 6.1) * 0.5 + 0.5) * bubbleW + time * 3 * depth) % bubbleW;
+      const gy = bubbleY + ((Math.cos(geoSeed + i * 4.7) * 0.5 + 0.5) * bubbleH + time * 2 * depth) % bubbleH;
+      const gr = 8 + i * 5;
+      const rot = time * (0.2 + i * 0.1) * (i % 2 === 0 ? 1 : -1);
+      const sides = [3, 6, 4, 6, 3][i];
+      const hue = (portalHue + 90 + i * 45) % 360;
+      ctx.strokeStyle = `hsla(${hue}, 70%, 70%, ${0.12 + depth * 0.1})`;
+      ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      for (let j = 0; j <= sides; j++) {
+        const a = (TAU / sides) * j + rot;
+        j === 0 ? ctx.moveTo(gx + Math.cos(a) * gr, gy + Math.sin(a) * gr)
+                : ctx.lineTo(gx + Math.cos(a) * gr, gy + Math.sin(a) * gr);
+      }
+      ctx.closePath(); ctx.stroke();
+    }
+
+    // Flower-of-life fragments (circle clusters)
+    for (let i = 0; i < 3; i++) {
+      const depth = 0.2 + i * 0.25;
+      const fx = bubbleX + ((Math.sin(geoSeed + 100 + i * 8.3) * 0.5 + 0.5) * bubbleW - time * 2.5 * depth) % bubbleW;
+      const fy = bubbleY + ((Math.cos(geoSeed + 100 + i * 5.9) * 0.5 + 0.5) * bubbleH - time * 1.8 * depth) % bubbleH;
+      const fr = 6 + i * 3;
+      const hue = (portalHue + 180 + i * 40) % 360;
+      ctx.strokeStyle = `hsla(${hue}, 65%, 65%, ${0.08 + depth * 0.06})`;
+      ctx.lineWidth = 0.5;
+      for (let j = 0; j < 6; j++) {
+        const a = (TAU / 6) * j + time * 0.15;
+        ctx.beginPath();
+        ctx.arc(fx + Math.cos(a) * fr * 0.5, fy + Math.sin(a) * fr * 0.5, fr * 0.5, 0, TAU);
+        ctx.stroke();
+      }
+    }
+
+    // ── Layer 5: Nebula glow — soft coloured clouds drifting through ──
+    for (let i = 0; i < 4; i++) {
+      const nx = bubbleX + ((Math.sin(geoSeed + 200 + i * 11.1) * 0.5 + 0.5) * bubbleW + Math.sin(time * 0.2 + i) * 30) % bubbleW;
+      const ny = bubbleY + ((Math.cos(geoSeed + 200 + i * 7.7) * 0.5 + 0.5) * bubbleH + Math.cos(time * 0.15 + i) * 20) % bubbleH;
+      const nr = 40 + i * 15;
+      const hue = (portalHue + 40 + i * 70) % 360;
+      const nebGrad = ctx.createRadialGradient(nx, ny, 0, nx, ny, nr);
+      nebGrad.addColorStop(0, `hsla(${hue}, 80%, 50%, 0.06)`);
+      nebGrad.addColorStop(0.5, `hsla(${hue}, 60%, 40%, 0.02)`);
+      nebGrad.addColorStop(1, `hsla(${hue}, 40%, 30%, 0)`);
+      ctx.fillStyle = nebGrad;
+      ctx.fillRect(nx - nr, ny - nr, nr * 2, nr * 2);
+    }
+
+    // ── Vignette: darken edges to frame the portal ──
+    const vigGrad = ctx.createRadialGradient(bubbleCX, bubbleCY, Math.min(bubbleW, bubbleH) * 0.25, bubbleCX, bubbleCY, Math.max(bubbleW, bubbleH) * 0.55);
+    vigGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    vigGrad.addColorStop(0.7, 'rgba(0,0,0,0.15)');
+    vigGrad.addColorStop(1, 'rgba(0,0,0,0.55)');
+    ctx.fillStyle = vigGrad;
+    ctx.fillRect(bubbleX, bubbleY, bubbleW, bubbleH);
+
+    ctx.restore(); // end clip
+
+    // ── Border: soft glowing frame with theme accent ──
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    // Outer glow
+    ctx.shadowColor = `hsla(${portalHue}, 70%, 60%, 0.4)`;
+    ctx.shadowBlur = 20;
+    ctx.strokeStyle = `hsla(${portalHue}, 60%, 55%, 0.35)`;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect(bubbleX, bubbleY, bubbleW, bubbleH, 16);
+    ctx.roundRect(bubbleX, bubbleY, bubbleW, bubbleH, rad);
     ctx.stroke();
+    ctx.shadowBlur = 0;
+    // Inner bright edge
+    ctx.strokeStyle = `hsla(${(portalHue + 40) % 360}, 80%, 75%, 0.25)`;
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.roundRect(bubbleX + 2, bubbleY + 2, bubbleW - 4, bubbleH - 4, rad - 2);
+    ctx.stroke();
+    ctx.restore();
 
     // ── Thought dots below the bubble (pointing toward the player below) ──
     for (let i = 0; i < 3; i++) {
       const dr = Math.max(0.5, 3.8 - i * 1.0);
       const dy = bubbleY + bubbleH + 10 + i * (dr * 2 + 5) + Math.sin(time * 2.2 + i * 0.9) * 1.8;
-      ctx.fillStyle = rgb(theme.accent, Math.max(0, (0.26 - i * 0.07) * alpha));
-      ctx.globalAlpha = 1; // already baked into fillStyle alpha
+      const dotAlpha = (0.26 - i * 0.07) * alpha;
+      ctx.fillStyle = `hsla(${portalHue}, 70%, 75%, ${Math.max(0, dotAlpha)})`;
       ctx.beginPath();
       ctx.arc(bubbleCX, dy, dr, 0, TAU);
       ctx.fill();
     }
-    ctx.globalAlpha = alpha;
 
     // ── Milestone label (small caps, accent colour) ──
     const labelAlpha = Math.min(elapsed / 0.5, 1);
@@ -713,7 +830,7 @@
     ctx.globalAlpha = alpha * labelAlpha;
     ctx.textAlign = 'center';
     ctx.font = `500 ${lSz}px sans-serif`;
-    ctx.fillStyle = rgb(theme.accent, 0.9);
+    ctx.fillStyle = `hsla(${(portalHue + 40) % 360}, 75%, 80%, 0.9)`;
     ctx.fillText(label.toUpperCase(), bubbleCX, bubbleY + pad + lSz);
     ctx.restore();
 
@@ -721,7 +838,7 @@
     if (labelAlpha > 0.15) {
       ctx.save();
       ctx.globalAlpha = alpha * Math.min(labelAlpha, 1) * 0.28;
-      ctx.strokeStyle = rgb(theme.accent, 1);
+      ctx.strokeStyle = `hsla(${(portalHue + 40) % 360}, 70%, 70%, 0.5)`;
       ctx.lineWidth = 0.6;
       ctx.beginPath();
       ctx.moveTo(bubbleX + pad * 1.8, bubbleY + pad + lSz + 5);
@@ -734,7 +851,6 @@
     const textY0 = bubbleY + pad + lSz * 2.5;
     ctx.font = `200 ${fSz}px sans-serif`;
     ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
 
     let wIdx = 0;
     for (let li = 0; li < lines.length; li++) {
@@ -753,6 +869,10 @@
         if (wA > 0.005) {
           ctx.save();
           ctx.globalAlpha = alpha * wA;
+          // Text with subtle glow for readability over the portal
+          ctx.shadowColor = `hsla(${portalHue}, 60%, 30%, 0.8)`;
+          ctx.shadowBlur = 6;
+          ctx.fillStyle = `hsla(${(portalHue + 40) % 360}, 20%, 95%, 0.95)`;
           ctx.fillText(word, lx, ly - bounce);
           ctx.restore();
         }
