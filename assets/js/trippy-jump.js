@@ -119,8 +119,8 @@
   const JUMP_VEL = -11;
   const SPRING_VEL = -18;
   const FRICTION = 0.88; // Smooth deceleration
-  const TILT_DEADZONE = 5; // Degrees of tilt ignored (eliminates resting jitter)
-  const TILT_SENSITIVITY = 20; // Degrees for full deflection
+  const TILT_DEADZONE = 6; // Degrees of tilt ignored (resting buffer)
+  const TILT_SENSITIVITY = 28; // Degrees for full deflection (more range = more control)
 
   let platforms = [];
   let particles = [];
@@ -143,7 +143,6 @@
   const keys = {};
   let touchDir = 0;
   let rawTilt = 0;
-  let tiltCenter = null; // calibrated center (set on first reading + each game start)
   let smoothTilt = 0;
   let tiltActive = false;
 
@@ -668,18 +667,29 @@
 
   // ── Accelerometer ──
   let accelInited = false;
-  function calibrateTilt() { tiltCenter = rawTilt; }
   function initAccel() {
     if (accelInited) return;
     const setupEvents = () => {
       window.addEventListener('deviceorientation', e => {
         let gamma = e.gamma;
-        if (gamma === null) return;
-        // Always use gamma directly (left-right tilt regardless of orientation).
-        // Calibration captures the "resting" position so we only measure relative movement.
-        rawTilt = gamma;
-        // Auto-calibrate on first reading
-        if (tiltCenter === null) tiltCenter = gamma;
+        let beta = e.beta;
+        if (gamma === null || beta === null) return;
+
+        let angle = (window.screen && window.screen.orientation) ? window.screen.orientation.angle : (window.orientation || 0);
+        angle = ((angle % 360) + 360) % 360;
+
+        let tilt = 0;
+        if (angle === 90) {
+          tilt = beta;
+        } else if (angle === 270) {
+          tilt = -beta;
+        } else if (angle === 180) {
+          tilt = -gamma;
+        } else {
+          tilt = gamma;
+        }
+        
+        rawTilt = tilt;
       }, {passive: true});
       accelInited = true;
     };
@@ -802,7 +812,6 @@
     padNoteTimer = 15 + Math.random() * 5; // stagger first pad note
 
     // Recalibrate tilt center each game start
-    calibrateTilt();
 
     // Philosophical milestone reset
     firedMilestones.clear();
@@ -1433,11 +1442,10 @@
     if (keys['ArrowLeft'] || keys['a']) move = -1;
     if (keys['ArrowRight'] || keys['d']) move = 1;
     // Touch and tilt only override when actively engaged (not stale values)
-    // Smooth tilt input with deadzone, relative to calibrated center
-    const relativeTilt = tiltCenter !== null ? rawTilt - tiltCenter : 0;
-    if (Math.abs(relativeTilt) > TILT_DEADZONE) {
+    // Smooth tilt input with deadzone
+    if (Math.abs(rawTilt) > TILT_DEADZONE) {
       tiltActive = true;
-      const normalised = Math.max(-1, Math.min(1, (relativeTilt - Math.sign(relativeTilt) * TILT_DEADZONE) / (TILT_SENSITIVITY - TILT_DEADZONE)));
+      const normalised = Math.max(-1, Math.min(1, (rawTilt - Math.sign(rawTilt) * TILT_DEADZONE) / (TILT_SENSITIVITY - TILT_DEADZONE)));
       smoothTilt += (normalised - smoothTilt) * 0.45;
     } else {
       tiltActive = false;
