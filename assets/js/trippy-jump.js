@@ -688,8 +688,8 @@
       mountains.push({ x: i * 350, w: 500, h: 250 + Math.random() * 200, c: 20 + Math.random() * 20 });
     }
     clouds = [];
-    for (let i = 0; i < 20; i++) {
-      clouds.push({ x: Math.random() * W, y: Math.random() * 2000 + 500, r: 60 + Math.random() * 120, s: 0.2 + Math.random() * 0.4 });
+    for (let i = 0; i < 18; i++) {
+      clouds.push({ x: Math.random() * W, y: Math.random() * 800 + 300, r: 50 + Math.random() * 90, s: 0.2 + Math.random() * 0.4, hue: Math.random() * 360 });
     }
     bgParticles = [];
     for (let i = 0; i < 120; i++) {
@@ -950,16 +950,19 @@
       ctx.restore();
     }
 
-    // Clouds
-    if (depth > 500 && depth < 15000) {
-      const cAlpha = depth < 4000 ? (depth-500)/3500 : Math.max(0, 1-(depth-10000)/5000);
+    // Clouds — psychedelic tinted, shorter depth band
+    if (depth > 500 && depth < 9000) {
+      const cAlpha = depth < 2500 ? (depth-500)/2000 : Math.max(0, 1-(depth-6000)/3000);
       ctx.save();
       ctx.globalAlpha = cAlpha;
       for (let i = 0; i < clouds.length; i++) {
         const c = clouds[i];
-        const cy = (c.y - cameraY * c.s) % (H + 500) - 250;
+        const cy = (c.y - cameraY * c.s) % (H + 300) - 150;
+        // Psychedelic hue that slowly drifts with time, per-cloud base offset
+        const hue = (c.hue + time * 8) % 360;
         const g = ctx.createRadialGradient(c.x, cy, 0, c.x, cy, c.r);
-        g.addColorStop(0, 'rgba(255,255,255,0.15)');
+        g.addColorStop(0, `hsla(${hue}, 60%, 65%, 0.12)`);
+        g.addColorStop(0.5, `hsla(${(hue + 40) % 360}, 50%, 55%, 0.06)`);
         g.addColorStop(1, 'transparent');
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(c.x, cy, c.r, 0, TAU); ctx.fill();
