@@ -112,7 +112,7 @@
   let maxHeight = 0;
   let muted = localStorage.getItem('trippy-muted') !== '0'; // default: muted; '0' = user explicitly unmuted
   let time = 0;
-  let chillMode = false;
+  let chillMode = localStorage.getItem('tj-chill') === '1';
   let tiltEnabled = localStorage.getItem('tj-tilt') !== '0'; // default: on
   let fallHistory = []; // timestamps of recent falls
 
@@ -806,7 +806,7 @@
       bgTop: [...t.bgTop],
       platTypes: JSON.parse(JSON.stringify(t.platTypes))
     };
-    chillMode = saved ? saved.chillMode : false;
+    if (saved) chillMode = saved.chillMode;
     document.getElementById('chill-btn').classList.toggle('is-on', chillMode);
 
     // Hide overlays gently
@@ -1897,7 +1897,11 @@
     manualTheme = true;
     themeIndex = (themeIndex + 1) % themes.length; 
   };
-  document.getElementById('chill-btn').onclick = function() { chillMode = !chillMode; this.classList.toggle('is-on', chillMode); };
+  document.getElementById('chill-btn').onclick = function() { 
+    chillMode = !chillMode; 
+    this.classList.toggle('is-on', chillMode);
+    localStorage.setItem('tj-chill', chillMode ? '1' : '0');
+  };
   document.getElementById('tilt-btn').onclick = function() {
     tiltEnabled = !tiltEnabled;
     this.classList.toggle('is-on', tiltEnabled);
@@ -1906,8 +1910,9 @@
   };
   document.getElementById('activate-chill-btn').onclick = () => {
     chillMode = true;
+    localStorage.setItem('tj-chill', '1');
     document.getElementById('chill-btn').classList.add('is-on');
-    document.getElementById('chill-suggestion').classList.remove('is-active');
+    initAudio(); initAccel(); initGame(false);
   };
   document.getElementById('decline-chill-btn').onclick = () => {
     document.getElementById('chill-suggestion').classList.remove('is-active');
@@ -1967,6 +1972,8 @@
     mb.classList.toggle('is-on', !muted); }
   { const tb = document.getElementById('tilt-btn');
     tb.classList.toggle('is-on', tiltEnabled); }
+  { const cb = document.getElementById('chill-btn');
+    cb.classList.toggle('is-on', chillMode); }
 
   // Tailor the start-screen hint to the detected input method
   const startHintEl = document.getElementById('start-hint');
