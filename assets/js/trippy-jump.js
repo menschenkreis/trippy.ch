@@ -224,13 +224,24 @@
 
   function generatePlatforms(fromY, toY) {
     let y = fromY;
-    // Adapt gap based on screen height to ensure desktop players aren't stranded
-    const baseGap = Math.min(95 * sphereSizeScale, H * 0.12);
-    const maxGapIncrease = Math.min(score / 120, H * 0.08);
+    
+    // Jump distance tuning:
+    // JUMP_VEL is -11, GRAVITY is 0.32. 
+    // Peak time: t = 11 / 0.32 = 34.375 frames
+    // Max height: h = (11 * 34.375) - (0.5 * 0.32 * 34.375^2) = 189 pixels
+    // We want platforms to be comfortably reachable, so gap should stay well below 180.
+    
+    const baseGap = 70; // Comfortable base
+    const maxDifficultyGap = 70; // Total max gap will be ~140-150 with randomness
     
     while (y > toY) {
-      y -= baseGap + Math.random() * 45 + maxGapIncrease;
-      const w = (60 + Math.random() * 25) * sphereSizeScale;
+      // Scale gap by screen height but cap it strictly to physical jump limit
+      const difficultyProgress = Math.min(score / 2000, 1);
+      const currentMaxGap = baseGap + (difficultyProgress * maxDifficultyGap);
+      
+      y -= 50 + Math.random() * (currentMaxGap - 50);
+      
+      const w = (65 + Math.random() * 25) * sphereSizeScale;
       const x = Math.random() * (W - w);
 
       let type = 'normal';
