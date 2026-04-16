@@ -49,15 +49,22 @@
 
   // ── Color Themes ──
   const themes = [
-    { name:'deepsky', primary:[40,150,255], secondary:[255,255,255], accent:[200,230,255], bg:'#0a0d14', bgTop:'#0e1520', platTypes:{ spring:[255,220,50], fragile:[255,80,100], moving:[100,255,200], vanishing:[220,120,255] } },
-    { name:'violet',  primary:[180,100,255], secondary:[255,80,200], accent:[220,180,255], bg:'#08060f', bgTop:'#0d0815', platTypes:{ spring:[255,200,80], fragile:[255,100,130], moving:[120,220,255], vanishing:[255,160,200] } },
-    { name:'cyan',    primary:[0,220,255],  secondary:[255,255,255], accent:[100,255,220], bg:'#060d12', bgTop:'#0a1218', platTypes:{ spring:[255,230,60], fragile:[255,100,90], moving:[80,255,180], vanishing:[180,140,255] } },
-    { name:'ember',   primary:[255,120,40],  secondary:[255,220,100], accent:[255,180,80], bg:'#120806', bgTop:'#1a0e08', platTypes:{ spring:[255,240,80], fragile:[255,60,80], moving:[80,255,160], vanishing:[200,130,255] } },
-    { name:'jade',    primary:[40,255,140],  secondary:[200,255,200], accent:[180,255,100], bg:'#061208', bgTop:'#0a1a0e', platTypes:{ spring:[255,220,50], fragile:[255,100,120], moving:[100,200,255], vanishing:[220,100,255] } },
-    { name:'void',    primary:[255,60,180],  secondary:[150,200,255], accent:[255,100,255], bg:'#020005', bgTop:'#080410', platTypes:{ spring:[255,210,60], fragile:[255,90,110], moving:[80,255,200], vanishing:[180,160,255] } }
+    { name:'deepsky', primary:[40,150,255], secondary:[255,255,255], accent:[200,230,255], bg:[10,13,20], bgTop:[14,21,32], platTypes:{ spring:[255,220,50], fragile:[255,80,100], moving:[100,255,200], vanishing:[220,120,255] } },
+    { name:'violet',  primary:[180,100,255], secondary:[255,80,200], accent:[220,180,255], bg:[8,6,15], bgTop:[13,8,21], platTypes:{ spring:[255,200,80], fragile:[255,100,130], moving:[120,220,255], vanishing:[255,160,200] } },
+    { name:'cyan',    primary:[0,220,255],  secondary:[255,255,255], accent:[100,255,220], bg:[6,13,18], bgTop:[10,18,24], platTypes:{ spring:[255,230,60], fragile:[255,100,90], moving:[80,255,180], vanishing:[180,140,255] } },
+    { name:'ember',   primary:[255,120,40],  secondary:[255,220,100], accent:[255,180,80], bg:[18,8,6], bgTop:[26,14,8], platTypes:{ spring:[255,240,80], fragile:[255,60,80], moving:[80,255,160], vanishing:[200,130,255] } },
+    { name:'jade',    primary:[40,255,140],  secondary:[200,255,200], accent:[180,255,100], bg:[6,18,8], bgTop:[10,26,14], platTypes:{ spring:[255,220,50], fragile:[255,100,120], moving:[100,200,255], vanishing:[220,100,255] } },
+    { name:'void',    primary:[255,60,180],  secondary:[150,200,255], accent:[255,100,255], bg:[2,0,5], bgTop:[8,4,16], platTypes:{ spring:[255,210,60], fragile:[255,90,110], moving:[80,255,200], vanishing:[180,160,255] } }
   ];
   let themeIndex = 0;
-  let theme = { ...themes[0] };
+  let theme = { 
+    primary: [...themes[0].primary], 
+    secondary: [...themes[0].secondary], 
+    accent: [...themes[0].accent],
+    bg: [...themes[0].bg],
+    bgTop: [...themes[0].bgTop],
+    platTypes: JSON.parse(JSON.stringify(themes[0].platTypes))
+  };
   let manualTheme = false;
   let lastAutoIdx = 0;
 
@@ -115,9 +122,9 @@
     powerTimer: 0
   };
 
-  const GRAVITY = 0.32;
-  const JUMP_VEL = -11;
-  const SPRING_VEL = -18;
+  const GRAVITY = 0.26;
+  const JUMP_VEL = -8.8;
+  const SPRING_VEL = -14.4;
   const FRICTION = 0.88; // Smooth deceleration
   const TILT_DEADZONE = 6; // Degrees of tilt ignored (resting buffer)
   const TILT_SENSITIVITY = 28; // Degrees for full deflection (more range = more control)
@@ -788,7 +795,15 @@
     maxHeight = saved ? saved.maxHeight : 0;
     lastAutoIdx = Math.min(themes.length-1, Math.floor(maxHeight / 10000));
     themeIndex = saved ? saved.themeIndex : lastAutoIdx;
-    theme = { ...themes[themeIndex] };
+    const t = themes[themeIndex];
+    theme = { 
+      primary: [...t.primary], 
+      secondary: [...t.secondary], 
+      accent: [...t.accent],
+      bg: [...t.bg],
+      bgTop: [...t.bgTop],
+      platTypes: JSON.parse(JSON.stringify(t.platTypes))
+    };
     chillMode = saved ? saved.chillMode : false;
     document.getElementById('chill-btn').classList.toggle('is-on', chillMode);
 
@@ -895,7 +910,7 @@
       else if (r < 0.3 + diff * 0.15) type = 'moving';
       else if (r < 0.4 + diff * 0.1) type = 'vanishing';
 
-      const p = { x, y, w, h: 10, type, alive: true, opacity: 1, vx: (Math.random() - 0.5) * 4, fade: 0 };
+      const p = { x, y, w, h: 10, type, alive: true, opacity: 1, vx: (Math.random() - 0.5) * 3, fade: 0 };
       newPlatforms.push(p);
       prevP = p; // next platform must be reachable from this one
 
@@ -926,15 +941,15 @@
     const depth = -cameraY;
     const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
     
-    let topColor = theme.bgTop || '#0e1520', botColor = theme.bg;
+    let topColor = rgb(theme.bgTop), botColor = rgb(theme.bg);
     if (depth < 8000) {
        const f = depth / 8000;
-       topColor = lerpColor('#1e3a5f', topColor, f);
-       botColor = lerpColor('#2b5876', botColor, f);
+       topColor = lerpColorRgb([30, 58, 95], theme.bgTop, f);
+       botColor = lerpColorRgb([43, 88, 118], theme.bg, f);
     } else if (depth > 12000) {
        const f = Math.min((depth - 12000) / 10000, 1);
-       topColor = lerpColor('#050a12', '#020005', f);
-       botColor = lerpColor('#0f1420', theme.bg, f);
+       topColor = lerpColorRgb(theme.bgTop, [2, 0, 5], f);
+       botColor = lerpColorRgb(theme.bg, theme.bg, f);
     }
     
     skyGrad.addColorStop(0, topColor);
@@ -1049,6 +1064,9 @@
     if (chillMode) drawChillBarrier();
   }
 
+  function lerpColorRgb(c1, c2, f) {
+    return `rgb(${Math.round(c1[0]+(c2[0]-c1[0])*f)}, ${Math.round(c1[1]+(c2[1]-c1[1])*f)}, ${Math.round(c1[2]+(c2[2]-c1[2])*f)})`;
+  }
   function lerpColor(a, b, f) {
     const c1 = hexToRgb(a), c2 = hexToRgb(b);
     return `rgb(${Math.round(c1[0]+(c2[0]-c1[0])*f)}, ${Math.round(c1[1]+(c2[1]-c1[1])*f)}, ${Math.round(c1[2]+(c2[2]-c1[2])*f)})`;
@@ -1080,16 +1098,16 @@
     if (sy < -50 || sy > H + 50) return;
     ctx.save();
     const th = themeHueOffset(); // shift hues with theme
-    const bob = Math.sin(time * 6 + p.phase) * 12;
+    const bob = Math.sin(time * 3.5 + p.phase) * 12;
     const cx = p.x, cy = sy + bob;
     const r = 22;
-    const pulse = 1 + Math.sin(time * 3 + p.phase) * 0.08;
+    const pulse = 1 + Math.sin(time * 2.2 + p.phase) * 0.08;
     const R = r * pulse;
     ctx.lineCap = 'round';
 
     if (p.type === 'aura') {
       // Iridescent triple-ring + 8 sparkle rays
-      const hue = (time * 60 + p.phase * 57.3 + th) % 360;
+      const hue = (time * 35 + p.phase * 57.3 + th) % 360;
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 2);
       g.addColorStop(0, `hsla(${hue}, 90%, 70%, 0.4)`);
       g.addColorStop(1, 'transparent');
@@ -1103,7 +1121,7 @@
       ctx.strokeStyle = `hsla(${hue}, 90%, 80%, 0.6)`;
       ctx.lineWidth = 0.8;
       for (let i = 0; i < 8; i++) {
-        const a = (TAU / 8) * i + time * 1.5;
+        const a = (TAU / 8) * i + time * 0.8;
         const len = R * (0.9 + Math.sin(time * 5 + i) * 0.3);
         ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * R * 0.3, cy + Math.sin(a) * R * 0.3);
         ctx.lineTo(cx + Math.cos(a) * len, cy + Math.sin(a) * len); ctx.stroke();
@@ -1121,13 +1139,13 @@
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 2, 0, TAU); ctx.fill();
       ctx.strokeStyle = `hsla(${hue}, 90%, 75%, 0.8)`; ctx.lineWidth = 1.4;
       for (let i = 0; i < 8; i++) {
-        const a = (TAU / 8) * i + time * 0.8;
+        const a = (TAU / 8) * i + time * 0.5;
         ctx.beginPath(); ctx.moveTo(cx, cy);
         ctx.lineTo(cx + Math.cos(a) * R * 1.1, cy + Math.sin(a) * R * 1.1); ctx.stroke();
       }
       ctx.strokeStyle = `hsla(${hue}, 80%, 80%, 0.4)`; ctx.lineWidth = 0.8;
       for (let i = 0; i < 8; i++) {
-        const a = (TAU / 8) * i + TAU / 16 + time * 0.8;
+        const a = (TAU / 8) * i + TAU / 16 + time * 0.5;
         ctx.beginPath(); ctx.moveTo(cx, cy);
         ctx.lineTo(cx + Math.cos(a) * R * 0.65, cy + Math.sin(a) * R * 0.65); ctx.stroke();
       }
@@ -1166,21 +1184,21 @@
       // Triangle CW
       ctx.strokeStyle = `hsla(${hue}, 85%, 65%, 0.8)`; ctx.lineWidth = 1.3;
       ctx.beginPath();
-      for (let i = 0; i < 3; i++) { const a = (TAU / 3) * i + time * 0.6; const px = cx + Math.cos(a) * R; const py = cy + Math.sin(a) * R; i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py); }
+      for (let i = 0; i < 3; i++) { const a = (TAU / 3) * i + time * 0.35; const px = cx + Math.cos(a) * R; const py = cy + Math.sin(a) * R; i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py); }
       ctx.closePath(); ctx.stroke();
       // Triangle CCW
       ctx.strokeStyle = `hsla(${hue + 30}, 80%, 70%, 0.7)`; ctx.lineWidth = 1.3;
       ctx.beginPath();
-      for (let i = 0; i < 3; i++) { const a = (TAU / 3) * i - time * 0.6 + Math.PI; const px = cx + Math.cos(a) * R; const py = cy + Math.sin(a) * R; i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py); }
+      for (let i = 0; i < 3; i++) { const a = (TAU / 3) * i - time * 0.35 + Math.PI; const px = cx + Math.cos(a) * R; const py = cy + Math.sin(a) * R; i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py); }
       ctx.closePath(); ctx.stroke();
       // Inner hexagon
       ctx.strokeStyle = `hsla(${hue}, 70%, 60%, 0.4)`; ctx.lineWidth = 0.7;
       ctx.beginPath();
-      for (let i = 0; i < 6; i++) { const a = (TAU / 6) * i + time * 0.3; const px = cx + Math.cos(a) * R * 0.5; const py = cy + Math.sin(a) * R * 0.5; i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py); }
+      for (let i = 0; i < 6; i++) { const a = (TAU / 6) * i + time * 0.2; const px = cx + Math.cos(a) * R * 0.5; const py = cy + Math.sin(a) * R * 0.5; i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py); }
       ctx.closePath(); ctx.stroke();
       // Vertex dots
       ctx.fillStyle = `hsla(${hue}, 90%, 80%, 0.8)`;
-      for (let i = 0; i < 6; i++) { const a = (TAU / 6) * i + time * 0.3; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * R * 0.5, cy + Math.sin(a) * R * 0.5, 1.8, 0, TAU); ctx.fill(); }
+      for (let i = 0; i < 6; i++) { const a = (TAU / 6) * i + time * 0.2; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * R * 0.5, cy + Math.sin(a) * R * 0.5, 1.8, 0, TAU); ctx.fill(); }
       // Radial spokes
       ctx.strokeStyle = `hsla(${hue}, 60%, 55%, 0.25)`; ctx.lineWidth = 0.5;
       for (let i = 0; i < 6; i++) { const a = (TAU / 6) * i; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R * 0.85, cy + Math.sin(a) * R * 0.85); ctx.stroke(); }
@@ -1195,7 +1213,7 @@
       // Outer petals
       ctx.strokeStyle = `hsla(${hue}, 80%, 65%, 0.7)`; ctx.lineWidth = 1.1;
       for (let i = 0; i < 8; i++) {
-        const a = (TAU / 8) * i + Math.sin(time * 1.5) * 0.1;
+        const a = (TAU / 8) * i + Math.sin(time * 0.8) * 0.1;
         const tipX = cx + Math.cos(a) * R;
         const tipY = cy + Math.sin(a) * R;
         const cp1a = a - 0.4, cp2a = a + 0.4;
@@ -1207,7 +1225,7 @@
       // Inner petals (rotated 22.5°)
       ctx.strokeStyle = `hsla(${hue + 20}, 75%, 70%, 0.5)`; ctx.lineWidth = 0.8;
       for (let i = 0; i < 8; i++) {
-        const a = (TAU / 8) * i + TAU / 16 + Math.sin(time * 2) * 0.08;
+        const a = (TAU / 8) * i + TAU / 16 + Math.sin(time * 1.2) * 0.08;
         ctx.beginPath(); ctx.moveTo(cx, cy);
         ctx.quadraticCurveTo(cx + Math.cos(a - 0.3) * R * 0.6, cy + Math.sin(a - 0.3) * R * 0.6, cx + Math.cos(a) * R * 0.55, cy + Math.sin(a) * R * 0.55);
         ctx.quadraticCurveTo(cx + Math.cos(a + 0.3) * R * 0.6, cy + Math.sin(a + 0.3) * R * 0.6, cx, cy);
@@ -1253,7 +1271,7 @@
       ctx.beginPath(); ctx.arc(cx, cy, cr, 0, TAU); ctx.stroke();
       // 6 around
       for (let i = 0; i < 6; i++) {
-        const a = (TAU / 6) * i + time * 0.3;
+        const a = (TAU / 6) * i + time * 0.15;
         ctx.beginPath(); ctx.arc(cx + Math.cos(a) * cr, cy + Math.sin(a) * cr, cr, 0, TAU); ctx.stroke();
       }
       ctx.fillStyle = `hsla(${hue}, 80%, 80%, 0.8)`;
@@ -1312,7 +1330,7 @@
       const AR = ar * ap;
       ctx.lineCap = 'round';
       if (player.powerUp === 'aura') {
-        const hue = (time * 60 + th) % 360;
+        const hue = (time * 35 + th) % 360;
         for (let ring = 0; ring < 3; ring++) {
           ctx.strokeStyle = `hsla(${(hue + ring * 120) % 360}, 85%, 65%, ${0.35 - ring * 0.08})`;
           ctx.lineWidth = 1.8 - ring * 0.4;
@@ -1321,7 +1339,7 @@
       } else if (player.powerUp === 'nova') {
         ctx.strokeStyle = `hsla(${(190 + th) % 360}, 90%, 70%, 0.5)`; ctx.lineWidth = 1.5;
         for (let i = 0; i < 8; i++) {
-          const a = (TAU / 8) * i + time * 2;
+          const a = (TAU / 8) * i + time * 1.2;
           ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * AR, Math.sin(a) * AR); ctx.stroke();
         }
       } else if (player.powerUp === 'magnet') {
@@ -1336,15 +1354,15 @@
       } else if (player.powerUp === 'merkaba') {
         ctx.strokeStyle = `hsla(${(50 + th) % 360}, 80%, 65%, 0.45)`; ctx.lineWidth = 1.4;
         ctx.beginPath();
-        for (let i = 0; i < 3; i++) { const a = (TAU / 3) * i + time * 0.4; i === 0 ? ctx.moveTo(Math.cos(a) * AR, Math.sin(a) * AR) : ctx.lineTo(Math.cos(a) * AR, Math.sin(a) * AR); }
+        for (let i = 0; i < 3; i++) { const a = (TAU / 3) * i + time * 0.25; i === 0 ? ctx.moveTo(Math.cos(a) * AR, Math.sin(a) * AR) : ctx.lineTo(Math.cos(a) * AR, Math.sin(a) * AR); }
         ctx.closePath(); ctx.stroke();
         ctx.beginPath();
-        for (let i = 0; i < 3; i++) { const a = (TAU / 3) * i - time * 0.4 + Math.PI; i === 0 ? ctx.moveTo(Math.cos(a) * AR, Math.sin(a) * AR) : ctx.lineTo(Math.cos(a) * AR, Math.sin(a) * AR); }
+        for (let i = 0; i < 3; i++) { const a = (TAU / 3) * i - time * 0.25 + Math.PI; i === 0 ? ctx.moveTo(Math.cos(a) * AR, Math.sin(a) * AR) : ctx.lineTo(Math.cos(a) * AR, Math.sin(a) * AR); }
         ctx.closePath(); ctx.stroke();
       } else if (player.powerUp === 'lotus') {
         ctx.strokeStyle = `hsla(${(320 + th) % 360}, 75%, 65%, 0.4)`; ctx.lineWidth = 1.2;
         for (let i = 0; i < 8; i++) {
-          const a = (TAU / 8) * i + time * 0.8;
+          const a = (TAU / 8) * i + time * 0.5;
           ctx.beginPath(); ctx.moveTo(0, 0);
           ctx.quadraticCurveTo(Math.cos(a - 0.35) * AR * 1.05, Math.sin(a - 0.35) * AR * 1.05, Math.cos(a) * AR, Math.sin(a) * AR);
           ctx.quadraticCurveTo(Math.cos(a + 0.35) * AR * 1.05, Math.sin(a + 0.35) * AR * 1.05, 0, 0);
@@ -1359,12 +1377,12 @@
         const cr = AR * 0.35;
         ctx.strokeStyle = `hsla(${(140 + th) % 360}, 70%, 55%, 0.4)`; ctx.lineWidth = 0.9;
         ctx.beginPath(); ctx.arc(0, 0, cr, 0, TAU); ctx.stroke();
-        for (let i = 0; i < 6; i++) { const a = (TAU / 6) * i + time * 0.4; ctx.beginPath(); ctx.arc(Math.cos(a) * cr, Math.sin(a) * cr, cr, 0, TAU); ctx.stroke(); }
+        for (let i = 0; i < 6; i++) { const a = (TAU / 6) * i + time * 0.25; ctx.beginPath(); ctx.arc(Math.cos(a) * cr, Math.sin(a) * cr, cr, 0, TAU); ctx.stroke(); }
       } else if (player.powerUp === 'star') {
         ctx.strokeStyle = `hsla(${(50 + th) % 360}, 85%, 75%, 0.5)`; ctx.lineWidth = 1.4;
         ctx.beginPath();
         for (let i = 0; i < 10; i++) {
-          const a = (TAU / 10) * i - Math.PI / 2 + time * 0.6;
+          const a = (TAU / 10) * i - Math.PI / 2 + time * 0.35;
           const sr = i % 2 === 0 ? AR * 0.9 : AR * 0.4;
           i === 0 ? ctx.moveTo(Math.cos(a) * sr, Math.sin(a) * sr) : ctx.lineTo(Math.cos(a) * sr, Math.sin(a) * sr);
         }
@@ -1429,13 +1447,19 @@
     if (autoIdx !== lastAutoIdx) {
       lastAutoIdx = autoIdx;
       themeIndex = autoIdx;
-      theme = { ...themes[themeIndex] };
       manualTheme = false;
     }
     const targetTheme = themes[themeIndex];
     for (let i = 0; i < 3; i++) {
       theme.primary[i] += (targetTheme.primary[i] - theme.primary[i]) * 0.05;
       theme.secondary[i] += (targetTheme.secondary[i] - theme.secondary[i]) * 0.05;
+      theme.accent[i] += (targetTheme.accent[i] - theme.accent[i]) * 0.05;
+      theme.bg[i] += (targetTheme.bg[i] - theme.bg[i]) * 0.05;
+      theme.bgTop[i] += (targetTheme.bgTop[i] - theme.bgTop[i]) * 0.05;
+      // Interpolate each platform type
+      for (const type in theme.platTypes) {
+        theme.platTypes[type][i] += (targetTheme.platTypes[type][i] - theme.platTypes[type][i]) * 0.05;
+      }
     }
 
     let move = 0;
@@ -1455,7 +1479,7 @@
     else if (tiltActive && Math.abs(smoothTilt) > 0.05) move = smoothTilt;
 
     // Movement tuning for better control
-    const accel = sphereSizeScale < 1 ? 0.65 : 0.85; 
+    const accel = sphereSizeScale < 1 ? 0.5 : 0.68; 
     player.vx += move * accel;
     player.vx *= FRICTION;
     player.vy += player.powerUp === 'merkaba' ? GRAVITY * 0.5 : GRAVITY;
@@ -1852,7 +1876,6 @@
   document.getElementById('theme-btn').onclick = () => { 
     manualTheme = true;
     themeIndex = (themeIndex + 1) % themes.length; 
-    theme = { ...themes[themeIndex] }; 
   };
   document.getElementById('chill-btn').onclick = function() { chillMode = !chillMode; this.classList.toggle('is-on', chillMode); };
   document.getElementById('mute-btn').onclick = function() {
