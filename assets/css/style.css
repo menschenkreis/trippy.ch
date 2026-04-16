@@ -1131,7 +1131,7 @@ footer a:hover { color: var(--pink); }
 }
 #lang-modal-en:active, #lang-modal-de:active { transform: scale(0.97); }
 
-/* ── Support Link (Sacred Geometry) ── */
+/* ── Support Link (Glittering Sacred Geometry) ── */
 .support-link {
   display: inline-flex;
   align-items: center;
@@ -1140,57 +1140,72 @@ footer a:hover { color: var(--pink); }
   text-decoration: none;
   color: #fff;
   font-size: 0.75rem;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   transition: all 0.4s ease;
   position: relative;
-  padding: 1.5rem 2.5rem;
+  padding: 1rem 2rem;
   margin: 1rem 0;
 }
 
 .support-link .mandala-bg {
   position: absolute;
-  inset: 0;
+  inset: 50%;
+  width: 120px;
+  height: 120px;
+  margin-left: -60px;
+  margin-top: -60px;
   z-index: -1;
-  color: var(--purple);
-  opacity: 0.25;
-  animation: geoRotate 20s linear infinite;
+  color: var(--teal);
+  opacity: 0.15;
+  animation: geoRotate 30s linear infinite;
   transition: all 0.6s ease;
   filter: blur(1px);
 }
 
 .support-link:hover .mandala-bg {
-  color: var(--teal);
-  opacity: 0.5;
-  animation: geoRotate 8s linear infinite;
-  filter: blur(0px) drop-shadow(0 0 15px var(--teal-glow));
-  transform: scale(1.2);
+  opacity: 0.4;
+  animation: geoRotate 10s linear infinite;
+  transform: scale(1.1);
+  color: var(--pink);
 }
 
 .sacred-geo {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   display: block;
   color: var(--pink);
-  animation: geoRotate 12s linear infinite;
-  filter: drop-shadow(0 0 5px var(--pink-glow));
+  animation: geoRotate 12s linear infinite, sparkle 2.5s ease-in-out infinite;
+  filter: drop-shadow(0 0 8px var(--pink-glow));
   transition: all 0.4s ease;
 }
 
 .support-link:hover .sacred-geo {
   color: var(--teal);
-  filter: drop-shadow(0 0 8px var(--teal-glow));
+  filter: drop-shadow(0 0 12px var(--teal-glow));
 }
 
 .support-text {
   position: relative;
   font-weight: 500;
-  text-shadow: 0 0 10px rgba(255,255,255,0.3);
+  text-shadow: 0 0 10px rgba(255,255,255,0.4);
+  animation: textGlitter 3s ease-in-out infinite;
 }
 
-.support-link:hover .support-text {
-  color: #fff;
-  text-shadow: 0 0 15px var(--teal-glow), 0 0 30px var(--purple-glow);
+@keyframes geoRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 0.6; filter: drop-shadow(0 0 5px var(--pink-glow)); transform: scale(1) rotate(var(--current-rot)); }
+  50% { opacity: 1; filter: drop-shadow(0 0 15px var(--pink-glow)); transform: scale(1.15) rotate(var(--current-rot)); }
+}
+
+@keyframes textGlitter {
+  0%, 100% { text-shadow: 0 0 10px rgba(255,255,255,0.4), 0 0 2px var(--teal); }
+  33% { text-shadow: 0 0 15px rgba(255,255,255,0.8), 0 0 5px var(--pink); }
+  66% { text-shadow: 0 0 12px rgba(255,255,255,0.6), 0 0 4px var(--violet); }
 }
 
   .scroll-hint { animation: none; }
