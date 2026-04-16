@@ -9,6 +9,9 @@
   let sphereSizeScale = 1.0;
   const TAU = Math.PI * 2;
 
+  // Detect touch/pointer type once at module level (used for scaling, hints, haptics)
+  const isTouch = window.matchMedia('(pointer: coarse)').matches;
+
   // Offscreen canvas for static sacred geometry layers (Parallax layers)
   const bgCanvas = document.createElement('canvas');
   const bgCtx = bgCanvas.getContext('2d');
@@ -26,7 +29,6 @@
     bgCanvas.height = H * dpr;
     bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const isTouch = window.matchMedia('(pointer: coarse)').matches;
     sphereSizeScale = isTouch ? 1.0 : Math.min(W / 900, 1.4);
   }
   resize();
@@ -142,6 +144,11 @@
     const base = isSpring ? 150 : 220;
     const freq = base + Math.min(score / 10, 600);
     playNote(freq, 'sine', 0.3, isSpring ? 1.2 : 0.6);
+  }
+
+  // ── Haptic Feedback ──
+  function vibrate(pattern) {
+    if (isTouch && navigator.vibrate) navigator.vibrate(pattern);
   }
 
   // ── Accelerometer ──
@@ -510,6 +517,7 @@
         player.powerTimer = 10;
         addShockwave(p.x, p.y - cameraY, [255,255,255]);
         playNote(880, 'sine', 0.5, 1.2);
+        vibrate([15, 8, 15, 8, 40]); // distinctive power-up rumble
         if (p.type === 'nova') player.vy = SPRING_VEL * 1.6;
       }
     }
@@ -530,10 +538,12 @@
             jump = player.powerUp === 'aura' ? SPRING_VEL * 1.3 : SPRING_VEL;
             addShockwave(player.x, p.y - cameraY, [255, 220, 50]);
             burst(player.x, p.y - cameraY, [255, 255, 150], 25, 'spark');
+            vibrate([12, 5, 30]); // double pulse for spring bounce
           }
-          if (p.type === 'fragile') { p.alive = false; burst(p.x + p.w/2, p.y - cameraY, [255, 80, 100], 15); }
+          if (p.type === 'fragile') { p.alive = false; burst(p.x + p.w/2, p.y - cameraY, [255, 80, 100], 15); vibrate(8); }
           if (p.type === 'vanishing') p.fade = 1;
           player.vy = jump; playJumpSound(p.type === 'spring');
+          if (p.type !== 'spring' && player.powerUp !== 'aura') vibrate(18); // normal jump tap
           burst(player.x, p.y - cameraY, theme.secondary, 12);
           break;
         }
@@ -611,11 +621,25 @@
       }
       
       drawPlayer(player.x, player.y - camY);
-      
-      ctx.fillStyle = 'rgba(255,255,255,0.8)'; 
-      ctx.font = `200 ${3.0 * sphereSizeScale}rem sans-serif`; 
-      ctx.textAlign = 'center'; 
-      ctx.fillText(score, W/2, 80);
+
+      // Score — positioned below the control buttons to avoid visual overlap
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.font = `200 ${3.0 * sphereSizeScale}rem sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(score, W/2, 130);
+
+      // Touch zone hints: shown briefly at game start on touch devices, then fade out
+      if (isTouch && time < 8) {
+        const hintAlpha = time < 5 ? 0.22 : (1 - (time - 5) / 3) * 0.22;
+        ctx.save();
+        ctx.globalAlpha = hintAlpha;
+        ctx.fillStyle = rgb(theme.accent, 1);
+        ctx.font = `${Math.round(48 * sphereSizeScale)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText('◀', W * 0.12, H - 80);
+        ctx.fillText('▶', W * 0.88, H - 80);
+        ctx.restore();
+      }
     }
     requestAnimationFrame(render);
     update();
@@ -633,7 +657,7 @@
   document.getElementById('play-again').onclick = (e) => { e.preventDefault(); document.getElementById('game-over').classList.remove('is-active'); initGame(false); };
   document.getElementById('theme-btn').onclick = () => { themeIndex = (themeIndex + 1) % themes.length; theme = { ...themes[themeIndex] }; };
   document.getElementById('chill-btn').onclick = function() { chillMode = !chillMode; this.classList.toggle('is-on', chillMode); };
-  document.getElementById('mute-btn').onclick = function() { muted = !muted; this.textContent = muted ? '🔊' : '🔇'; this.classList.toggle('is-on', !muted); initAudio(); };
+  document.getElementById('mute-btn').onclick = function() { muted = !muted; this.textContent = muted ? '🔇' : '🔊'; this.classList.toggle('is-on', !muted); initAudio(); };
   document.getElementById('info-btn').onclick = () => document.getElementById('info-panel').classList.toggle('is-open');
   document.getElementById('close-panel').onclick = () => document.getElementById('info-panel').classList.remove('is-open');
 
@@ -654,5 +678,14 @@
   }
 
   checkResume();
+
+  // Tailor the start-screen hint to the detected input method
+  const startHintEl = document.getElementById('start-hint');
+  if (startHintEl) {
+    startHintEl.textContent = isTouch
+      ? 'tap left · right to move  ·  tilt to steer'
+      : 'arrow keys or a · d to move';
+  }
+
   requestAnimationFrame(render);
 })();
