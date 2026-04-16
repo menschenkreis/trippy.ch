@@ -46,22 +46,42 @@
     .journey-icon{width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:rgba(140,100,255,0.5);margin-top:2px}
     .journey-entry-text{font-size:0.8rem;line-height:1.55;color:rgba(255,255,255,0.38)}
     .journey-entry-text strong{color:rgba(255,255,255,0.6);font-weight:400}
+
+    /* Transition Layer for Zen Fades */
+    .screen-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.8s;
+    }
+    .screen-overlay.is-active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
     /* Game over overlay */
-    #game-over{position:fixed;inset:0;z-index:300;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(8,6,15,0.85);backdrop-filter:blur(12px)}
-    #game-over.is-active{display:flex}
+    #game-over{z-index:300;background:rgba(8,6,15,0.85);backdrop-filter:blur(12px)}
     #game-over h2{font-size:clamp(1.4rem,5vw,2rem);font-weight:200;letter-spacing:0.15em;color:rgba(255,255,255,0.8);margin:0 0 0.5rem}
     #game-over .score-display{font-size:clamp(2.5rem,10vw,3.5rem);font-weight:100;letter-spacing:0.1em;margin:0.5rem 0;text-shadow:0 0 30px rgba(140,100,255,0.4)}
     #game-over .high-score{font-size:clamp(0.75rem,2.5vw,0.85rem);color:rgba(140,100,255,0.6);margin-bottom:1.5rem;letter-spacing:0.1em}
     #play-again{padding:0.85rem 2.2rem;border:1px solid rgba(140,100,255,0.4);border-radius:30px;background:rgba(140,100,255,0.1);color:rgba(200,180,255,0.9);font-size:clamp(0.85rem,2.5vw,0.9rem);cursor:pointer;letter-spacing:0.1em;transition:all 0.3s;font-family:inherit;backdrop-filter:blur(8px);min-height:48px}
     #play-again:hover{background:rgba(140,100,255,0.2);box-shadow:0 0 25px rgba(140,100,255,0.3);color:#fff}
+
     /* Start screen */
-    #start-screen{position:fixed;inset:0;z-index:250;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(8,6,15,0.9);backdrop-filter:blur(8px)}
-    #start-screen.hidden{display:none}
+    #start-screen{z-index:250;background:rgba(8,6,15,0.9);backdrop-filter:blur(8px)}
     #start-screen h2{font-size:clamp(1.6rem,6vw,2.2rem);font-weight:200;letter-spacing:0.2em;color:rgba(255,255,255,0.8);margin:0 0 0.3rem;text-shadow:0 0 30px rgba(140,100,255,0.3)}
     #start-screen .sub{font-size:clamp(0.65rem,2vw,0.75rem);color:rgba(140,100,255,0.5);letter-spacing:0.15em;text-transform:uppercase;margin-bottom:2rem}
     #start-btn{padding:1rem 2.5rem;border:1px solid rgba(140,100,255,0.4);border-radius:30px;background:rgba(140,100,255,0.1);color:rgba(200,180,255,0.9);font-size:clamp(0.9rem,2.5vw,1rem);cursor:pointer;letter-spacing:0.12em;transition:all 0.3s;font-family:inherit;backdrop-filter:blur(8px);min-height:52px}
     #start-btn:hover{background:rgba(140,100,255,0.2);box-shadow:0 0 25px rgba(140,100,255,0.3);color:#fff}
     #start-hint{margin-top:1rem;font-size:clamp(0.65rem,2vw,0.7rem);color:rgba(255,255,255,0.25);letter-spacing:0.1em}
+
     /* Landscape orientation prompt */
     #landscape-hint{position:fixed;inset:0;z-index:1000;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(8,6,15,0.97);backdrop-filter:blur(12px);text-align:center;padding:2rem}
     #landscape-hint p{font-size:2rem;margin:0 0 1rem}
@@ -69,8 +89,7 @@
     @media (orientation:landscape) and (max-height:500px){#landscape-hint{display:flex}}
 
     /* Chill Mode Suggestion Modal */
-    #chill-suggestion{position:fixed;inset:0;z-index:400;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(8,6,15,0.92);backdrop-filter:blur(15px);text-align:center;padding:2rem}
-    #chill-suggestion.is-active{display:flex}
+    #chill-suggestion{z-index:400;background:rgba(8,6,15,0.92);backdrop-filter:blur(15px);text-align:center;padding:2rem}
     #chill-suggestion h2{font-size:1.4rem;font-weight:200;letter-spacing:0.1em;color:rgba(255,255,255,0.8);margin-bottom:1rem}
     #chill-suggestion p{font-size:0.9rem;color:rgba(255,255,255,0.4);margin-bottom:2rem;line-height:1.6;max-width:300px}
     .modal-btns{display:flex;gap:1rem}
@@ -128,7 +147,7 @@
     <a class="source-link" href="https://github.com/menschenkreis/trippy.ch" target="_blank">view source on github</a>
   </div>
 
-  <div id="start-screen">
+  <div id="start-screen" class="screen-overlay is-active">
     <h2>TRIPPY JUMP</h2>
     <p class="sub">ascend through the void</p>
     <button id="start-btn">BEGIN ASCENT</button>
@@ -140,14 +159,14 @@
     <span>rotate to portrait for the best experience</span>
   </div>
 
-  <div id="game-over">
+  <div id="game-over" class="screen-overlay">
     <h2>FALLEN</h2>
     <div class="score-display" id="final-score">0</div>
     <div class="high-score" id="final-high">BEST: 0</div>
     <button id="play-again">ASCEND AGAIN</button>
   </div>
 
-  <div id="chill-suggestion">
+  <div id="chill-suggestion" class="screen-overlay">
     <h2>RELAX THE ASCENT?</h2>
     <p>You've fallen a few times. Want to activate <strong>Chill Mode</strong>? It adds a safety floor so you can climb without falling.</p>
     <div class="modal-btns">

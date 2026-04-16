@@ -115,6 +115,8 @@
   let chillMode = false;
   let tiltEnabled = localStorage.getItem('tj-tilt') !== '0'; // default: on
   let fallHistory = []; // timestamps of recent falls
+
+  const player = {
     x: 0, y: 0, vx: 0, vy: 0,
     width: 24, height: 24,
     rotation: 0,
@@ -1874,7 +1876,6 @@
     }
     if (e.key === ' ' && gameOver) {
       e.preventDefault();
-      document.getElementById('game-over').classList.remove('is-active');
       initGame(false);
     }
   });
@@ -1885,8 +1886,8 @@
   canvas.addEventListener('mousedown', e => { if (playing) touchDir = e.clientX < W/2 ? -1 : 1; initAudio(); initAccel(); });
   canvas.addEventListener('mouseup', () => touchDir = 0);
 
-  document.getElementById('start-btn').onclick = (e) => { e.preventDefault(); document.getElementById('start-screen').classList.add('hidden'); initGame(false); };
-  document.getElementById('play-again').onclick = (e) => { e.preventDefault(); document.getElementById('game-over').classList.remove('is-active'); initGame(false); };
+  document.getElementById('start-btn').onclick = (e) => { e.preventDefault(); initGame(false); };
+  document.getElementById('play-again').onclick = (e) => { e.preventDefault(); initGame(false); };
   document.getElementById('theme-btn').onclick = () => { 
     manualTheme = true;
     themeIndex = (themeIndex + 1) % themes.length; 
@@ -1924,7 +1925,7 @@
     if (saved && saved.score > 200) {
       const startBtn = document.getElementById('start-btn');
       startBtn.textContent = 'RESUME JOURNEY';
-      startBtn.onclick = (e) => { e.preventDefault(); document.getElementById('start-screen').classList.add('hidden'); initGame(true); };
+      startBtn.onclick = (e) => { e.preventDefault(); initGame(true); };
       const sub = document.querySelector('#start-screen .sub');
       if (sub) sub.textContent = `last height: ${saved.score}m`;
       const fresh = document.createElement('p');
