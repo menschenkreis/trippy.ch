@@ -24,6 +24,14 @@ body {
   line-height: 1.7;
   overflow-x: hidden;
   transition: background-color 0.6s ease, color 0.6s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  outline: none;
+}
+
+button, a, input, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
 }
 
 a { color: var(--teal); text-decoration: none; transition: color 0.3s, border-color 0.3s; }
@@ -1209,8 +1217,5 @@ footer a:hover { color: var(--pink); }
   66% { text-shadow: 0 0 12px rgba(255,255,255,0.6), 0 0 4px var(--violet); }
 }
 
-  .scroll-hint { animation: none; }
-  .nav-card, .exp-card { transition: none; }
-  #theme-btn { animation: none; }
-  .page-transition { transition: none; }
-}
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
