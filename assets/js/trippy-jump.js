@@ -101,7 +101,7 @@
   const SPRING_VEL = -18;
   const FRICTION = 0.88; // Smooth deceleration
   const TILT_DEADZONE = 5; // Degrees of tilt ignored (eliminates resting jitter)
-  const TILT_SENSITIVITY = 25; // Degrees for full deflection
+  const TILT_SENSITIVITY = 20; // Degrees for full deflection
 
   let platforms = [];
   let particles = [];
