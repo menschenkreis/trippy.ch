@@ -224,21 +224,15 @@
 
   function generatePlatforms(fromY, toY) {
     let y = fromY;
+    const baseGap = 70;
+    const maxDifficultyGap = 70;
     
-    // Jump distance tuning:
-    // JUMP_VEL is -11, GRAVITY is 0.32. 
-    // Peak time: t = 11 / 0.32 = 34.375 frames
-    // Max height: h = (11 * 34.375) - (0.5 * 0.32 * 34.375^2) = 189 pixels
-    // We want platforms to be comfortably reachable, so gap should stay well below 180.
-    
-    const baseGap = 70; // Comfortable base
-    const maxDifficultyGap = 70; // Total max gap will be ~140-150 with randomness
+    // Use an array to store new items and add them all at once
+    const newPlatforms = [];
     
     while (y > toY) {
-      // Scale gap by screen height but cap it strictly to physical jump limit
       const difficultyProgress = Math.min(score / 2000, 1);
       const currentMaxGap = baseGap + (difficultyProgress * maxDifficultyGap);
-      
       y -= 50 + Math.random() * (currentMaxGap - 50);
       
       const w = (65 + Math.random() * 25) * sphereSizeScale;
@@ -252,13 +246,14 @@
       else if (r < 0.3 + diff * 0.15) type = 'moving';
       else if (r < 0.4 + diff * 0.1) type = 'vanishing';
 
-      platforms.push({ x, y, w, h: 10, type, alive: true, opacity: 1, vx: (Math.random() - 0.5) * 4, fade: 0 });
+      newPlatforms.push({ x, y, w, h: 10, type, alive: true, opacity: 1, vx: (Math.random() - 0.5) * 4, fade: 0 });
 
       if (Math.random() < 0.06) {
         const pTypes = ['aura', 'nova', 'magnet'];
         powerUps.push({ x: x + w/2, y: y - 35, type: pTypes[Math.floor(Math.random()*pTypes.length)], alive: true, phase: Math.random()*TAU });
       }
     }
+    platforms = platforms.concat(newPlatforms);
   }
 
   // ── Drawing ──
@@ -577,14 +572,55 @@
   function render() {
     ctx.clearRect(0, 0, W, H);
     drawBackground();
+    
     if (playing || gameOver) {
-      powerUps.forEach(drawPowerUp);
-      platforms.forEach(p => { const sy = p.y - cameraY; if (sy > -50 && sy < H + 50) drawPlatform(p, sy); });
-      trail.forEach(t => { ctx.fillStyle = rgb(theme.primary, t.a * 0.5); ctx.beginPath(); ctx.arc(t.x, t.y - cameraY, 6 * t.a, 0, TAU); ctx.fill(); });
-      particles.forEach(p => { ctx.fillStyle = rgb(p.color, p.life); ctx.beginPath(); ctx.arc(p.x, p.y - cameraY, p.type === 'spark' ? p.size*(0.5+p.life) : p.size, 0, TAU); ctx.fill(); });
-      shockwaves.forEach(s => { ctx.strokeStyle = rgb(s.color, s.alpha); ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(s.x, s.y, s.radius, 0, TAU); ctx.stroke(); });
-      drawPlayer(player.x, player.y - cameraY);
-      ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = `200 ${3.0 * sphereSizeScale}rem sans-serif`; ctx.textAlign = 'center'; ctx.fillText(score, W/2, 80);
+      const camY = cameraY; // Cache for performance
+      
+      // Render powerups
+      for (let i = 0; i < powerUps.length; i++) {
+        drawPowerUp(powerUps[i]);
+      }
+      
+      // Render platforms with frustum culling
+      for (let i = 0; i < platforms.length; i++) {
+        const p = platforms[i];
+        const sy = p.y - camY;
+        if (sy > -100 && sy < H + 100) drawPlatform(p, sy);
+      }
+
+      // Trail - draw as a single path if possible, or batched
+      for (let i = 0; i < trail.length; i++) {
+        const t = trail[i];
+        ctx.fillStyle = rgb(theme.primary, t.a * 0.5);
+        ctx.beginPath(); 
+        ctx.arc(t.x, t.y - camY, 6 * t.a, 0, TAU); 
+        ctx.fill();
+      }
+
+      // Particles
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        ctx.fillStyle = rgb(p.color, p.life);
+        ctx.beginPath(); 
+        ctx.arc(p.x, p.y - camY, p.type === 'spark' ? p.size*(0.5+p.life) : p.size, 0, TAU); 
+        ctx.fill();
+      }
+
+      // Shockwaves
+      for (let i = 0; i < shockwaves.length; i++) {
+        const s = shockwaves[i];
+        ctx.strokeStyle = rgb(s.color, s.alpha);
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.radius, 0, TAU); ctx.stroke();
+      }
+      
+      drawPlayer(player.x, player.y - camY);
+      
+      // Score
+      ctx.fillStyle = 'rgba(255,255,255,0.8)'; 
+      ctx.font = `200 ${3.0 * sphereSizeScale}rem sans-serif`; 
+      ctx.textAlign = 'center'; 
+      ctx.fillText(score, W/2, 80);
     }
     requestAnimationFrame(render);
     update();
