@@ -224,9 +224,12 @@
 
   function generatePlatforms(fromY, toY) {
     let y = fromY;
-    const baseGap = 95 * sphereSizeScale;
+    // Adapt gap based on screen height to ensure desktop players aren't stranded
+    const baseGap = Math.min(95 * sphereSizeScale, H * 0.12);
+    const maxGapIncrease = Math.min(score / 120, H * 0.08);
+    
     while (y > toY) {
-      y -= baseGap + Math.random() * 45 + Math.min(score / 120, 70);
+      y -= baseGap + Math.random() * 45 + maxGapIncrease;
       const w = (60 + Math.random() * 25) * sphereSizeScale;
       const x = Math.random() * (W - w);
 
