@@ -1174,15 +1174,15 @@ footer a:hover { color: var(--pink); }
   width: 18px;
   height: 18px;
   display: block;
-  color: var(--pink);
+  color: var(--teal);
   animation: geoRotate 12s linear infinite, sparkle 2.5s ease-in-out infinite;
-  filter: drop-shadow(0 0 8px var(--pink-glow));
+  filter: drop-shadow(0 0 8px var(--teal-glow));
   transition: all 0.4s ease;
 }
 
 .support-link:hover .sacred-geo {
-  color: var(--teal);
-  filter: drop-shadow(0 0 12px var(--teal-glow));
+  color: var(--pink);
+  filter: drop-shadow(0 0 12px var(--pink-glow));
 }
 
 .support-text {
