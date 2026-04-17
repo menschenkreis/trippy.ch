@@ -1154,18 +1154,109 @@
   }
 
   function drawChillBarrier() {
-    const sy = H - 25;
+    const sy  = H - 25;
+    const acc = theme.accent;
+    const pri = theme.primary;
     ctx.save();
-    const g = ctx.createLinearGradient(0, sy-10, 0, sy+10);
-    const color = theme.accent;
-    g.addColorStop(0, 'transparent');
-    g.addColorStop(0.5, rgb(color, 0.6 + Math.sin(time*5)*0.2));
-    g.addColorStop(1, 'transparent');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, sy-10, W, 20);
-    for (let x = -50; x < W + 100; x += 80) {
-      drawSg(ctx, x - (time * 60)%80, sy, 35, 0.3, 6, time);
+
+    // ── 1. Wide luminous gradient band ──────────────────────────────────────
+    const pulse = 0.55 + Math.sin(time * 4.5) * 0.15;
+    const band  = ctx.createLinearGradient(0, sy - 42, 0, sy + 18);
+    band.addColorStop(0,    'transparent');
+    band.addColorStop(0.22, rgb(acc, 0.08));
+    band.addColorStop(0.52, rgb(acc, pulse));
+    band.addColorStop(0.70, rgb(pri, 0.30));
+    band.addColorStop(1,    'transparent');
+    ctx.fillStyle = band;
+    ctx.fillRect(0, sy - 42, W, 60);
+
+    // ── 2. Bright centre line + secondary rule ───────────────────────────────
+    ctx.strokeStyle = rgb(acc, pulse);
+    ctx.lineWidth   = 1.8;
+    ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
+
+    ctx.strokeStyle = rgb(pri, 0.40);
+    ctx.lineWidth   = 0.6;
+    ctx.beginPath(); ctx.moveTo(0, sy - 15); ctx.lineTo(W, sy - 15); ctx.stroke();
+
+    // ── 3. Three tiling rows of sacred geometry ──────────────────────────────
+    // Each row scrolls at its own speed and direction so they never sync.
+    const s1 = (time * 52) % 70;
+    const s2 = (time * 36) % 70;
+    const s3 = (time * 64) % 70;
+    for (let x = -70; x < W + 70; x += 70) {
+      drawSg(ctx, x + s1,        sy - 21, 24, 0.52, 6,  time * 0.35);   // hexagonal, scrolls right
+      drawSg(ctx, x - s2 + 35,   sy +  1, 32, 0.62, 8, -time * 0.27);   // octagonal, scrolls left
+      drawSg(ctx, x + s3 + 18,   sy + 15, 18, 0.40, 3,  time * 0.78);   // triangular, fast right
     }
+
+    // ── 4. Lotus-gate nodes ──────────────────────────────────────────────────
+    // Evenly spaced, slowly scrolling mini-mandalas with glowing halos.
+    const NODE_GAP    = 148;
+    const nodeCount   = Math.ceil(W / NODE_GAP) + 2;
+    const nodeScroll  = (time * 26) % NODE_GAP;
+    for (let i = 0; i < nodeCount; i++) {
+      const nx = (i * NODE_GAP - nodeScroll + NODE_GAP) % (W + NODE_GAP) - NODE_GAP / 2;
+      const np = Math.sin(time * 3.2 + i * 1.5);          // per-node breathe
+
+      // Radial halo
+      const halo = ctx.createRadialGradient(nx, sy, 0, nx, sy, 26);
+      halo.addColorStop(0,   rgb(acc, 0.68 + np * 0.14));
+      halo.addColorStop(0.4, rgb(acc, 0.20));
+      halo.addColorStop(1,   'transparent');
+      ctx.fillStyle = halo;
+      ctx.beginPath(); ctx.arc(nx, sy, 26, 0, TAU); ctx.fill();
+
+      ctx.save();
+      ctx.translate(nx, sy);
+
+      // Outer hexagon — rotates slowly
+      ctx.strokeStyle = rgb(pri, 0.80); ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      for (let j = 0; j <= 6; j++) {
+        const a = (TAU / 6) * j + time * 0.55 + i * 0.9;
+        const r = 10 + np * 2;
+        j === 0 ? ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r)
+                : ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      ctx.stroke();
+
+      // Inner triangle — counter-rotates
+      ctx.strokeStyle = rgb(acc, 0.65); ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      for (let j = 0; j <= 3; j++) {
+        const a = (TAU / 3) * j - time * 1.1 - i * 0.6;
+        const r = 5;
+        j === 0 ? ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r)
+                : ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      ctx.stroke();
+
+      // Centre jewel dot
+      ctx.fillStyle = rgb(pri, 0.90 + np * 0.10);
+      ctx.beginPath(); ctx.arc(0, 0, 2.5, 0, TAU); ctx.fill();
+
+      ctx.restore();
+    }
+
+    // ── 5. Dashed inter-node connecting rule ─────────────────────────────────
+    ctx.strokeStyle = rgb(pri, 0.20);
+    ctx.lineWidth   = 0.5;
+    ctx.setLineDash([4, 9]);
+    ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // ── 6. Rising energy particles ───────────────────────────────────────────
+    // Golden-angle horizontal spacing keeps coverage uniform with no clustering.
+    for (let i = 0; i < 24; i++) {
+      const px  = (i * 137.508 + time * 36) % W;
+      const age = (time * 20 + i * 10.7) % 48;      // 0–48 lifetime per particle
+      const py  = sy - age;
+      const pa  = 0.75 * (1 - age / 48);
+      ctx.fillStyle = rgb(acc, pa);
+      ctx.beginPath(); ctx.arc(px, py, 1.8, 0, TAU); ctx.fill();
+    }
+
     ctx.restore();
   }
 
