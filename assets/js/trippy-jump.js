@@ -117,6 +117,8 @@
   let chillMode = localStorage.getItem('tj-chill') === '1';
   let tiltEnabled = localStorage.getItem('tj-tilt') !== '0'; // default: on
   let fallHistory = []; // timestamps of recent falls
+  let lastCheckpoint = 0; // highest checkpoint reached (meters)
+  let checkpointFlash = null; // { life, maxLife } — brief on-screen notification
   let playerShapeTier = 0; // increments every 1000m, drives shape morphing
   let mandalaClock    = 0; // accumulated angle driven by player movement
 
@@ -764,13 +766,28 @@
     squishY = 0.62;
   }
 
+  function computeCheckpoint(sc) {
+    if (sc < 500) return 0;
+    if (sc < 1000) return 500;
+    return Math.floor(sc / 1000) * 1000;
+  }
+
   // ── Init Game ──
-  function initGame(restore = false) {
+  function initGame(restore = false, fromCheckpoint = 0) {
     const saved = restore ? loadGame() : null;
-    score = saved ? saved.score : 0;
+    if (fromCheckpoint > 0) {
+      score = fromCheckpoint;
+      maxHeight = fromCheckpoint * 10;
+      cameraY = 0; // overwritten after player.y is set below
+    } else {
+      score = saved ? saved.score : 0;
+      maxHeight = saved ? saved.maxHeight : 0;
+      cameraY = saved ? saved.cameraY : 0;
+      lastCheckpoint = saved ? computeCheckpoint(saved.score) : 0;
+    }
+    if (!fromCheckpoint && !restore) lastCheckpoint = 0;
+    checkpointFlash = null;
     sessionStartScore = score;
-    cameraY = saved ? saved.cameraY : 0;
-    maxHeight = saved ? saved.maxHeight : 0;
     lastAutoIdx = Math.min(themes.length-1, Math.floor(maxHeight / 10000));
     themeIndex = saved ? saved.themeIndex : lastAutoIdx;
     const t = themes[themeIndex];
@@ -823,7 +840,14 @@
     }
     updateJourneyPanel();
 
-    if (saved) {
+    if (fromCheckpoint > 0) {
+      const startY = -(fromCheckpoint * 10);
+      player.x = W / 2; player.y = startY;
+      player.vx = 0; player.vy = JUMP_VEL;
+      cameraY = player.y - (H - 150);
+      platforms = [{ x: W/2 - 50, y: startY + 80, w: 100, h: 10, type: 'normal', alive: true, opacity: 1 }];
+      generatePlatforms(startY + 80, cameraY - 3000);
+    } else if (saved) {
       player.x = saved.player.x; player.y = saved.player.y;
       player.vx = saved.player.vx; player.vy = saved.player.vy;
       platforms = saved.platforms;
@@ -1737,7 +1761,13 @@
         burst(player.x, player.y - cameraY, theme.accent, 40, 'spark');
         addShockwave(player.x, player.y - cameraY, theme.secondary);
       }
+      const newCP = computeCheckpoint(score);
+      if (newCP > lastCheckpoint) {
+        lastCheckpoint = newCP;
+        checkpointFlash = { life: 3.0, maxLife: 3.0 };
+      }
     }
+    if (checkpointFlash) { checkpointFlash.life -= 0.016; if (checkpointFlash.life <= 0) checkpointFlash = null; }
 
     if (player.powerUp) {
       player.powerTimer -= 0.016;
@@ -1901,6 +1931,9 @@
     document.getElementById('final-score').textContent = score + 'm';
     document.getElementById('final-high').textContent = 'BEST: ' + highScore + 'm';
     document.getElementById('game-over').classList.add('is-active');
+    const cpBtn = document.getElementById('checkpoint-btn');
+    if (lastCheckpoint > 0) { cpBtn.textContent = `↺ FROM ${lastCheckpoint}m`; cpBtn.style.display = ''; }
+    else cpBtn.style.display = 'none';
     playGameOverSound();
 
     // Track falls for chill mode suggestion
@@ -1985,6 +2018,19 @@
       ctx.font = `200 ${3.0 * sphereSizeScale}rem sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillText(score + 'm', W/2, 130);
+
+      // Checkpoint notification — brief shimmer banner
+      if (checkpointFlash) {
+        const { life, maxLife } = checkpointFlash;
+        const alpha = Math.min((maxLife - life) / 0.4, 1) * Math.min(life / 0.7, 1);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = `200 ${Math.round(14 * sphereSizeScale)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = `hsla(${(time * 40) % 360}, 70%, 85%, 1)`;
+        ctx.fillText(`✦ ${lastCheckpoint}m checkpoint`, W/2, 162);
+        ctx.restore();
+      }
 
       // Milestone quote — gentle fade-in/out animated thought bubble
       if (milestoneDisplay) {
@@ -2142,6 +2188,7 @@
 
   document.getElementById('start-btn').onclick = (e) => { e.preventDefault(); initAudio(); initAccel(); initGame(false); };
   document.getElementById('play-again').onclick = (e) => { e.preventDefault(); initAudio(); initAccel(); initGame(false); };
+  document.getElementById('checkpoint-btn').onclick = (e) => { e.preventDefault(); initAudio(); initAccel(); initGame(false, lastCheckpoint); };
   document.getElementById('theme-btn').onclick = () => { 
     manualTheme = true;
     themeIndex = (themeIndex + 1) % themes.length; 
