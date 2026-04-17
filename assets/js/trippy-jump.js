@@ -118,6 +118,7 @@
   let tiltEnabled = localStorage.getItem('tj-tilt') !== '0'; // default: on
   let fallHistory = []; // timestamps of recent falls
   let playerShapeTier = 0; // increments every 1000m, drives shape morphing
+  let mandalaClock    = 0; // accumulated angle driven by player movement
 
   const player = {
     x: 0, y: 0, vx: 0, vy: 0,
@@ -807,6 +808,7 @@
     chordBloomFlash = 0;
     lastMilestone = 0;
     playerShapeTier = Math.min(5, Math.floor(score / 1000));
+    mandalaClock    = 0;
     padNoteTimer = 15 + Math.random() * 5; // stagger first pad note
 
     // Recalibrate tilt center each game start
@@ -1050,74 +1052,152 @@
     if (chillMode) drawChillBarrier();
   }
 
+  // ── Clockwork Mandala ────────────────────────────────────────────────────────
+  // A layered, radially-symmetric mandala whose rings rotate like interlocking
+  // gears.  mandalaClock accumulates from player.vx so the whole mechanism
+  // literally turns with the player's movement; inner rings are geared faster.
   function drawKaleidoscope() {
     if (score < 2500) return;
     const intensity = Math.min(1, (score - 2500) / 600);
-    // Centre drifts with horizontal movement; vertical reacts to jump velocity
-    const cx = W / 2 + player.vx * 10;
-    const cy = H / 2 + player.vy * 2;
-    // Rotation speeds up while the player is moving
-    const vBoost = 1 + Math.abs(player.vx) * 0.06;
-    const maxR = Math.min(W * 0.46, H * 0.46);
+
+    const cx = W / 2;
+    const cy = H / 2;
+    const maxR = Math.min(W * 0.44, H * 0.44);
+
+    // Slow autonomous drift + accumulated player drive
+    const clock = mandalaClock + time * 0.18;
+    const hueBase = (time * 10) % 360;
 
     ctx.save();
-    ctx.globalAlpha = intensity * 0.20;
+    ctx.translate(cx, cy);
 
-    const rings = [
-      { sides:  3, r: maxR * 0.14, speed:  1.4, hOff:   0 },
-      { sides:  6, r: maxR * 0.27, speed: -0.8, hOff:  60 },
-      { sides:  4, r: maxR * 0.40, speed:  0.55, hOff: 120 },
-      { sides:  8, r: maxR * 0.54, speed: -0.32, hOff: 195 },
-      { sides:  5, r: maxR * 0.68, speed:  0.18, hOff: 270 },
-      { sides: 12, r: maxR * 0.84, speed: -0.09, hOff: 340 },
-    ];
-
-    for (const L of rings) {
-      const rot = time * L.speed * vBoost;
-      const hue = (L.hOff + time * 18) % 360;
-
-      // Polygon outline
-      ctx.strokeStyle = `hsl(${hue}, 100%, 68%)`;
-      ctx.lineWidth = 1.5;
+    // ── Helper: draw one petal (pointed oval) from origin to polar (r, a) ──
+    function petal(a, r, spread) {
+      const tip = { x: Math.cos(a) * r, y: Math.sin(a) * r };
       ctx.beginPath();
-      for (let i = 0; i <= L.sides; i++) {
-        const a = (TAU / L.sides) * i + rot;
-        i === 0 ? ctx.moveTo(cx + Math.cos(a) * L.r, cy + Math.sin(a) * L.r)
-                : ctx.lineTo(cx + Math.cos(a) * L.r, cy + Math.sin(a) * L.r);
-      }
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(Math.cos(a - spread) * r * 0.72,
+                           Math.sin(a - spread) * r * 0.72, tip.x, tip.y);
+      ctx.quadraticCurveTo(Math.cos(a + spread) * r * 0.72,
+                           Math.sin(a + spread) * r * 0.72, 0, 0);
       ctx.stroke();
-
-      // Flower-of-life circles at each vertex
-      ctx.strokeStyle = `hsl(${(hue + 45) % 360}, 90%, 72%)`;
-      ctx.lineWidth = 0.8;
-      for (let i = 0; i < L.sides; i++) {
-        const a = (TAU / L.sides) * i + rot;
-        const px = cx + Math.cos(a) * L.r;
-        const py = cy + Math.sin(a) * L.r;
-        ctx.beginPath(); ctx.arc(px, py, L.r * 0.12, 0, TAU); ctx.stroke();
-      }
-
-      // Star polygon (skip-2 connectors) for rings with 5+ sides
-      if (L.sides >= 5) {
-        ctx.strokeStyle = `hsl(${(hue + 90) % 360}, 85%, 60%)`;
-        ctx.lineWidth = 0.5;
-        ctx.beginPath();
-        for (let i = 0; i < L.sides; i++) {
-          const a1 = (TAU / L.sides) * i + rot;
-          const a2 = (TAU / L.sides) * ((i + 2) % L.sides) + rot;
-          ctx.moveTo(cx + Math.cos(a1) * L.r, cy + Math.sin(a1) * L.r);
-          ctx.lineTo(cx + Math.cos(a2) * L.r, cy + Math.sin(a2) * L.r);
-        }
-        ctx.stroke();
-      }
     }
 
-    // Pulsing central dot
-    ctx.globalAlpha = intensity * 0.50;
-    ctx.fillStyle = `hsl(${(time * 40) % 360}, 100%, 80%)`;
-    ctx.beginPath();
-    ctx.arc(cx, cy, 6 + Math.sin(time * 4) * 2, 0, TAU);
-    ctx.fill();
+    // ── Layer definitions ────────────────────────────────────────────────────
+    // Each layer is a gear: dir ±1 alternates CW/CCW, sm sets gear ratio.
+    // hOff staggers the hue so each ring has a distinct colour.
+    const layers = [
+      // Innermost: 8 petals, fastest
+      { rf: 0.12, n: 8,  dir:  1, sm: 4.0, hOff:   0,
+        draw(r, hue) {
+          ctx.strokeStyle = `hsl(${hue}, 100%, 72%)`; ctx.lineWidth = 1.4;
+          for (let i = 0; i < this.n; i++) petal((TAU / this.n) * i, r, 0.38);
+        }
+      },
+      // Ring 2: polygon + radial spokes
+      { rf: 0.24, n: 8,  dir: -1, sm: 2.5, hOff:  45,
+        draw(r, hue) {
+          ctx.strokeStyle = `hsl(${hue}, 100%, 68%)`; ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          for (let i = 0; i <= this.n; i++) {
+            const a = (TAU / this.n) * i;
+            i === 0 ? ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r)
+                    : ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+          }
+          ctx.stroke();
+          ctx.strokeStyle = `hsl(${hue}, 80%, 55%)`; ctx.lineWidth = 0.7;
+          for (let i = 0; i < this.n; i++) {
+            const a = (TAU / this.n) * i;
+            ctx.beginPath(); ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(a)*r*0.88, Math.sin(a)*r*0.88); ctx.stroke();
+          }
+        }
+      },
+      // Ring 3: gear teeth (arc segments with radial ticks)
+      { rf: 0.37, n: 12, dir:  1, sm: 1.6, hOff:  90,
+        draw(r, hue) {
+          ctx.strokeStyle = `hsl(${hue}, 100%, 65%)`; ctx.lineWidth = 1.0;
+          for (let i = 0; i < this.n; i++) {
+            const a0 = (TAU / this.n) * i;
+            const a1 = a0 + (TAU / this.n) * 0.55;
+            ctx.beginPath(); ctx.arc(0, 0, r, a0, a1); ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(a0) * r * 0.86, Math.sin(a0) * r * 0.86);
+            ctx.lineTo(Math.cos(a0) * r * 1.14, Math.sin(a0) * r * 1.14);
+            ctx.stroke();
+          }
+        }
+      },
+      // Ring 4: ball-bearing dots
+      { rf: 0.50, n: 16, dir: -1, sm: 1.1, hOff: 135,
+        draw(r, hue) {
+          ctx.fillStyle = `hsl(${hue}, 100%, 70%)`;
+          for (let i = 0; i < this.n; i++) {
+            const a = (TAU / this.n) * i;
+            ctx.beginPath();
+            ctx.arc(Math.cos(a)*r, Math.sin(a)*r, 3, 0, TAU); ctx.fill();
+          }
+          // Thin ring connecting the dots
+          ctx.strokeStyle = `hsl(${hue}, 60%, 45%)`; ctx.lineWidth = 0.5;
+          ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
+        }
+      },
+      // Ring 5: 8 wider petals
+      { rf: 0.64, n: 8,  dir:  1, sm: 0.65, hOff: 180,
+        draw(r, hue) {
+          ctx.strokeStyle = `hsl(${hue}, 100%, 68%)`; ctx.lineWidth = 1.3;
+          for (let i = 0; i < this.n; i++) petal((TAU / this.n) * i, r, 0.42);
+          // Octagon outline
+          ctx.strokeStyle = `hsl(${hue}, 70%, 45%)`; ctx.lineWidth = 0.6;
+          ctx.beginPath();
+          for (let i = 0; i <= this.n; i++) {
+            const a = (TAU / this.n) * i;
+            i === 0 ? ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r)
+                    : ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+          }
+          ctx.stroke();
+        }
+      },
+      // Ring 6: clock-face ticks — outermost, slowest
+      { rf: 0.80, n: 24, dir: -1, sm: 0.32, hOff: 225,
+        draw(r, hue) {
+          ctx.strokeStyle = `hsl(${hue}, 100%, 65%)`; ctx.lineWidth = 1.0;
+          for (let i = 0; i < this.n; i++) {
+            const a = (TAU / this.n) * i;
+            const len = i % 3 === 0 ? 9 : 4;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(a) * (r - len * 0.5), Math.sin(a) * (r - len * 0.5));
+            ctx.lineTo(Math.cos(a) * (r + len * 0.5), Math.sin(a) * (r + len * 0.5));
+            ctx.stroke();
+          }
+          ctx.strokeStyle = `hsl(${hue}, 50%, 40%)`; ctx.lineWidth = 0.4;
+          ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
+        }
+      },
+    ];
+
+    // ── Draw all layers ──────────────────────────────────────────────────────
+    ctx.globalAlpha = intensity * 0.24;
+    for (const L of layers) {
+      const rot   = clock * L.dir * L.sm;
+      const hue   = (hueBase + L.hOff) % 360;
+      const r     = maxR * L.rf;
+      ctx.save();
+      ctx.rotate(rot);
+      L.draw.call(L, r, hue);
+      ctx.restore();
+    }
+
+    // ── Central jewel: pulsing filled circle ─────────────────────────────────
+    ctx.globalAlpha = intensity * 0.55;
+    const jR = 5 + Math.sin(time * 3.5) * 2;
+    const jHue = (hueBase + time * 20) % 360;
+    const jg = ctx.createRadialGradient(0, 0, 0, 0, 0, jR * 2.5);
+    jg.addColorStop(0,   `hsl(${jHue}, 100%, 92%)`);
+    jg.addColorStop(0.4, `hsl(${jHue}, 100%, 68%)`);
+    jg.addColorStop(1,   'transparent');
+    ctx.fillStyle = jg;
+    ctx.beginPath(); ctx.arc(0, 0, jR * 2.5, 0, TAU); ctx.fill();
 
     ctx.restore();
   }
@@ -1586,6 +1666,7 @@
     if (-player.y > maxHeight) {
       maxHeight = -player.y;
       score = Math.floor(maxHeight / 10) * (player.powerUp === 'star' ? 2 : 1);
+      mandalaClock += player.vx * 0.004; // player drives the clockwork
       const newTier = Math.min(5, Math.floor(score / 1000));
       if (newTier > playerShapeTier) {
         playerShapeTier = newTier;
