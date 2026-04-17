@@ -117,6 +117,7 @@
   let chillMode = localStorage.getItem('tj-chill') === '1';
   let tiltEnabled = localStorage.getItem('tj-tilt') !== '0'; // default: on
   let fallHistory = []; // timestamps of recent falls
+  let playerShapeTier = 0; // increments every 1000m, drives shape morphing
 
   const player = {
     x: 0, y: 0, vx: 0, vy: 0,
@@ -805,6 +806,7 @@
     chordBloomCooldown = 0;
     chordBloomFlash = 0;
     lastMilestone = 0;
+    playerShapeTier = Math.min(5, Math.floor(score / 1000));
     padNoteTimer = 15 + Math.random() * 5; // stagger first pad note
 
     // Recalibrate tilt center each game start
@@ -1044,7 +1046,80 @@
       ctx.fillRect(0, 0, W, H);
     }
 
+    drawKaleidoscope();
     if (chillMode) drawChillBarrier();
+  }
+
+  function drawKaleidoscope() {
+    if (score < 2500) return;
+    const intensity = Math.min(1, (score - 2500) / 600);
+    // Centre drifts with horizontal movement; vertical reacts to jump velocity
+    const cx = W / 2 + player.vx * 10;
+    const cy = H / 2 + player.vy * 2;
+    // Rotation speeds up while the player is moving
+    const vBoost = 1 + Math.abs(player.vx) * 0.06;
+    const maxR = Math.min(W * 0.46, H * 0.46);
+
+    ctx.save();
+    ctx.globalAlpha = intensity * 0.20;
+
+    const rings = [
+      { sides:  3, r: maxR * 0.14, speed:  1.4, hOff:   0 },
+      { sides:  6, r: maxR * 0.27, speed: -0.8, hOff:  60 },
+      { sides:  4, r: maxR * 0.40, speed:  0.55, hOff: 120 },
+      { sides:  8, r: maxR * 0.54, speed: -0.32, hOff: 195 },
+      { sides:  5, r: maxR * 0.68, speed:  0.18, hOff: 270 },
+      { sides: 12, r: maxR * 0.84, speed: -0.09, hOff: 340 },
+    ];
+
+    for (const L of rings) {
+      const rot = time * L.speed * vBoost;
+      const hue = (L.hOff + time * 18) % 360;
+
+      // Polygon outline
+      ctx.strokeStyle = `hsl(${hue}, 100%, 68%)`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i <= L.sides; i++) {
+        const a = (TAU / L.sides) * i + rot;
+        i === 0 ? ctx.moveTo(cx + Math.cos(a) * L.r, cy + Math.sin(a) * L.r)
+                : ctx.lineTo(cx + Math.cos(a) * L.r, cy + Math.sin(a) * L.r);
+      }
+      ctx.stroke();
+
+      // Flower-of-life circles at each vertex
+      ctx.strokeStyle = `hsl(${(hue + 45) % 360}, 90%, 72%)`;
+      ctx.lineWidth = 0.8;
+      for (let i = 0; i < L.sides; i++) {
+        const a = (TAU / L.sides) * i + rot;
+        const px = cx + Math.cos(a) * L.r;
+        const py = cy + Math.sin(a) * L.r;
+        ctx.beginPath(); ctx.arc(px, py, L.r * 0.12, 0, TAU); ctx.stroke();
+      }
+
+      // Star polygon (skip-2 connectors) for rings with 5+ sides
+      if (L.sides >= 5) {
+        ctx.strokeStyle = `hsl(${(hue + 90) % 360}, 85%, 60%)`;
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        for (let i = 0; i < L.sides; i++) {
+          const a1 = (TAU / L.sides) * i + rot;
+          const a2 = (TAU / L.sides) * ((i + 2) % L.sides) + rot;
+          ctx.moveTo(cx + Math.cos(a1) * L.r, cy + Math.sin(a1) * L.r);
+          ctx.lineTo(cx + Math.cos(a2) * L.r, cy + Math.sin(a2) * L.r);
+        }
+        ctx.stroke();
+      }
+    }
+
+    // Pulsing central dot
+    ctx.globalAlpha = intensity * 0.50;
+    ctx.fillStyle = `hsl(${(time * 40) % 360}, 100%, 80%)`;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6 + Math.sin(time * 4) * 2, 0, TAU);
+    ctx.fill();
+
+    ctx.restore();
   }
 
   function lerpColorRgb(c1, c2, f) {
@@ -1253,6 +1328,28 @@
     ctx.restore();
   }
 
+  // Draw a closed regular polygon of n sides, radius r, rotation rot at ctx origin
+  function drawPolyAt(n, r, rot) {
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const a = (TAU / n) * i + rot;
+      i === 0 ? ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r)
+              : ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.stroke();
+  }
+
+  // Draw n filled dots at radius r, evenly spaced from angle rot
+  function drawOrbits(n, r, rot, dotR, color) {
+    ctx.save();
+    ctx.fillStyle = color;
+    for (let i = 0; i < n; i++) {
+      const a = (TAU / n) * i + rot;
+      ctx.beginPath(); ctx.arc(Math.cos(a) * r, Math.sin(a) * r, dotR, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function drawPlayer(x, y) {
     ctx.save();
     ctx.translate(x, y);
@@ -1327,21 +1424,83 @@
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(0,0, pW * 1.8, 0, TAU); ctx.fill();
 
-    ctx.strokeStyle = rgb(theme.primary, 1.0);
+    // ── Tier-based player shape — morphs every 1000m ──
+    const tier = playerShapeTier;
+    const primCol = rgb(theme.primary, 1.0);
+    const secCol  = rgb(theme.secondary, 0.65);
+    const accCol  = rgb(theme.accent, 0.5);
+    ctx.strokeStyle = primCol;
     ctx.lineWidth = 2.5;
-    for (let j = 0; j < 2; j++) {
+
+    if (tier === 0) {
+      // Double triangle (original)
+      drawPolyAt(3, pW * 0.75, time * 2.5);
+      drawPolyAt(3, pW * 0.75, -time * 1.8);
+
+    } else if (tier === 1) {
+      // Star of David: upright + inverted triangle, hexagonal ring, 6 orbital dots
+      drawPolyAt(3, pW * 0.78, time * 2.0);
+      drawPolyAt(3, pW * 0.78, -time * 1.5 + Math.PI);
+      ctx.strokeStyle = secCol; ctx.lineWidth = 1;
+      drawPolyAt(6, pW * 0.52, time * 0.7);
+      drawOrbits(6, pW * 0.92, -time * 0.6, 2.5, secCol);
+
+    } else if (tier === 2) {
+      // Square mandala: 2 counter-rotating squares (one at 45°), inner square, 8 orbital dots
+      drawPolyAt(4, pW * 0.78, time * 1.8);
+      drawPolyAt(4, pW * 0.78, -time * 1.4 + Math.PI / 4);
+      ctx.strokeStyle = secCol; ctx.lineWidth = 1;
+      drawPolyAt(4, pW * 0.46, -time * 0.9);
+      drawOrbits(8, pW * 0.92, time * 0.5, 2.5, secCol);
+
+    } else if (tier === 3) {
+      // Pentagon + pentagram (skip-2 star polygon), 5+5 orbital dots
+      drawPolyAt(5, pW * 0.78, time * 1.5);
       ctx.beginPath();
-      const rot = j === 0 ? time * 2.5 : -time * 1.8;
-      for (let i = 0; i < 3; i++) {
-        const a = (TAU / 3) * i + rot;
-        const px = Math.cos(a) * pW * 0.75;
-        const py = Math.sin(a) * pW * 0.75;
-        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      for (let i = 0; i < 6; i++) {
+        const a = (TAU / 5) * (i * 2) + (-time * 1.2);
+        i === 0 ? ctx.moveTo(Math.cos(a) * pW * 0.78, Math.sin(a) * pW * 0.78)
+                : ctx.lineTo(Math.cos(a) * pW * 0.78, Math.sin(a) * pW * 0.78);
       }
       ctx.closePath(); ctx.stroke();
+      ctx.strokeStyle = secCol; ctx.lineWidth = 1;
+      drawPolyAt(5, pW * 0.45, time * 0.7);
+      drawOrbits(5, pW * 0.95, time * 0.4, 3, secCol);
+      drawOrbits(5, pW * 0.52, -time * 0.6, 2, accCol);
+
+    } else if (tier === 4) {
+      // Hexagonal mandala: dual hexagon, flower-of-life inner circles, 12 orbital dots
+      drawPolyAt(6, pW * 0.80, time * 1.2);
+      drawPolyAt(6, pW * 0.80, -time * 0.9 + Math.PI / 6);
+      ctx.strokeStyle = secCol; ctx.lineWidth = 1;
+      const fr = pW * 0.44;
+      for (let i = 0; i < 6; i++) {
+        const a = (TAU / 6) * i + time * 0.4;
+        ctx.beginPath(); ctx.arc(Math.cos(a) * fr, Math.sin(a) * fr, fr, 0, TAU); ctx.stroke();
+      }
+      drawOrbits(6, pW * 0.97, time * 0.35, 3, secCol);
+      drawOrbits(6, pW * 0.52, -time * 0.5, 2.5, accCol);
+
+    } else {
+      // Tier 5 — full sacred geometry: triangles + square + hexagon + flower + octagon + 12 dots
+      drawPolyAt(3, pW * 0.82, time * 2.2);
+      drawPolyAt(3, pW * 0.82, -time * 1.6 + Math.PI);
+      ctx.lineWidth = 1.5;
+      drawPolyAt(4, pW * 0.70, time * 1.4);
+      ctx.strokeStyle = secCol; ctx.lineWidth = 1;
+      drawPolyAt(6, pW * 0.58, -time * 1.0);
+      const fr5 = pW * 0.50;
+      for (let i = 0; i < 6; i++) {
+        const a = (TAU / 6) * i - time * 0.3;
+        ctx.beginPath(); ctx.arc(Math.cos(a) * fr5, Math.sin(a) * fr5, fr5, 0, TAU); ctx.stroke();
+      }
+      ctx.strokeStyle = accCol; ctx.lineWidth = 0.8;
+      drawPolyAt(8, pW * 0.90, time * 0.6);
+      drawOrbits(12, pW * 1.0, -time * 0.25, 2.5, secCol);
     }
+
     ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(0,0, 4, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, 4, 0, TAU); ctx.fill();
     ctx.restore();
   }
 
@@ -1427,6 +1586,12 @@
     if (-player.y > maxHeight) {
       maxHeight = -player.y;
       score = Math.floor(maxHeight / 10) * (player.powerUp === 'star' ? 2 : 1);
+      const newTier = Math.min(5, Math.floor(score / 1000));
+      if (newTier > playerShapeTier) {
+        playerShapeTier = newTier;
+        burst(player.x, player.y - cameraY, theme.accent, 40, 'spark');
+        addShockwave(player.x, player.y - cameraY, theme.secondary);
+      }
     }
 
     if (player.powerUp) {
