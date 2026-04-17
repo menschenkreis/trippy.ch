@@ -93,34 +93,56 @@ a:hover { color: var(--pink); }
   height: 52px;
   border-radius: 50%;
   border: 2px solid var(--violet);
-  background: linear-gradient(135deg, var(--purple), var(--pink), var(--teal));
+  background: linear-gradient(135deg, var(--teal), var(--purple), var(--pink));
   background-size: 300% 300%;
-  animation: themePulse 3s ease-in-out infinite, themeGradient 4s ease infinite;
+  animation: langPulse 3s ease-in-out infinite, themeGradient 4s ease infinite;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.9rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+  font-size: 1.4rem;
+  font-weight: 300;
+  letter-spacing: 0.08em;
   color: #fff;
-  box-shadow: 0 0 20px var(--purple-glow), 0 0 40px rgba(124,58,237,0.15);
+  text-shadow: 0 0 8px rgba(255,255,255,0.4);
+  box-shadow: 0 0 20px var(--teal-glow), 0 0 40px rgba(45,212,191,0.15);
   transition: transform 0.3s, box-shadow 0.3s, var(--transition-colors);
+  overflow: hidden;
+}
+#lang-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent, rgba(255,255,255,0.1), transparent);
+  animation: langSpin 6s linear infinite;
+}
+#lang-btn span {
+  position: relative;
+  z-index: 1;
+  transition: transform 0.4s cubic-bezier(0.7, 0, 0.3, 1), opacity 0.3s ease;
 }
 #lang-btn:hover {
   transform: scale(1.12);
-  box-shadow: 0 0 30px var(--purple-glow), 0 0 60px rgba(124,58,237,0.25);
+  box-shadow: 0 0 30px var(--teal-glow), 0 0 60px rgba(45,212,191,0.25);
 }
 #lang-btn:active { transform: scale(0.95); }
-#lang-btn.morphing {
-  animation: langMorph 0.5s ease;
-  pointer-events: none;
+#lang-btn.morphing span {
+  animation: textFlip 0.5s cubic-bezier(0.7, 0, 0.3, 1);
 }
-@keyframes langMorph {
-  0%   { transform: scale(1) rotate(0deg); filter: hue-rotate(0deg); }
-  30%  { transform: scale(0.6) rotate(180deg); filter: hue-rotate(120deg); opacity: 0.5; }
-  60%  { transform: scale(1.3) rotate(360deg); filter: hue-rotate(240deg); opacity: 0.5; }
-  100% { transform: scale(1) rotate(360deg); filter: hue-rotate(360deg); opacity: 1; }
+@keyframes langPulse {
+  0%, 100% { box-shadow: 0 0 20px var(--teal-glow), 0 0 40px rgba(45,212,191,0.15); }
+  50% { box-shadow: 0 0 30px var(--teal-glow), 0 0 60px rgba(45,212,191,0.3); }
+}
+@keyframes langSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes textFlip {
+  0%   { transform: rotateX(0deg) scale(1); opacity: 1; }
+  40%  { transform: rotateX(90deg) scale(0.6); opacity: 0; }
+  60%  { transform: rotateX(-90deg) scale(0.6); opacity: 0; }
+  100% { transform: rotateX(0deg) scale(1); opacity: 1; }
 }
 .portal-active #lang-btn, .portal-active #theme-btn { pointer-events: none; opacity: 0.3; }
 

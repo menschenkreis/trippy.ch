@@ -52,17 +52,21 @@
   function createToggle() {
     const btn = document.createElement('button');
     btn.id = 'lang-btn';
-    btn.textContent = currentLang.toUpperCase();
+    const label = document.createElement('span');
+    label.textContent = currentLang.toUpperCase();
+    btn.appendChild(label);
     btn.addEventListener('click', () => {
       currentLang = currentLang === 'en' ? 'de' : 'en';
       localStorage.setItem(STORAGE_KEY, currentLang);
 
-      // Trippy morph animation
+      // Trippy flip animation — swap text at the midpoint
       btn.classList.add('morphing');
       setTimeout(() => {
-        btn.textContent = currentLang.toUpperCase();
+        label.textContent = currentLang.toUpperCase();
+      }, 200);
+      setTimeout(() => {
         btn.classList.remove('morphing');
-      }, 250);
+      }, 500);
 
       applyTranslations(currentLang);
     });
