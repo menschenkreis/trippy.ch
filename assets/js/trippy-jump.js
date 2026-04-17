@@ -955,67 +955,6 @@
       ctx.restore();
     }
 
-    // Clouds — psychedelic tinted, shorter depth band
-    if (depth > 500 && depth < 9000) {
-      const cAlpha = depth < 2500 ? (depth-500)/2000 : Math.max(0, 1-(depth-6000)/3000);
-      ctx.save();
-      ctx.globalAlpha = cAlpha;
-      for (let i = 0; i < clouds.length; i++) {
-        const c = clouds[i];
-        const cy = (c.y - cameraY * c.s) % (H + 300) - 150;
-        // Psychedelic hue that slowly drifts with time, per-cloud base offset
-        const hue = (c.hue + time * 8) % 360;
-        const g = ctx.createRadialGradient(c.x, cy, 0, c.x, cy, c.r);
-        g.addColorStop(0, `hsla(${hue}, 60%, 65%, 0.12)`);
-        g.addColorStop(0.5, `hsla(${(hue + 40) % 360}, 50%, 55%, 0.06)`);
-        g.addColorStop(1, 'transparent');
-        ctx.fillStyle = g;
-        ctx.beginPath(); ctx.arc(c.x, cy, c.r, 0, TAU); ctx.fill();
-      }
-      ctx.restore();
-    }
-
-    // Mid-ground geometric debris (depth 3 500 – 20 000)
-    // Pieces tile vertically using a tiling-parallax formula: each layer scrolls
-    // at rate (1 − s) relative to the camera, so different speeds never sync.
-    if (depth > 3500 && depth < 20000 && debris.length > 0) {
-      const dAlpha = depth < 6500  ? (depth - 3500) / 3000      // fade in
-                   : depth > 16000 ? Math.max(0, 1 - (depth - 16000) / 4000) // fade out
-                   : 1;
-      ctx.save();
-      const period = H * 1.5; // vertical tile period in screen pixels
-      for (let i = 0; i < debris.length; i++) {
-        const d = debris[i];
-        // How far has this parallax layer scrolled in screen space?
-        const scrolled = -cameraY * (1 - d.s);
-        const sy = ((scrolled + d.yOffset) % period + period) % period - H * 0.25;
-        if (sy < -d.size - 4 || sy > H + d.size + 4) continue;
-
-        d.rot += d.rotSpeed;
-        d.x   += d.driftX;
-        if (d.x < -d.size) d.x = W + d.size;
-        if (d.x >  W + d.size) d.x = -d.size;
-
-        ctx.save();
-        ctx.globalAlpha = dAlpha * d.alpha;
-        ctx.strokeStyle = rgb(theme.accent, 1);
-        ctx.lineWidth = 1;
-        ctx.translate(d.x, sy);
-        ctx.rotate(d.rot);
-        ctx.beginPath();
-        for (let j = 0; j < d.sides; j++) {
-          const a = (TAU / d.sides) * j;
-          j === 0
-            ? ctx.moveTo(Math.cos(a) * d.size, Math.sin(a) * d.size)
-            : ctx.lineTo(Math.cos(a) * d.size, Math.sin(a) * d.size);
-        }
-        ctx.closePath();
-        ctx.stroke();
-        ctx.restore();
-      }
-      ctx.restore();
-    }
-
     // Stars & Deep Space
     if (depth > 8000) {
       const sAlpha = Math.min(1, (depth - 8000) / 4000);
@@ -1454,10 +1393,44 @@
           ctx.beginPath(); ctx.arc(0, 0, AR * (0.7 + ring * 0.2), 0, TAU); ctx.stroke();
         }
       } else if (player.powerUp === 'nova') {
-        ctx.strokeStyle = `hsla(${(190 + th) % 360}, 90%, 70%, 0.5)`; ctx.lineWidth = 1.5;
+        // Radial thrust rays
+        ctx.strokeStyle = `hsla(${(190 + th) % 360}, 90%, 70%, 0.55)`; ctx.lineWidth = 1.5;
         for (let i = 0; i < 8; i++) {
           const a = (TAU / 8) * i + time * 1.2;
           ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * AR, Math.sin(a) * AR); ctx.stroke();
+        }
+        // Orbiting cloud blobs — the former background clouds, now attached to the player
+        for (let i = 0; i < 6; i++) {
+          const a   = (TAU / 6) * i + time * 0.7;
+          const bx  = Math.cos(a) * AR * 0.8;
+          const by  = Math.sin(a) * AR * 0.8;
+          const br  = AR * 0.45;
+          const hue = ((190 + th) + i * 28 + time * 14) % 360;
+          const bg  = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+          bg.addColorStop(0,   `hsla(${hue}, 90%, 72%, 0.22)`);
+          bg.addColorStop(0.5, `hsla(${(hue + 40) % 360}, 80%, 60%, 0.10)`);
+          bg.addColorStop(1,   'transparent');
+          ctx.fillStyle = bg;
+          ctx.beginPath(); ctx.arc(bx, by, br, 0, TAU); ctx.fill();
+        }
+        // Orbiting debris polygons — the former background geometric debris, now a personal vortex
+        for (let i = 0; i < 5; i++) {
+          const orbitA = (TAU / 5) * i + time * (i % 2 === 0 ? 0.9 : -0.75);
+          const orbitR = AR * (0.55 + (i % 3) * 0.14);
+          const dx     = Math.cos(orbitA) * orbitR;
+          const dy     = Math.sin(orbitA) * orbitR;
+          const sides  = 3 + (i % 3);
+          const size   = AR * 0.13;
+          const rot    = time * (i % 2 === 0 ? 1.6 : -2.1) + i;
+          const hue    = ((190 + th) + i * 42) % 360;
+          ctx.strokeStyle = `hsla(${hue}, 100%, 74%, 0.65)`; ctx.lineWidth = 1;
+          ctx.beginPath();
+          for (let j = 0; j <= sides; j++) {
+            const pa = (TAU / sides) * j + rot;
+            j === 0 ? ctx.moveTo(dx + Math.cos(pa) * size, dy + Math.sin(pa) * size)
+                    : ctx.lineTo(dx + Math.cos(pa) * size, dy + Math.sin(pa) * size);
+          }
+          ctx.stroke();
         }
       } else if (player.powerUp === 'magnet') {
         ctx.strokeStyle = `hsla(${(210 + th) % 360}, 80%, 60%, 0.4)`; ctx.lineWidth = 1;
