@@ -127,7 +127,7 @@
   const GRAVITY = 0.26;
   const JUMP_VEL = -8.8;
   const SPRING_VEL = -14.4;
-  const FRICTION = 0.88; // Smooth deceleration
+  const FRICTION = 0.891; // Smooth deceleration — slightly higher cap raises top speed ~10 %
   const TILT_DEADZONE = 6; // Degrees of tilt ignored (resting buffer)
   const TILT_SENSITIVITY = 28; // Degrees for full deflection (more range = more control)
 
@@ -213,11 +213,11 @@
     } catch(e) {}
 
     masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0.50;
-    // Soft low-pass to tame high frequencies — warm, never harsh
+    masterGain.gain.value = 0.52;
+    // Soft low-pass — warm presence without harshness
     const masterFilter = audioCtx.createBiquadFilter();
     masterFilter.type = 'lowpass';
-    masterFilter.frequency.value = 2200; // lower ceiling keeps high notes smooth
+    masterFilter.frequency.value = 2800; // balanced: bright but not shrill
     masterFilter.Q.value = 0.5;
     masterGain.connect(masterFilter);
     masterFilter.connect(audioCtx.destination);
@@ -226,10 +226,10 @@
     delayNode = audioCtx.createDelay();
     delayNode.delayTime.value = 0.35;
     const feedback1 = audioCtx.createGain();
-    feedback1.gain.value = 0.28; // less feedback = echo fades faster, less buildup
+    feedback1.gain.value = 0.32;
     const delayFilter = audioCtx.createBiquadFilter();
     delayFilter.type = 'lowpass';
-    delayFilter.frequency.value = 1000;
+    delayFilter.frequency.value = 1100;
     delayNode.connect(delayFilter);
     delayFilter.connect(feedback1);
     feedback1.connect(delayNode);
@@ -242,7 +242,7 @@
     feedback2.gain.value = 0.3;
     const reverbFilter = audioCtx.createBiquadFilter();
     reverbFilter.type = 'lowpass';
-    reverbFilter.frequency.value = 750; // deeper warmth
+    reverbFilter.frequency.value = 900;
     reverbNode.connect(reverbFilter);
     reverbFilter.connect(feedback2);
     feedback2.connect(reverbNode);
@@ -278,8 +278,8 @@
     const octaveRange = Math.min(Math.floor(melodyStep / pentatonicScale.length), 1);
     const octaveShift = octaveRange * 12;
 
-    // ~35 % chance: drop an octave for tonal colour / keeps notes in a warmer register
-    const colorShift = Math.random() < 0.35 ? -12 : 0;
+    // ~12 % chance: drop an octave for tonal colour — rare enough to feel intentional
+    const colorShift = Math.random() < 0.12 ? -12 : 0;
 
     const freq = BASE_FREQ * Math.pow(2, (semitone + octaveShift + colorShift) / 12);
     return { idx: idx % 5, freq, pitchClass: idx % 5 };
@@ -365,11 +365,11 @@
       const osc2 = audioCtx.createOscillator();
       const g = audioCtx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(note.freq * 1.05, now);
-      osc.frequency.exponentialRampToValueAtTime(note.freq * 0.75, now + 0.6);
+      osc.frequency.setValueAtTime(note.freq, now);
+      osc.frequency.exponentialRampToValueAtTime(note.freq * 0.891, now + 0.55); // ~major second down
       osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(note.freq * 1.05 * 1.498, now);
-      osc2.frequency.exponentialRampToValueAtTime(note.freq * 0.75 * 1.498, now + 0.6);
+      osc2.frequency.setValueAtTime(note.freq * 1.4983, now);
+      osc2.frequency.exponentialRampToValueAtTime(note.freq * 1.4983 * 0.891, now + 0.55);
       g.gain.setValueAtTime(0, now);
       g.gain.linearRampToValueAtTime(0.18, now + 0.04);
       g.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
@@ -426,14 +426,14 @@
       const osc2 = audioCtx.createOscillator();
       const g2 = audioCtx.createGain();
 
-      osc1.type = Math.random() < 0.25 ? 'triangle' : 'sine'; // triangle = warmer timbre
+      osc1.type = Math.random() < 0.10 ? 'triangle' : 'sine'; // rare triangle avoids muddiness
       osc1.frequency.setValueAtTime(note.freq, now);
       g1.gain.setValueAtTime(0, now);
       g1.gain.linearRampToValueAtTime(0.17, now + 0.04);
       g1.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
 
-      // Warm harmonic interval — random from min3, maj3, perfect 4th, perfect 5th
-      const intervals = [1.2, 1.2599, 1.3348, 1.4983];
+      // Only perfect 4th and 5th — the most consonant intervals, never clashes in delay stack
+      const intervals = [1.3348, 1.4983];
       const harmInterval = intervals[Math.floor(Math.random() * intervals.length)];
       osc2.type = 'sine';
       osc2.frequency.setValueAtTime(note.freq * harmInterval, now);
