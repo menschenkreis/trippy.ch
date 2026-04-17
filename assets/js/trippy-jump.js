@@ -130,9 +130,9 @@
     powerTimer: 0
   };
 
-  const GRAVITY = 0.20;
-  const JUMP_VEL = -7.7;
-  const SPRING_VEL = -12.6;
+  const GRAVITY = 0.23;
+  const JUMP_VEL = -8.2;
+  const SPRING_VEL = -13.4;
   const FRICTION = 0.900; // terminal vx = accel / (1−FRICTION)
   const TILT_DEADZONE = 6; // Degrees of tilt ignored (resting buffer)
   const TILT_SENSITIVITY = 28; // Degrees for full deflection (more range = more control)
@@ -882,16 +882,16 @@
       let x = Math.random() * (W - w);
 
       // ── Reachability guarantee ──
-      // Physics: JUMP_VEL = 7.7 px/frame upward, GRAVITY = 0.20 px/frame².
-      // Solve 0.10t² − 7.7t + dy = 0  →  disc = 59.29 − 0.40·dy
-      //   t_land = (7.7 + √disc) / 0.20,  terminal vx ≈ 5.6 px/frame.
+      // Physics: JUMP_VEL = 8.2 px/frame upward, GRAVITY = 0.23 px/frame².
+      // Solve 0.115t² − 8.2t + dy = 0  →  disc = 67.24 − 0.46·dy
+      //   t_land = (8.2 + √disc) / 0.23,  terminal vx ≈ 6.0 px/frame.
       // If the randomly-placed platform is outside that cone, reposition it.
       if (prevP) {
         const dy = prevP.y - y; // px gap upward (always positive here)
-        const disc = 59.29 - 0.40 * dy;
+        const disc = 67.24 - 0.46 * dy;
         if (disc >= 0) {
-          const tLand    = (7.7 + Math.sqrt(disc)) / 0.20;      // frames in air
-          const maxHoriz = Math.min(tLand * 5.6, W * 0.49);     // cap at wrap distance
+          const tLand    = (8.2 + Math.sqrt(disc)) / 0.23;      // frames in air
+          const maxHoriz = Math.min(tLand * 6.0, W * 0.49);     // cap at wrap distance
 
           const srcCx   = prevP.x + prevP.w * 0.5;
           const dstCx   = x + w * 0.5;
