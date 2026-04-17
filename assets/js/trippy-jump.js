@@ -1404,7 +1404,7 @@
       tiltActive = false;
       smoothTilt *= 0.8; // quick decay to zero
     }
-    const accel = sphereSizeScale < 1 ? 0.5 : 0.68; 
+    const accel = sphereSizeScale < 1 ? 0.525 : 0.714;
     player.vx += move * accel;
     // Add tilt movement only if enabled and no other input (keys/touch) is active
     if (tiltEnabled && move === 0) {
