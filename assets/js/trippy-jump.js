@@ -93,7 +93,9 @@
     const data = {
       score, cameraY, maxHeight, themeIndex, chillMode,
       player: { x: player.x, y: player.y, vx: player.vx, vy: player.vy },
-      platforms: platforms.slice(-40).map(p => ({ ...p, opacity: 1 }))
+      // Save platforms spanning from 2500px above the camera down to just below the
+    // player — ensures the player has something to land on immediately after restore.
+    platforms: platforms.filter(p => p.y >= cameraY - 2500 && p.y <= player.y + H).map(p => ({ ...p, opacity: 1 }))
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
   }
@@ -127,7 +129,7 @@
   const GRAVITY = 0.26;
   const JUMP_VEL = -8.8;
   const SPRING_VEL = -14.4;
-  const FRICTION = 0.891; // Smooth deceleration — slightly higher cap raises top speed ~10 %
+  const FRICTION = 0.900; // terminal vx = accel / (1−FRICTION)
   const TILT_DEADZONE = 6; // Degrees of tilt ignored (resting buffer)
   const TILT_SENSITIVITY = 28; // Degrees for full deflection (more range = more control)
 
@@ -1404,7 +1406,7 @@
       tiltActive = false;
       smoothTilt *= 0.8; // quick decay to zero
     }
-    const accel = sphereSizeScale < 1 ? 0.525 : 0.714;
+    const accel = sphereSizeScale < 1 ? 0.56 : 0.75;
     player.vx += move * accel;
     // Add tilt movement only if enabled and no other input (keys/touch) is active
     if (tiltEnabled && move === 0) {
