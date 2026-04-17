@@ -130,9 +130,9 @@
     powerTimer: 0
   };
 
-  const GRAVITY = 0.26;
-  const JUMP_VEL = -8.8;
-  const SPRING_VEL = -14.4;
+  const GRAVITY = 0.20;
+  const JUMP_VEL = -7.7;
+  const SPRING_VEL = -12.6;
   const FRICTION = 0.900; // terminal vx = accel / (1−FRICTION)
   const TILT_DEADZONE = 6; // Degrees of tilt ignored (resting buffer)
   const TILT_SENSITIVITY = 28; // Degrees for full deflection (more range = more control)
@@ -882,16 +882,16 @@
       let x = Math.random() * (W - w);
 
       // ── Reachability guarantee ──
-      // Physics: JUMP_VEL = 8.8 px/frame upward, GRAVITY = 0.26 px/frame².
-      // Solve 0.13t² − 8.8t + dy = 0  →  disc = 77.44 − 0.52·dy
-      //   t_land = (8.8 + √disc) / 0.26,  terminal vx ≈ 5.5 px/frame.
+      // Physics: JUMP_VEL = 7.7 px/frame upward, GRAVITY = 0.20 px/frame².
+      // Solve 0.10t² − 7.7t + dy = 0  →  disc = 59.29 − 0.40·dy
+      //   t_land = (7.7 + √disc) / 0.20,  terminal vx ≈ 5.6 px/frame.
       // If the randomly-placed platform is outside that cone, reposition it.
       if (prevP) {
         const dy = prevP.y - y; // px gap upward (always positive here)
-        const disc = 77.44 - 0.52 * dy;
+        const disc = 59.29 - 0.40 * dy;
         if (disc >= 0) {
-          const tLand    = (8.8 + Math.sqrt(disc)) / 0.26;      // frames in air
-          const maxHoriz = Math.min(tLand * 5.5, W * 0.49);     // cap at wrap distance
+          const tLand    = (7.7 + Math.sqrt(disc)) / 0.20;      // frames in air
+          const maxHoriz = Math.min(tLand * 5.6, W * 0.49);     // cap at wrap distance
 
           const srcCx   = prevP.x + prevP.w * 0.5;
           const dstCx   = x + w * 0.5;
@@ -964,6 +964,17 @@
     skyGrad.addColorStop(1, botColor);
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, W, H);
+
+    // Zen breath — a slow, silent radial pulse that fills the screen with warmth
+    {
+      const breath = 0.5 + 0.5 * Math.sin(time * 0.38); // ~16-second full cycle
+      const bg = ctx.createRadialGradient(W * 0.5, H * 0.42, 0, W * 0.5, H * 0.42, Math.max(W, H) * 0.72);
+      bg.addColorStop(0,   rgb(theme.accent, breath * 0.055));
+      bg.addColorStop(0.5, rgb(theme.primary, breath * 0.025));
+      bg.addColorStop(1,   'transparent');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+    }
 
     // Mountains
     if (depth < 10000) {
@@ -1733,7 +1744,7 @@
       tiltActive = false;
       smoothTilt *= 0.8; // quick decay to zero
     }
-    const accel = sphereSizeScale < 1 ? 0.56 : 0.75;
+    const accel = sphereSizeScale < 1 ? 0.44 : 0.60;
     player.vx += move * accel;
     // Add tilt movement only if enabled and no other input (keys/touch) is active
     if (tiltEnabled && move === 0) {
@@ -1749,7 +1760,7 @@
     if (player.x > W) player.x = 0;
 
     const targetCam = player.y - H * 0.45;
-    if (targetCam < cameraY) cameraY += (targetCam - cameraY) * 0.15;
+    if (targetCam < cameraY) cameraY += (targetCam - cameraY) * 0.09;
 
     if (-player.y > maxHeight) {
       maxHeight = -player.y;
@@ -1950,7 +1961,17 @@
     }
   }
 
-  function render() {
+  // Fixed-timestep rendering: physics always runs at 60 Hz regardless of display refresh rate.
+  // This prevents the game running at 2× speed on 120 Hz monitors.
+  let _rafTs = 0;
+  let _rafAccum = 0;
+  const _PHYS_DT = 1000 / 60; // ms per physics tick
+
+  function render(ts) {
+    const elapsed = _rafTs ? Math.min(ts - _rafTs, 100) : _PHYS_DT;
+    _rafTs = ts;
+    _rafAccum += elapsed;
+
     // Clear without any transform so we never leave uncleared slivers at screen edges
     ctx.clearRect(0, 0, W, H);
 
@@ -2163,8 +2184,11 @@
       ctx.restore();
     }
 
+    while (_rafAccum >= _PHYS_DT) {
+      update();
+      _rafAccum -= _PHYS_DT;
+    }
     requestAnimationFrame(render);
-    update();
   }
 
   // ── Listeners ──
