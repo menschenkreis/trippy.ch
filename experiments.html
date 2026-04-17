@@ -4,14 +4,14 @@
   <link rel="icon" type="image/jpeg" href="assets/favicon.jpg">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interactive Visual Experiments — trippy.ch</title>
-  <meta name="description" content="Explore interactive psychedelic experiments, including fractals, physics ragdolls, and generative art playgrounds.">
+  <title data-i18n="title">Interactive Visual Experiments — trippy.ch</title>
+  <meta name="description" content="Explore interactive psychedelic experiments, including fractals, physics ragdolls, and generative art playgrounds." data-i18n="meta.description">
 
   <!-- Open Graph -->
   <meta property="og:type"        content="website">
   <meta property="og:url"         content="https://trippy.ch/experiments.html">
-  <meta property="og:title"       content="Interactive Visual Experiments">
-  <meta property="og:description" content="Explore interactive psychedelic experiments, including fractals, physics ragdolls, and generative art playgrounds.">
+  <meta property="og:title"       content="Interactive Visual Experiments" data-i18n="og:title">
+  <meta property="og:description" content="Explore interactive psychedelic experiments, including fractals, physics ragdolls, and generative art playgrounds." data-i18n="og:description">
   <meta property="og:image"       content="https://trippy.ch/assets/og-preview.jpg">
 
   <link rel="stylesheet" href="assets/css/style.css">
@@ -21,40 +21,65 @@
   <button id="contrast-btn" title="Toggle high contrast">LC</button>
   <button id="theme-btn" title="Randomize theme">✦</button>
   <div class="experiments-page">
-    <a href="index.html" class="blog-post back-link">↞ back to portal</a>
-    <h1>Experiments</h1>
+    <a href="index.html" class="blog-post back-link" data-i18n="back">↞ back to portal</a>
+    <h1 data-i18n="heading">Experiments</h1>
     <div class="exp-grid">
       <a href="experiments/fractal-dreams.html" class="exp-card">
         <span class="tag">webgl · fractal · julia set</span>
-        <h3>Fractal Dreams</h3>
-        <p>Gently evolving Julia set fractals bathed in DMT-inspired hues. Touch to guide the morphing and watch infinity unfold.</p>
+        <h3 data-i18n="fractal.title">Fractal Dreams</h3>
+        <p data-i18n="fractal.desc">Gently evolving Julia set fractals bathed in DMT-inspired hues. Touch to guide the morphing and watch infinity unfold.</p>
       </a>
       <a href="experiments/falling-emy.html" class="exp-card">
         <span class="tag">canvas · physics · sacred geometry</span>
-        <h3>Falling Emy</h3>
-        <p>Stick-figure ragdolls tumble through an infinite void of frictionless sacred-geometry spheres. Tilt your phone, drag them around.</p>
+        <h3 data-i18n="emy.title">Falling Emy</h3>
+        <p data-i18n="emy.desc">Stick-figure ragdolls tumble through an infinite void of frictionless sacred-geometry spheres. Tilt your phone, drag them around.</p>
       </a>
       <a href="experiments/trippy-jump.html" class="exp-card">
         <span class="tag">canvas · game · sacred geometry</span>
-        <h3>Trippy Jump</h3>
-        <p>A psychedelic Doodle Jump — bounce up through an infinite void of sacred-geometry platforms. Screen-wrap, springs, fragile platforms, and neon trails.</p>
+        <h3 data-i18n="jump.title">Trippy Jump</h3>
+        <p data-i18n="jump.desc">A psychedelic Doodle Jump — bounce up through an infinite void of sacred-geometry platforms. Screen-wrap, springs, fragile platforms, and neon trails.</p>
       </a>
       <a href="experiments/trippy-peggle.html" class="exp-card">
         <span class="tag">canvas · game · pachinko</span>
-        <h3>Trippy Peggle</h3>
-        <p>A psychedelic pachinko game — aim, shoot, and clear neon pegs with particle explosions and an epic fever-time slow-mo moment.</p>
+        <h3 data-i18n="peggle.title">Trippy Peggle</h3>
+        <p data-i18n="peggle.desc">A psychedelic pachinko game — aim, shoot, and clear neon pegs with particle explosions and an epic fever-time slow-mo moment.</p>
       </a>
       <a href="experiments/trippy-slither.html" class="exp-card">
         <span class="tag">canvas · game · meditative</span>
-        <h3>Trippy Slither</h3>
-        <p>A meditative snake game — drift through the void, collect glowing orbs, and weave trails of light into flowing art.</p>
+        <h3 data-i18n="slither.title">Trippy Slither</h3>
+        <p data-i18n="slither.desc">A meditative snake game — drift through the void, collect glowing orbs, and weave trails of light into flowing art.</p>
       </a>
     </div>
   </div>
   <footer>
     <p><a href="index.html">trippy.ch</a></p>
   </footer>
+
+  <script type="application/json" id="i18n-data">
+{
+  "de": {
+    "title": "Interaktive visuelle experimente — trippy.ch",
+    "meta.description": "Erkunde interaktive psychedelische experimente, einschließlich fraktale, physik-puppen und generative kunst-spielplätze.",
+    "og:title": "Interaktive visuelle experimente",
+    "og:description": "Erkunde interaktive psychedelische experimente, einschließlich fraktale, physik-puppen und generative kunst-spielplätze.",
+    "back": "↞ zurück zum portal",
+    "heading": "Experimente",
+    "fractal.title": "Fraktale Träume",
+    "fractal.desc": "Sanft entwickelnde julia-mengen-fraktale in dmt-inspirierten farbtönen. Berühre, um die morphung zu lenken und zusehen, wie sich unendlichkeit entfaltet.",
+    "emy.title": "Fallende Emy",
+    "emy.desc": "Strichfiguren-puppen stürzen durch einen endlosen void aus reibungsloser heiliger geometrie. Neige dein handy, ziehe sie herum.",
+    "jump.title": "Trippy Sprung",
+    "jump.desc": "Ein psychedelischer doodle jump — hüpfe durch einen endlichen void von plattformen mit heiliger geometrie. Bildschirm-wrapping, federn, zerbrechliche plattformen und neon-spuren.",
+    "peggle.title": "Trippy Peggle",
+    "peggle.desc": "Ein psychedelisches pachinko-spiel — zielen, schießen und neon-stifte mit partikel-explosionen und einem epischen fieberzeit-slow-mo-moment räumen.",
+    "slither.title": "Trippy Slither",
+    "slither.desc": "Ein meditatives schlangenspiel — drifte durch den void, sammle leuchtende orbs und wirde lichtspuren zu fließender kunst."
+  }
+}
+  </script>
+
 <script src="assets/js/main.js"></script>
+<script src="assets/js/i18n.js"></script>
   <script>document.getElementById('page-transition').classList.add('is-active');requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('page-transition').classList.remove('is-active')));</script>
 </body>
 </html>

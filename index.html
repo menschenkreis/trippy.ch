@@ -4,13 +4,13 @@
   <link rel="icon" type="image/jpeg" href="assets/favicon.jpg">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>trippy.ch — a dreamworld portal</title>
+  <title data-i18n="title">trippy.ch — a dreamworld portal</title>
 
   <!-- Open Graph / social preview -->
   <meta property="og:type"        content="website">
   <meta property="og:url"         content="https://trippy.ch/">
-  <meta property="og:title"       content="trippy.ch — a dreamworld portal">
-  <meta property="og:description" content="Visual experiments &amp; insights — generative art, physics playgrounds, and interactive meditations.">
+  <meta property="og:title"       content="trippy.ch — a dreamworld portal" data-i18n="og:title">
+  <meta property="og:description" content="Visual experiments &amp; insights — generative art, physics playgrounds, and interactive meditations." data-i18n="og:description">
   <meta property="og:image"       content="https://trippy.ch/assets/og-preview.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -18,8 +18,8 @@
   <!-- Twitter / X Card -->
   <meta name="twitter:card"        content="summary_large_image">
   <meta name="twitter:url"         content="https://trippy.ch/">
-  <meta name="twitter:title"       content="trippy.ch — a dreamworld portal">
-  <meta name="twitter:description" content="Visual experiments &amp; insights — generative art, physics playgrounds, and interactive meditations.">
+  <meta name="twitter:title"       content="trippy.ch — a dreamworld portal" data-i18n="twitter:title">
+  <meta name="twitter:description" content="Visual experiments &amp; insights — generative art, physics playgrounds, and interactive meditations." data-i18n="twitter:description">
   <meta name="twitter:image"       content="https://trippy.ch/assets/og-preview.jpg">
 
   <link rel="stylesheet" href="assets/css/style.css">
@@ -287,9 +287,9 @@
   <nav class="sticky-nav" id="sticky-nav">
     <a href="#" class="nav-logo">trippy</a>
     <div class="nav-links" id="nav-links">
-      <a href="#experiments">Experiments</a>
-      <a href="blog.html">Insights</a>
-      <a href="https://github.com/menschenkreis/trippy.ch" target="_blank" rel="noopener">Source</a>
+      <a href="#experiments" data-i18n="nav.experiments">Experiments</a>
+      <a href="blog.html" data-i18n="nav.insights">Insights</a>
+      <a href="https://github.com/menschenkreis/trippy.ch" target="_blank" rel="noopener" data-i18n="nav.source">Source</a>
     </div>
     <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
       <span></span><span></span><span></span>
@@ -303,32 +303,32 @@
       <a href="#experiments" class="portal-trigger">
         <h1 class="hero-title">trippy</h1>
       </a>
-      <p class="hero-sub">visual experiments &amp; insights</p>
+      <p class="hero-sub" data-i18n="hero.sub">visual experiments &amp; insights</p>
     </div>
-    <div class="scroll-hint">↡ drift deeper ↡</div>
+    <div class="scroll-hint" data-i18n="hero.drift">↡ drift deeper ↡</div>
   </section>
 
   <!-- Experiments -->
   <section class="home-exp-section" id="experiments">
     <div class="section-header">
-      <h2>Experiments</h2>
-      <p>Psychedelic visual explorations — shaders, physics, games, and generative art.</p>
+      <h2 data-i18n="exp.heading">Experiments</h2>
+      <p data-i18n="exp.desc">Psychedelic visual explorations — shaders, physics, games, and generative art.</p>
     </div>
     <div class="home-exp-grid">
       <a href="experiments/fractal-dreams.html" class="home-exp-card">
         <span class="tag">webgl · fractal · julia set</span>
-        <h3>Fractal Dreams</h3>
-        <p>Gently evolving Julia set fractals bathed in DMT-inspired hues. Touch to guide the morphing and watch infinity unfold.</p>
+        <h3 data-i18n="exp.fractal.title">Fractal Dreams</h3>
+        <p data-i18n="exp.fractal.desc">Gently evolving Julia set fractals bathed in DMT-inspired hues. Touch to guide the morphing and watch infinity unfold.</p>
       </a>
       <a href="experiments/falling-emy.html" class="home-exp-card">
         <span class="tag">canvas · physics · sacred geometry</span>
-        <h3>Falling Emy</h3>
-        <p>Stick-figure ragdolls tumble through an infinite void of frictionless sacred-geometry spheres. Tilt your phone, drag them around.</p>
+        <h3 data-i18n="exp.emy.title">Falling Emy</h3>
+        <p data-i18n="exp.emy.desc">Stick-figure ragdolls tumble through an infinite void of frictionless sacred-geometry spheres. Tilt your phone, drag them around.</p>
       </a>
       <a href="experiments/trippy-jump.html" class="home-exp-card">
         <span class="tag">canvas · game · sacred geometry</span>
-        <h3>Trippy Jump</h3>
-        <p>A psychedelic Doodle Jump — bounce up through an infinite void of sacred-geometry platforms. Screen-wrap, springs, fragile platforms, and neon trails.</p>
+        <h3 data-i18n="exp.jump.title">Trippy Jump</h3>
+        <p data-i18n="exp.jump.desc">A psychedelic Doodle Jump — bounce up through an infinite void of sacred-geometry platforms. Screen-wrap, springs, fragile platforms, and neon trails.</p>
       </a>
     </div>
   </section>
@@ -336,18 +336,18 @@
   <!-- Blog / Insights -->
   <section class="home-blog-section" id="insights">
     <div class="section-header">
-      <h2>Trippy Insights</h2>
-      <p>Occasional thoughts on creativity, AI collaboration, and the space between.</p>
+      <h2 data-i18n="blog.heading">Trippy Insights</h2>
+      <p data-i18n="blog.desc">Occasional thoughts on creativity, AI collaboration, and the space between.</p>
     </div>
     <a href="blog.html" class="blog-link-card">
       <span class="card-icon">◎</span>
-      <h3>Read the Blog</h3>
-      <p>Explore insights, behind-the-scenes, and creative reflections.</p>
+      <h3 data-i18n="blog.read">Read the Blog</h3>
+      <p data-i18n="blog.explore">Explore insights, behind-the-scenes, and creative reflections.</p>
     </a>
   </section>
 
   <footer>
-    <p>trippy.ch — a creative experiment</p>
+    <p data-i18n="footer.text">trippy.ch — a creative experiment</p>
     <div class="footer-extra" style="margin-top: 3rem;">
       <a href="https://www.buymeacoffee.com/trippy.ch" target="_blank" rel="noopener" class="support-link">
         <div class="mandala-bg">
@@ -367,13 +367,45 @@
             <circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="1"/>
           </svg>
         </span>
-        <span class="support-text">support the dream</span>
+        <span class="support-text" data-i18n="footer.support">support the dream</span>
       </a>
     </div>
   </footer>
 
+  <script type="application/json" id="i18n-data">
+{
+  "de": {
+    "title": "trippy.ch — ein traumwelt-portal",
+    "og:title": "trippy.ch — ein traumwelt-portal",
+    "og:description": "Visuelle experimente & einblicke — generative kunst, physik-spielplätze und interaktive meditationen.",
+    "twitter:title": "trippy.ch — ein traumwelt-portal",
+    "twitter:description": "Visuelle experimente & einblicke — generative kunst, physik-spielplätze und interaktive meditationen.",
+    "hero.sub": "visuelle experimente & einblicke",
+    "hero.drift": "↡ tiefer gleiten ↡",
+    "nav.experiments": "Experimente",
+    "nav.insights": "Einblicke",
+    "nav.source": "Quellcode",
+    "exp.heading": "Experimente",
+    "exp.desc": "Psychedelische visuelle erkundungen — shader, physik, spiele und generative kunst.",
+    "exp.fractal.title": "Fraktale Träume",
+    "exp.fractal.desc": "Sanft entwickelnde julia-mengen-fraktale in dmt-inspirierten farbtönen. Berühre, um die morphung zu lenken und zusehen, wie sich unendlichkeit entfaltet.",
+    "exp.emy.title": "Fallende Emy",
+    "exp.emy.desc": "Strichfiguren-puppen stürzen durch einen endlosen void aus reibungsloser heiliger geometrie. Neige dein handy, ziehe sie herum.",
+    "exp.jump.title": "Trippy Sprung",
+    "exp.jump.desc": "Ein psychedelischer doodle jump — hüpfe durch einen endlichen void von plattformen mit heiliger geometrie. Bildschirm-wrapping, federn, zerbrechliche plattformen und neon-spuren.",
+    "blog.heading": "Trippy Einblicke",
+    "blog.desc": "Gelegentliche gedanken über kreativität, kollaboration mit ki und den raum dazwischen.",
+    "blog.read": "Zum Blog",
+    "blog.explore": "Einblicke, hinter den kulissen und kreative reflexionen erkunden.",
+    "footer.text": "trippy.ch — ein kreatives experiment",
+    "footer.support": "den traum unterstützen"
+  }
+}
+  </script>
+
   <script src="assets/js/hero-morph.js"></script>
   <script src="assets/js/main.js"></script>
+  <script src="assets/js/i18n.js"></script>
   <script>
     document.getElementById('page-transition').classList.add('is-active');
     requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('page-transition').classList.remove('is-active')));

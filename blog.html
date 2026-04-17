@@ -4,14 +4,14 @@
   <link rel="icon" type="image/jpeg" href="assets/favicon.jpg">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Insights — Psychedelic Thoughts & AI Art — trippy.ch</title>
-  <meta name="description" content="A blog about the intersection of AI, creativity, game design, and psychedelic visual experiments on trippy.ch.">
+  <title data-i18n="title">Insights — Psychedelic Thoughts & AI Art — trippy.ch</title>
+  <meta name="description" content="A blog about the intersection of AI, creativity, game design, and psychedelic visual experiments on trippy.ch." data-i18n="meta.description">
 
   <!-- Open Graph -->
   <meta property="og:type"        content="website">
   <meta property="og:url"         content="https://trippy.ch/blog.html">
-  <meta property="og:title"       content="Insights — Psychedelic Thoughts & AI Art">
-  <meta property="og:description" content="A blog about the intersection of AI, creativity, game design, and psychedelic visual experiments.">
+  <meta property="og:title"       content="Insights — Psychedelic Thoughts & AI Art" data-i18n="og:title">
+  <meta property="og:description" content="A blog about the intersection of AI, creativity, game design, and psychedelic visual experiments." data-i18n="og:description">
   <meta property="og:image"       content="https://trippy.ch/assets/og-preview.jpg">
 
   <link rel="stylesheet" href="assets/css/style.css">
@@ -21,38 +21,38 @@
   <button id="contrast-btn" title="Toggle high contrast">LC</button>
   <button id="theme-btn" title="Randomize theme">✦</button>
   <div class="blog-list">
-    <a href="index.html" class="blog-post back-link">↞ back to portal</a>
-    <h1>Trippy Insights</h1>
+    <a href="index.html" class="blog-post back-link" data-i18n="back">↞ back to portal</a>
+    <h1 data-i18n="heading">Trippy Insights</h1>
     <div class="blog-entry">
       <canvas class="blog-bg-canvas" data-color="#fdcb6e"></canvas>
       <div class="blog-entry-content">
-        <h2><a href="blog/wings-clipped-edge-of-ai.html">Wings, Clipped — The Art of Building at the Edge of What AI Can Do</a></h2>
+        <h2><a href="blog/wings-clipped-edge-of-ai.html" data-i18n="post1.title">Wings, Clipped — The Art of Building at the Edge of What AI Can Do</a></h2>
         <div class="date">April 2026</div>
-        <p class="excerpt">The most exciting creative experience of my life is also one of the most frustrating. That's the paradox of building at the frontier.</p>
+        <p class="excerpt" data-i18n-html="post1.excerpt">The most exciting creative experience of my life is also one of the most frustrating. That's the paradox of building at the frontier.</p>
       </div>
     </div>
     <div class="blog-entry">
       <canvas class="blog-bg-canvas" data-color="#00b894"></canvas>
       <div class="blog-entry-content">
-        <h2><a href="blog/dream-of-game-design.html">AI as My Brush — A Dream of Becoming a Game Designer</a></h2>
+        <h2><a href="blog/dream-of-game-design.html" data-i18n="post2.title">AI as My Brush — A Dream of Becoming a Game Designer</a></h2>
         <div class="date">April 2026</div>
-        <p class="excerpt">Music, art, technology, games — and finally finding the tool that lets them all converge into something you can build, alone, from the intersection.</p>
+        <p class="excerpt" data-i18n-html="post2.excerpt">Music, art, technology, games — and finally finding the tool that lets them all converge into something you can build, alone, from the intersection.</p>
       </div>
     </div>
     <div class="blog-entry">
       <canvas class="blog-bg-canvas" data-color="#e84393"></canvas>
       <div class="blog-entry-content">
-        <h2><a href="blog/falling-emy-life-lessons.html">The Descent — What Falling Emy Teaches Us About Life</a></h2>
+        <h2><a href="blog/falling-emy-life-lessons.html" data-i18n="post3.title">The Descent — What Falling Emy Teaches Us About Life</a></h2>
         <div class="date">April 2026</div>
-        <p class="excerpt">A meditation on the fall — gravity, collisions, challenges, sacred geometry, and why the only choice we have is how we move through the void.</p>
+        <p class="excerpt" data-i18n-html="post3.excerpt">A meditation on the fall — gravity, collisions, challenges, sacred geometry, and why the only choice we have is how we move through the void.</p>
       </div>
     </div>
     <div class="blog-entry">
       <canvas class="blog-bg-canvas" data-color="#7c3aed"></canvas>
       <div class="blog-entry-content">
-        <h2><a href="blog/collaboration-with-ai.html">A Collaboration Between Human and Machine</a></h2>
+        <h2><a href="blog/collaboration-with-ai.html" data-i18n="post4.title">A Collaboration Between Human and Machine</a></h2>
         <div class="date">April 2026</div>
-        <p class="excerpt">On building something at the intersection of human creativity and AI-assisted design — and why this space feels worth exploring.</p>
+        <p class="excerpt" data-i18n-html="post4.excerpt">On building something at the intersection of human creativity and AI-assisted design — and why this space feels worth exploring.</p>
       </div>
     </div>
   </div>
@@ -77,12 +77,36 @@
             <circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="1"/>
           </svg>
         </span>
-        <span class="support-text">support the dream</span>
+        <span class="support-text" data-i18n="footer.support">support the dream</span>
       </a>
     </div>
   </footer>
+
+  <script type="application/json" id="i18n-data">
+{
+  "de": {
+    "title": "Einblicke — Psychedelische Gedanken & Ki-Kunst — trippy.ch",
+    "meta.description": "Ein blog über die schnitstelle von ki, kreativität, spielentwicklung und psychedelischen visuellen experimenten auf trippy.ch.",
+    "og:title": "Einblicke — Psychedelische Gedanken & Ki-Kunst",
+    "og:description": "Ein blog über die schnitstelle von ki, kreativität, spielentwicklung und psychedelischen visuellen experimenten.",
+    "back": "↞ zurück zum portal",
+    "heading": "Trippy Einblicke",
+    "post1.title": "Geklippte Flügel — Die kunst des bauens an der grenze dessen, was ki kann",
+    "post1.excerpt": "Das aufregendste kreative erlebnis meines lebens ist auch eines der frustrierendsten. Das ist das paradox des bauens an der grenze.",
+    "post2.title": "Ki als mein pinsel — Ein traum, spieleentwickler zu werden",
+    "post2.excerpt": "Musik, kunst, technologie, spiele — und endlich das werkzeug zu finden, das all dies zu etwas vereint, das man allein bauen kann.",
+    "post3.title": "Der abstieg — Was fallende emy uns über das leben lehrt",
+    "post3.excerpt": "Eine meditation über den fall — schwerkraft, kollisionen, herausforderungen, heilige geometrie und warum die einzige wahl, die wir haben, ist, wie wir uns durch den void bewegen.",
+    "post4.title": "Eine zusammenarbeit zwischen mensch und maschine",
+    "post4.excerpt": "Darüber, etwas an der schnitstelle von menschlicher kreativität und ki-unterstütztem design zu bauen — und warum dieser raum es wert ist, erkundet zu werden.",
+    "footer.support": "den traum unterstützen"
+  }
+}
+  </script>
+
 <script src="assets/js/main.js"></script>
 <script src="assets/js/blog-shaders.js"></script>
+<script src="assets/js/i18n.js"></script>
   <script>document.getElementById('page-transition').classList.add('is-active');requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('page-transition').classList.remove('is-active')));</script>
 </body>
 </html>

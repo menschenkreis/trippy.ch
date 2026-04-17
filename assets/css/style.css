@@ -83,6 +83,47 @@ a:hover { color: var(--pink); }
 }
 #theme-btn:active { transform: scale(0.95); }
 
+/* Language Toggle Button */
+#lang-btn {
+  position: fixed;
+  bottom: 2rem;
+  left: 2rem;
+  z-index: 1000;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid var(--violet);
+  background: linear-gradient(135deg, var(--purple), var(--pink), var(--teal));
+  background-size: 300% 300%;
+  animation: themePulse 3s ease-in-out infinite, themeGradient 4s ease infinite;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #fff;
+  box-shadow: 0 0 20px var(--purple-glow), 0 0 40px rgba(124,58,237,0.15);
+  transition: transform 0.3s, box-shadow 0.3s, var(--transition-colors);
+}
+#lang-btn:hover {
+  transform: scale(1.12);
+  box-shadow: 0 0 30px var(--purple-glow), 0 0 60px rgba(124,58,237,0.25);
+}
+#lang-btn:active { transform: scale(0.95); }
+#lang-btn.morphing {
+  animation: langMorph 0.5s ease;
+  pointer-events: none;
+}
+@keyframes langMorph {
+  0%   { transform: scale(1) rotate(0deg); filter: hue-rotate(0deg); }
+  30%  { transform: scale(0.6) rotate(180deg); filter: hue-rotate(120deg); opacity: 0.5; }
+  60%  { transform: scale(1.3) rotate(360deg); filter: hue-rotate(240deg); opacity: 0.5; }
+  100% { transform: scale(1) rotate(360deg); filter: hue-rotate(360deg); opacity: 1; }
+}
+.portal-active #lang-btn, .portal-active #theme-btn { pointer-events: none; opacity: 0.3; }
+
 @keyframes themePulse {
   0%, 100% { box-shadow: 0 0 20px var(--purple-glow), 0 0 40px rgba(124,58,237,0.15); }
   50% { box-shadow: 0 0 30px var(--purple-glow), 0 0 60px rgba(124,58,237,0.3); }
