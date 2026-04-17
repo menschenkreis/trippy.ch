@@ -66,7 +66,7 @@
       this.canvas = canvas;
       this.aimX = 0;
       this.aimY = 1;
-      this.pointerX = 0; // raw screen position of finger/cursor
+      this.pointerX = 0;
       this.pointerY = 0;
       this.shotRequested = false;
       this._aimAngle = Math.PI / 2;
@@ -76,16 +76,12 @@
       if (this._bound) return;
       this._bound = true;
       const c = this.canvas;
-      // Mouse
       c.addEventListener('mousemove', e => {
         this.pointerX = e.clientX;
         this.pointerY = e.clientY;
         this._updateAimFromPointer();
       });
-      c.addEventListener('click', () => {
-        this.shotRequested = true;
-      });
-      // Touch
+      c.addEventListener('click', () => { this.shotRequested = true; });
       c.addEventListener('touchstart', e => {
         e.preventDefault();
         const t = e.touches[0];
@@ -104,7 +100,6 @@
         e.preventDefault();
         this.shotRequested = true;
       }, { passive: false });
-      // Keyboard fallback
       document.addEventListener('keydown', e => {
         if (e.key === 'ArrowLeft') this._aimAngle = Math.max(0.1, this._aimAngle - 0.04);
         if (e.key === 'ArrowRight') this._aimAngle = Math.min(Math.PI - 0.1, this._aimAngle + 0.04);
@@ -115,7 +110,7 @@
     }
     _updateAimFromPointer() {
       const lx = this.canvas.width / (window.devicePixelRatio || 1) / 2;
-      const ly = 70; // face center Y
+      const ly = 70;
       const dx = this.pointerX - lx;
       const dy = this.pointerY - ly;
       const len = Math.sqrt(dx*dx + dy*dy) || 1;
@@ -133,8 +128,14 @@
       this.x = x; this.y = y; this.vx = vx; this.vy = vy;
       this.color = color; this.life = this.maxLife = life;
       this.size = size; this.active = true;
+      // Trail positions for particle trails
+      this.trail = [];
+      this.trailMax = 3;
     }
     update(dt) {
+      // Store trail position
+      this.trail.unshift({ x: this.x, y: this.y });
+      if (this.trail.length > this.trailMax) this.trail.pop();
       this.x += this.vx * dt;
       this.y += this.vy * dt;
       this.vy += 200 * dt;
@@ -143,11 +144,27 @@
     }
     draw(ctx) {
       const a = Math.max(0, this.life / this.maxLife);
+      const sz = this.size * a;
+      // Draw trail
+      for (let i = 0; i < this.trail.length; i++) {
+        const ta = a * (1 - i / this.trail.length) * 0.3;
+        const ts = sz * (1 - i / this.trail.length);
+        if (ts < 0.3) continue;
+        ctx.globalAlpha = ta;
+        ctx.beginPath();
+        ctx.arc(this.trail[i].x, this.trail[i].y, ts, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+      }
+      // Draw particle with glow
       ctx.globalAlpha = a;
+      ctx.shadowColor = this.color;
+      ctx.shadowBlur = Math.min(sz * 3, 12);
       ctx.fillStyle = this.color;
       ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size * a, 0, Math.PI * 2);
+      ctx.arc(this.x, this.y, sz, 0, Math.PI * 2);
       ctx.fill();
+      ctx.shadowBlur = 0;
       ctx.globalAlpha = 1;
     }
   }
@@ -170,12 +187,14 @@
             p.vy = Math.sin(angle) * spd;
             p.color = color; p.life = life * (0.5 + Math.random() * 0.5);
             p.maxLife = p.life; p.size = size; p.active = true;
+            p.trail = [];
           }
           continue;
         }
         const angle = Math.random() * Math.PI * 2;
         const spd = Math.random() * speed;
-        const p = new Particle(x, y, Math.cos(angle)*spd, Math.sin(angle)*spd, color, life*(0.5+Math.random()*0.5), size);
+        const sz = size * (0.3 + Math.random() * 0.7); // Vary sizes 0.3-1.0x
+        const p = new Particle(x, y, Math.cos(angle)*spd, Math.sin(angle)*spd, color, life*(0.5+Math.random()*0.5), sz);
         this.particles.push(p);
       }
     }
@@ -192,7 +211,222 @@
   }
 
   // ═══════════════════════════════════════════════
-  //  6. PEG
+  //  6. AMBIENT PARTICLES (fireflies / dust motes)
+  // ═══════════════════════════════════════════════
+  class AmbientParticles {
+    constructor(count) {
+      this.particles = [];
+      this.count = Math.min(count, 25); // Cap for mobile perf
+      this._init();
+    }
+    _init() {
+      // Lazy init — positions set on first resize
+    }
+    resize(w, h) {
+      if (this.particles.length === 0) {
+        for (let i = 0; i < this.count; i++) {
+          this.particles.push({
+            x: Math.random() * w,
+            y: Math.random() * h,
+            vx: (Math.random() - 0.5) * 15,
+            vy: (Math.random() - 0.5) * 10 - 5,
+            size: 0.5 + Math.random() * 1.5,
+            alpha: 0.1 + Math.random() * 0.2,
+            phase: Math.random() * Math.PI * 2,
+            speed: 0.5 + Math.random() * 1.5,
+          });
+        }
+      }
+    }
+    update(dt, w, h, time) {
+      for (const p of this.particles) {
+        p.x += p.vx * dt + Math.sin(time * p.speed + p.phase) * 0.3;
+        p.y += p.vy * dt;
+        // Wrap around
+        if (p.x < -10) p.x = w + 10;
+        if (p.x > w + 10) p.x = -10;
+        if (p.y < -10) p.y = h + 10;
+        if (p.y > h + 10) p.y = -10;
+      }
+    }
+    draw(ctx, time) {
+      for (const p of this.particles) {
+        const flicker = 0.5 + 0.5 * Math.sin(time * p.speed * 2 + p.phase);
+        ctx.globalAlpha = p.alpha * flicker;
+        ctx.shadowColor = '#fff';
+        ctx.shadowBlur = 4;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // ═══════════════════════════════════════════════
+  //  7. FLOATING GEOMETRY (ambient background shapes)
+  // ═══════════════════════════════════════════════
+  class FloatingGeometry {
+    constructor(w, h) {
+      this.shapes = [];
+      const types = ['circle', 'hexagon', 'triangle'];
+      for (let i = 0; i < 7; i++) {
+        this.shapes.push({
+          type: types[i % types.length],
+          x: Math.random() * w,
+          y: Math.random() * h,
+          size: 80 + Math.random() * 200,
+          rotation: Math.random() * Math.PI * 2,
+          rotSpeed: (Math.random() - 0.5) * 0.1,
+          vx: (Math.random() - 0.5) * 8,
+          vy: (Math.random() - 0.5) * 5,
+          alpha: 0.02 + Math.random() * 0.02,
+          sides: [0, 6, 3][i % 3], // 0 = circle
+        });
+      }
+    }
+    update(dt, w, h) {
+      for (const s of this.shapes) {
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+        s.rotation += s.rotSpeed * dt;
+        // Wrap
+        if (s.x < -s.size * 2) s.x = w + s.size * 2;
+        if (s.x > w + s.size * 2) s.x = -s.size * 2;
+        if (s.y < -s.size * 2) s.y = h + s.size * 2;
+        if (s.y > h + s.size * 2) s.y = -s.size * 2;
+      }
+    }
+    draw(ctx) {
+      for (const s of this.shapes) {
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(s.rotation);
+        ctx.globalAlpha = s.alpha;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 0.5;
+        if (s.sides === 0) {
+          // Circle
+          ctx.beginPath();
+          ctx.arc(0, 0, s.size, 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          // Polygon
+          ctx.beginPath();
+          for (let i = 0; i < s.sides; i++) {
+            const a = (i / s.sides) * Math.PI * 2;
+            const px = Math.cos(a) * s.size;
+            const py = Math.sin(a) * s.size;
+            i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // ═══════════════════════════════════════════════
+  //  8. SACRED GEOMETRY DRAWING HELPERS
+  // ═══════════════════════════════════════════════
+  const SacredGeo = {
+    // Draw a polygon with n sides
+    polygon(ctx, x, y, radius, sides, rotation) {
+      ctx.beginPath();
+      for (let i = 0; i < sides; i++) {
+        const a = (i / sides) * Math.PI * 2 + rotation;
+        const px = x + Math.cos(a) * radius;
+        const py = y + Math.sin(a) * radius;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+    },
+
+    // Draw a star shape
+    star(ctx, x, y, outerR, innerR, points, rotation) {
+      ctx.beginPath();
+      for (let i = 0; i < points * 2; i++) {
+        const a = (i / (points * 2)) * Math.PI * 2 + rotation - Math.PI / 2;
+        const r = i % 2 === 0 ? outerR : innerR;
+        const px = x + Math.cos(a) * r;
+        const py = y + Math.sin(a) * r;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+    },
+
+    // Flower of Life — overlapping circles in hex pattern
+    flowerOfLife(ctx, cx, cy, radius, layers, rotation, opacity) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(rotation);
+      ctx.globalAlpha = opacity;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 0.5;
+      // Center circle
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      // Rings of circles
+      for (let ring = 1; ring <= layers; ring++) {
+        const count = ring * 6;
+        const dist = radius * ring;
+        for (let i = 0; i < count; i++) {
+          const a = (i / count) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.arc(Math.cos(a) * dist, Math.sin(a) * dist, radius, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    },
+
+    // Metatron's Cube — 13 circles + connecting lines
+    metatronsCube(ctx, cx, cy, radius, rotation, opacity) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(rotation);
+      ctx.globalAlpha = opacity;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 0.4;
+      // 13 points: center + 2 rings
+      const points = [{ x: 0, y: 0 }];
+      for (let ring = 1; ring <= 2; ring++) {
+        const count = ring === 1 ? 6 : 12;
+        const r = radius * ring * 0.5;
+        for (let i = 0; i < count; i++) {
+          const a = (i / count) * Math.PI * 2 + (ring === 2 ? Math.PI / 6 : 0);
+          points.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
+        }
+      }
+      // Draw circles at each point
+      const circR = radius * 0.3;
+      for (const p of points) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, circR, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      // Connect all points with lines
+      for (let i = 0; i < points.length; i++) {
+        for (let j = i + 1; j < points.length; j++) {
+          ctx.beginPath();
+          ctx.moveTo(points[i].x, points[i].y);
+          ctx.lineTo(points[j].x, points[j].y);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    },
+  };
+
+  // ═══════════════════════════════════════════════
+  //  9. PEG
   // ═══════════════════════════════════════════════
   const PEG_TYPES = { BLUE: 'blue', ACTIVE: 'active', GREEN: 'green', PURPLE: 'purple' };
 
@@ -231,7 +465,7 @@
         if (this.hitTime >= this.clearDelay) this.active = false;
       }
     }
-    draw(ctx, time) {
+    draw(ctx, time, isFever) {
       if (!this.active) return;
       const color = this.getColor();
       const glow = this.getGlow();
@@ -242,41 +476,102 @@
         scale = 1 - t * 0.5;
         alpha = 1 - t;
       }
+      const pulseSize = 1 + Math.sin(this.pulse) * 0.15;
+      const feverPulse = isFever ? (1 + Math.sin(time * 8) * 0.1) : 1;
+
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.translate(this.x, this.y);
-      ctx.scale(scale, scale);
+      ctx.scale(scale * pulseSize * feverPulse, scale * pulseSize * feverPulse);
 
-      // Outer glow
-      const pulseSize = 1 + Math.sin(this.pulse) * 0.15;
+      // Outer glow ring (all pegs)
       ctx.shadowColor = glow;
-      ctx.shadowBlur = this.type === PEG_TYPES.PURPLE ? 20 : 12;
+      ctx.shadowBlur = this.type === PEG_TYPES.PURPLE ? 20 : (isFever ? 18 : 12);
       ctx.beginPath();
-      ctx.arc(0, 0, this.radius * pulseSize, 0, Math.PI * 2);
+      ctx.arc(0, 0, this.radius + 4, 0, Math.PI * 2);
+      ctx.strokeStyle = glow;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Draw shape based on type
+      switch (this.type) {
+        case PEG_TYPES.BLUE:
+          this._drawBlue(ctx, color, glow, time);
+          break;
+        case PEG_TYPES.ACTIVE:
+          this._drawActive(ctx, color, glow, time);
+          break;
+        case PEG_TYPES.GREEN:
+          this._drawGreen(ctx, color, glow, time);
+          break;
+        case PEG_TYPES.PURPLE:
+          this._drawPurple(ctx, color, glow, time);
+          break;
+      }
+
+      ctx.restore();
+    }
+
+    _drawBlue(ctx, color, glow, time) {
+      // Circle with outer ring
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
       ctx.fillStyle = color;
       ctx.fill();
       ctx.shadowBlur = 0;
-
-      // Inner highlight
+      // Inner ring
       ctx.beginPath();
-      ctx.arc(-2, -2, this.radius * 0.4, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.arc(0, 0, this.radius * 0.5, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+      // Highlight
+      ctx.beginPath();
+      ctx.arc(-2, -2, this.radius * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
       ctx.fill();
+    }
 
-      // Purple sparkle
-      if (this.type === PEG_TYPES.PURPLE && !this.hit) {
-        for (let i = 0; i < 4; i++) {
-          const a = time * 2 + i * Math.PI / 2;
-          const r = this.radius + 6;
-          ctx.beginPath();
-          ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 1.5, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(200,66,255,0.6)';
-          ctx.fill();
-        }
-      }
+    _drawActive(ctx, color, glow, time) {
+      const rot = time * 0.5;
+      // Hexagon shape
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 16;
+      SacredGeo.polygon(ctx, 0, 0, this.radius, 6, rot);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      // Inner hexagon (rotated)
+      SacredGeo.polygon(ctx, 0, 0, this.radius * 0.5, 6, -rot);
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+      // Highlight
+      ctx.beginPath();
+      ctx.arc(-2, -2, this.radius * 0.3, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.fill();
+    }
 
-      // Green shimmer
-      if (this.type === PEG_TYPES.GREEN && !this.hit) {
+    _drawGreen(ctx, color, glow, time) {
+      const rot = time * 0.7;
+      // Triangle shape
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 14;
+      SacredGeo.polygon(ctx, 0, 0, this.radius, 3, rot);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      // Inner triangle (opposite rotation)
+      SacredGeo.polygon(ctx, 0, 0, this.radius * 0.45, 3, -rot);
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+      // Shimmer trail arc
+      if (!this.hit) {
         const shimA = time * 4;
         ctx.beginPath();
         ctx.arc(0, 0, this.radius + 3, shimA, shimA + 1);
@@ -284,13 +579,48 @@
         ctx.lineWidth = 2;
         ctx.stroke();
       }
+      // Highlight
+      ctx.beginPath();
+      ctx.arc(-1, -2, this.radius * 0.25, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.fill();
+    }
 
-      ctx.restore();
+    _drawPurple(ctx, color, glow, time) {
+      const rot = time * 0.4;
+      // Star shape (6 pointed)
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 20;
+      SacredGeo.star(ctx, 0, 0, this.radius, this.radius * 0.5, 6, rot);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      // Inner star
+      SacredGeo.star(ctx, 0, 0, this.radius * 0.4, this.radius * 0.2, 6, -rot);
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+      // Orbiting sparkles
+      if (!this.hit) {
+        for (let i = 0; i < 5; i++) {
+          const a = time * 2.5 + i * (Math.PI * 2 / 5);
+          const r = this.radius + 6 + Math.sin(time * 3 + i) * 2;
+          ctx.beginPath();
+          ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 1.5, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(200,66,255,0.6)';
+          ctx.fill();
+        }
+      }
+      // Highlight
+      ctx.beginPath();
+      ctx.arc(-1, -2, this.radius * 0.25, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fill();
     }
   }
 
   // ═══════════════════════════════════════════════
-  //  7. LEVEL GENERATOR
+  //  10. LEVEL GENERATOR
   // ═══════════════════════════════════════════════
   class LevelGenerator {
     generate(levelNum, w, h) {
@@ -327,7 +657,7 @@
       for (let r = 0; r < rows; r++) {
         const offset = (r % 2) * spacing * 0.5;
         for (let c = 0; c < cols; c++) {
-          if (Math.random() < 0.12) continue; // random gaps
+          if (Math.random() < 0.12) continue;
           pegs.push({ x: left + c * spacing + offset + spacing/2, y: top + r * spacing + spacing/2 });
         }
       }
@@ -350,7 +680,6 @@
 
     _mandala(cx, cy, maxR, density) {
       const pegs = [];
-      // Flower of life inspired
       const rings = Math.max(2, Math.floor(maxR / 70 / density + 1));
       for (let ring = 0; ring <= rings; ring++) {
         const r = ring * 60 / density;
@@ -360,7 +689,6 @@
           pegs.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
         }
       }
-      // Hexagonal ring
       const hexR = maxR * 0.7;
       for (let i = 0; i < 6; i++) {
         const a = (i / 6) * Math.PI * 2 - Math.PI / 6;
@@ -390,11 +718,9 @@
       if (positions.length < 10) return positions.map(p => new Peg(p.x, p.y, PEG_TYPES.BLUE));
       const pegs = positions.map(p => new Peg(p.x, p.y, PEG_TYPES.BLUE));
 
-      // Assign active pegs — spread them out
       const activeCount = Math.max(10, Math.floor(pegs.length * Config.ACTIVE_PEG_RATIO));
       const indices = pegs.map((_, i) => i);
       this._shuffle(indices);
-      // Pick spread-out ones
       const activeIndices = [];
       const used = new Set();
       for (const idx of indices) {
@@ -411,7 +737,6 @@
       }
       for (const idx of activeIndices) pegs[idx].type = PEG_TYPES.ACTIVE;
 
-      // Green pegs — pick from non-active, in harder spots (far from center)
       const remaining = indices.filter(i => !used.has(i));
       remaining.sort((a, b) => {
         const da = Math.abs(pegs[a].x - w/2);
@@ -423,7 +748,6 @@
         used.add(remaining[i]);
       }
 
-      // Purple peg — tricky spot (near edges or far from launcher)
       const rest = remaining.filter(i => !used.has(i));
       rest.sort((a, b) => {
         const da = Math.abs(pegs[a].x - w/2) + pegs[a].y;
@@ -444,7 +768,7 @@
   }
 
   // ═══════════════════════════════════════════════
-  //  8. BALL
+  //  11. BALL
   // ═══════════════════════════════════════════════
   class Ball {
     constructor(x, y, vx, vy) {
@@ -454,6 +778,7 @@
       this.active = true;
       this.trail = [];
       this.offscreen = false;
+      this.sparkleTimer = 0;
     }
     update(dt) {
       this.vy += Config.GRAVITY * dt;
@@ -463,44 +788,81 @@
       this.y += this.vy * dt;
       this.trail.unshift({ x: this.x, y: this.y });
       if (this.trail.length > Config.TRAIL_LENGTH) this.trail.pop();
+      this.sparkleTimer += dt;
     }
-    draw(ctx, color) {
-      // Trail
+    draw(ctx, color, theme, time, isFever) {
+      const glowSize = isFever ? 25 : 15;
+      const trailMaxWidth = isFever ? 14 : 10;
+
+      // Trail with hue shift and glow
       if (this.trail.length > 1) {
         for (let i = 1; i < this.trail.length; i++) {
           const a = 1 - i / this.trail.length;
+          const width = trailMaxWidth * a;
+          if (width < 0.5) continue;
+          // Shift color through theme along the trail
+          const colorIdx = Math.floor((i / this.trail.length) * 3);
+          const trailColor = isFever ? theme.color(colorIdx) : color;
+          const rgb = this._colorToRgb(trailColor);
           ctx.beginPath();
           ctx.moveTo(this.trail[i-1].x, this.trail[i-1].y);
           ctx.lineTo(this.trail[i].x, this.trail[i].y);
-          ctx.strokeStyle = color.replace(')', `,${a * 0.6})`).replace('rgb', 'rgba');
-          ctx.lineWidth = this.radius * 2 * a;
+          ctx.strokeStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},${a * 0.7})`;
+          ctx.lineWidth = width;
           ctx.lineCap = 'round';
+          ctx.shadowColor = trailColor;
+          ctx.shadowBlur = isFever ? 12 : 6;
           ctx.stroke();
+          ctx.shadowBlur = 0;
         }
       }
+
       // Ball
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 15;
+      ctx.shadowColor = isFever ? '#fff' : color;
+      ctx.shadowBlur = glowSize;
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
       ctx.fillStyle = '#fff';
       ctx.fill();
       ctx.shadowBlur = 0;
+
       // Inner glow
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.radius * 0.6, 0, Math.PI * 2);
       ctx.fillStyle = color;
       ctx.fill();
+
+      // Rainbow ring during fever
+      if (isFever) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius + 3, 0, Math.PI * 2);
+        const hue = (time * 360) % 360;
+        ctx.strokeStyle = `hsla(${hue}, 100%, 70%, 0.6)`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+
+    _colorToRgb(color) {
+      // Handle both rgb() and hex formats
+      if (color.startsWith('#')) {
+        const r = parseInt(color.slice(1,3),16);
+        const g = parseInt(color.slice(3,5),16);
+        const b = parseInt(color.slice(5,7),16);
+        return { r, g, b };
+      }
+      const m = color.match(/(\d+)/g);
+      return m ? { r: +m[0], g: +m[1], b: +m[2] } : { r: 255, g: 255, b: 255 };
     }
   }
 
   // ═══════════════════════════════════════════════
-  //  9. LAUNCHER
+  //  12. LAUNCHER
   // ═══════════════════════════════════════════════
   class Launcher {
     constructor(canvas) {
       this.x = canvas.width / 2;
-      this.y = 70; // face center
+      this.y = 70;
       this.angle = Math.PI / 2;
       this.canvas = canvas;
       this.faceSize = 36;
@@ -512,21 +874,19 @@
       this.angle = Math.atan2(ay, ax);
       if (this.angle < 0.1) this.angle = 0.1;
       if (this.angle > Math.PI - 0.1) this.angle = Math.PI - 0.1;
-      // Smooth eye tracking toward pointer
       const lx = this.x, ly = this.y;
       const dx = pointerX - lx, dy = pointerY - ly;
       const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-      const maxOffset = 4;
-      const tx = (dx / dist) * Math.min(maxOffset, dist * 0.02);
-      const ty = (dy / dist) * Math.min(maxOffset, dist * 0.02);
+      const maxOff = 4;
+      const tx = (dx / dist) * Math.min(maxOff, dist * 0.02);
+      const ty = (dy / dist) * Math.min(maxOff, dist * 0.02);
       this._eyeTrackX += (tx - this._eyeTrackX) * 0.15;
       this._eyeTrackY += (ty - this._eyeTrackY) * 0.15;
     }
     draw(ctx, color, time) {
       const x = this.x, y = this.y, s = this.faceSize;
       ctx.save();
-
-      // ── Outer aura / halo ──
+      // Outer aura
       const auraR = s * 1.6 + Math.sin(time * 1.5) * 3;
       const auraGrad = ctx.createRadialGradient(x, y, s * 0.5, x, y, auraR);
       auraGrad.addColorStop(0, color.replace(')', ',0.08)').replace('rgb', 'rgba'));
@@ -534,252 +894,192 @@
       auraGrad.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = auraGrad;
       ctx.beginPath(); ctx.arc(x, y, auraR, 0, Math.PI * 2); ctx.fill();
-
-      // ── Rotating outer ring (sacred geometry) ──
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(time * 0.3);
+      // Rotating outer ring
+      ctx.save(); ctx.translate(x, y); ctx.rotate(time * 0.3);
       ctx.strokeStyle = color.replace(')', ',0.2)').replace('rgb', 'rgba');
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(0, 0, s * 1.15, 0, Math.PI * 2); ctx.stroke();
-      // Small dots on ring
       for (let i = 0; i < 6; i++) {
         const a = (i / 6) * Math.PI * 2;
-        ctx.beginPath();
-        ctx.arc(Math.cos(a) * s * 1.15, Math.sin(a) * s * 1.15, 2, 0, Math.PI * 2);
-        ctx.fillStyle = color.replace(')', ',0.4)').replace('rgb', 'rgba');
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(Math.cos(a) * s * 1.15, Math.sin(a) * s * 1.15, 2, 0, Math.PI * 2);
+        ctx.fillStyle = color.replace(')', ',0.4)').replace('rgb', 'rgba'); ctx.fill();
       }
       ctx.restore();
-
-      // ── Face outline — large almond/eye shape ──
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 18;
-
-      // Head: rounded hexagonal shape
+      // Face outline — rounded hexagonal head
+      ctx.save(); ctx.translate(x, y);
+      ctx.shadowColor = color; ctx.shadowBlur = 18;
       ctx.beginPath();
       for (let i = 0; i < 6; i++) {
         const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
         const r = s * (0.85 + Math.sin(time * 2 + i) * 0.03);
-        const px = Math.cos(a) * r, py = Math.sin(a) * r;
-        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+        i === 0 ? ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r) : ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
       }
       ctx.closePath();
       const headGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, s);
       headGrad.addColorStop(0, color.replace(')', ',0.15)').replace('rgb', 'rgba'));
       headGrad.addColorStop(0.7, color.replace(')', ',0.08)').replace('rgb', 'rgba'));
       headGrad.addColorStop(1, color.replace(')', ',0.03)').replace('rgb', 'rgba'));
-      ctx.fillStyle = headGrad;
-      ctx.fill();
+      ctx.fillStyle = headGrad; ctx.fill();
       ctx.strokeStyle = color.replace(')', ',0.5)').replace('rgb', 'rgba');
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
+      ctx.lineWidth = 1.5; ctx.stroke();
       ctx.shadowBlur = 0;
-
-      // ── Third eye (center forehead) ──
-      const thirdY = -s * 0.35;
+      // Third eye
       const thirdPulse = 1 + Math.sin(time * 3) * 0.15;
-      ctx.beginPath();
-      ctx.arc(0, thirdY, 4 * thirdPulse, 0, Math.PI * 2);
-      ctx.fillStyle = color;
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 12;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      // Third eye inner ring
-      ctx.beginPath();
-      ctx.arc(0, thirdY, 6 * thirdPulse, 0, Math.PI * 2);
+      ctx.beginPath(); ctx.arc(0, -s * 0.35, 4 * thirdPulse, 0, Math.PI * 2);
+      ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 12; ctx.fill(); ctx.shadowBlur = 0;
+      ctx.beginPath(); ctx.arc(0, -s * 0.35, 6 * thirdPulse, 0, Math.PI * 2);
       ctx.strokeStyle = color.replace(')', ',0.3)').replace('rgb', 'rgba');
-      ctx.lineWidth = 0.8;
-      ctx.stroke();
-
-      // ── Eyes (two large alien eyes that track the pointer) ──
-      const eyeSpacing = s * 0.38;
-      const eyeY = -s * 0.05;
-      const eyeW = s * 0.32;
-      const eyeH = s * 0.4;
-      const pupilR = s * 0.13;
-
+      ctx.lineWidth = 0.8; ctx.stroke();
+      // Eyes
+      const eyeSpacing = s * 0.38, eyeY = -s * 0.05, eyeW = s * 0.32, eyeH = s * 0.4, pupilR = s * 0.13;
       for (const side of [-1, 1]) {
         const ex = side * eyeSpacing;
-        // Eye socket — almond shape
-        ctx.beginPath();
-        ctx.ellipse(ex, eyeY, eyeW, eyeH, 0, 0, Math.PI * 2);
+        ctx.beginPath(); ctx.ellipse(ex, eyeY, eyeW, eyeH, 0, 0, Math.PI * 2);
         const eyeGrad = ctx.createRadialGradient(ex, eyeY, 0, ex, eyeY, eyeH);
         eyeGrad.addColorStop(0, 'rgba(20,10,40,0.9)');
         eyeGrad.addColorStop(0.8, color.replace(')', ',0.2)').replace('rgb', 'rgba'));
         eyeGrad.addColorStop(1, color.replace(')', ',0.1)').replace('rgb', 'rgba'));
-        ctx.fillStyle = eyeGrad;
-        ctx.fill();
+        ctx.fillStyle = eyeGrad; ctx.fill();
         ctx.strokeStyle = color.replace(')', ',0.5)').replace('rgb', 'rgba');
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
-
-        // Iris
-        const ix = ex + this._eyeTrackX;
-        const iy = eyeY + this._eyeTrackY;
-        ctx.beginPath();
-        ctx.arc(ix, iy, pupilR * 1.3, 0, Math.PI * 2);
+        ctx.lineWidth = 1.2; ctx.stroke();
+        const ix = ex + this._eyeTrackX, iy = eyeY + this._eyeTrackY;
+        ctx.beginPath(); ctx.arc(ix, iy, pupilR * 1.3, 0, Math.PI * 2);
         ctx.fillStyle = color.replace(')', ',0.4)').replace('rgb', 'rgba');
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 8;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-
-        // Pupil
-        ctx.beginPath();
-        ctx.arc(ix, iy, pupilR, 0, Math.PI * 2);
-        ctx.fillStyle = '#0a0a0f';
-        ctx.fill();
-
-        // Pupil highlight
-        ctx.beginPath();
-        ctx.arc(ix - pupilR * 0.3, iy - pupilR * 0.3, pupilR * 0.3, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.6)';
-        ctx.fill();
-
-        // Inner geometry ring in eye
-        ctx.beginPath();
-        ctx.arc(ix, iy, pupilR * 1.8, 0, Math.PI * 2);
+        ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.fill(); ctx.shadowBlur = 0;
+        ctx.beginPath(); ctx.arc(ix, iy, pupilR, 0, Math.PI * 2);
+        ctx.fillStyle = '#0a0a0f'; ctx.fill();
+        ctx.beginPath(); ctx.arc(ix - pupilR * 0.3, iy - pupilR * 0.3, pupilR * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(ix, iy, pupilR * 1.8, 0, Math.PI * 2);
         ctx.strokeStyle = color.replace(')', ',0.15)').replace('rgb', 'rgba');
-        ctx.lineWidth = 0.6;
-        ctx.stroke();
+        ctx.lineWidth = 0.6; ctx.stroke();
       }
-
-      // ── Mouth — subtle serene line ──
-      ctx.beginPath();
-      ctx.moveTo(-s * 0.15, s * 0.35);
+      // Mouth — serene curve
+      ctx.beginPath(); ctx.moveTo(-s * 0.15, s * 0.35);
       ctx.quadraticCurveTo(0, s * 0.42, s * 0.15, s * 0.35);
       ctx.strokeStyle = color.replace(')', ',0.25)').replace('rgb', 'rgba');
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      // ── Sacred geometry lines inside face ──
+      ctx.lineWidth = 1; ctx.stroke();
+      // Inner sacred geometry — Star of David
       ctx.strokeStyle = color.replace(')', ',0.06)').replace('rgb', 'rgba');
       ctx.lineWidth = 0.5;
-      // Inner triangle
       ctx.beginPath();
       for (let i = 0; i < 3; i++) {
         const a = (i / 3) * Math.PI * 2 - Math.PI / 2 + time * 0.2;
-        const px = Math.cos(a) * s * 0.6, py = Math.sin(a) * s * 0.6;
-        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-      }
-      ctx.closePath(); ctx.stroke();
-      // Inverted triangle
+        i === 0 ? ctx.moveTo(Math.cos(a) * s * 0.6, Math.sin(a) * s * 0.6) : ctx.lineTo(Math.cos(a) * s * 0.6, Math.sin(a) * s * 0.6);
+      } ctx.closePath(); ctx.stroke();
       ctx.beginPath();
       for (let i = 0; i < 3; i++) {
         const a = (i / 3) * Math.PI * 2 + Math.PI / 2 + time * 0.2;
-        const px = Math.cos(a) * s * 0.5, py = Math.sin(a) * s * 0.5;
-        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-      }
-      ctx.closePath(); ctx.stroke();
-
+        i === 0 ? ctx.moveTo(Math.cos(a) * s * 0.5, Math.sin(a) * s * 0.5) : ctx.lineTo(Math.cos(a) * s * 0.5, Math.sin(a) * s * 0.5);
+      } ctx.closePath(); ctx.stroke();
       ctx.restore();
-
-      // ── Nozzle (points at finger, comes from chin area) ──
+      // Nozzle from chin
       this._drawNozzle(ctx, color, time);
-
-      // ── Aiming line ──
+      // Aim line
       this._drawAimLine(ctx, color, time);
     }
     _drawNozzle(ctx, color, time) {
-      const x = this.x, y = this.y;
-      const nozzleStartY = y + this.faceSize * 0.5; // chin
+      const x = this.x, nozzleStartY = this.y + this.faceSize * 0.5;
       const nozzleLen = 16;
       const nx = x + Math.cos(this.angle) * nozzleLen;
       const ny = nozzleStartY + Math.sin(this.angle) * nozzleLen;
-
-      // Nozzle line from chin in aim direction
       ctx.save();
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 3;
-      ctx.lineCap = 'round';
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 12;
-      ctx.beginPath();
-      ctx.moveTo(x, nozzleStartY);
-      ctx.lineTo(nx, ny);
-      ctx.stroke();
+      ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.shadowColor = color; ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.moveTo(x, nozzleStartY); ctx.lineTo(nx, ny); ctx.stroke();
       ctx.shadowBlur = 0;
-
-      // Nozzle tip — small diamond
-      ctx.save();
-      ctx.translate(nx, ny);
-      ctx.rotate(this.angle);
-      ctx.beginPath();
-      ctx.moveTo(5, 0);
-      ctx.lineTo(0, -3);
-      ctx.lineTo(-3, 0);
-      ctx.lineTo(0, 3);
-      ctx.closePath();
-      ctx.fillStyle = color;
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 8;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.restore();
-      ctx.restore();
+      ctx.save(); ctx.translate(nx, ny); ctx.rotate(this.angle);
+      ctx.beginPath(); ctx.moveTo(5, 0); ctx.lineTo(0, -3); ctx.lineTo(-3, 0); ctx.lineTo(0, 3); ctx.closePath();
+      ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.fill(); ctx.shadowBlur = 0;
+      ctx.restore(); ctx.restore();
     }
     _drawAimLine(ctx, color, time) {
       const x = this.x, y = this.y + this.faceSize * 0.5;
-      const len = 100;
-      const segments = 10;
+      const len = 100, segments = 10;
       for (let i = 1; i <= segments; i++) {
         const t = i / segments;
         const px = x + Math.cos(this.angle) * (20 + len * t);
         const py = y + Math.sin(this.angle) * (20 + len * t);
         const a = (1 - t) * 0.3;
-        const sz = 2 - t * 1;
-        // Diamond shapes along aim line
-        ctx.save();
-        ctx.translate(px, py);
-        ctx.rotate(time * 2 + i);
+        const pulse = 1 + Math.sin(time * 4 - i * 0.5) * 0.3;
+        ctx.save(); ctx.translate(px, py); ctx.rotate(time * 2 + i);
         ctx.fillStyle = color.replace(')', `,${a})`).replace('rgb', 'rgba');
-        ctx.beginPath();
-        ctx.moveTo(0, -sz);
-        ctx.lineTo(sz * 0.7, 0);
-        ctx.lineTo(0, sz);
-        ctx.lineTo(-sz * 0.7, 0);
-        ctx.closePath();
-        ctx.fill();
+        if (i % 2 === 0) {
+          const sz = 2 * pulse;
+          ctx.beginPath(); ctx.moveTo(0, -sz); ctx.lineTo(sz, 0); ctx.lineTo(0, sz); ctx.lineTo(-sz, 0);
+          ctx.closePath(); ctx.fill();
+        } else {
+          ctx.beginPath(); ctx.arc(0, 0, 1.5 * pulse, 0, Math.PI * 2); ctx.fill();
+        }
         ctx.restore();
       }
     }
   }
 
   // ═══════════════════════════════════════════════
-  //  10. CAMERA
+  //  13. CAMERA
   // ═══════════════════════════════════════════════
   class Camera {
     constructor(w, h) {
       this.x = w / 2; this.y = h / 2;
       this.zoom = 1; this.targetZoom = 1;
       this.targetX = w / 2; this.targetY = h / 2;
+      // Screen shake
+      this.shakeX = 0; this.shakeY = 0;
+      this.shakeIntensity = 0;
     }
     setZoom(z) { this.targetZoom = z; }
     follow(x, y) { this.targetX = x; this.targetY = y; }
     reset(w, h) {
       this.targetZoom = 1; this.targetX = w/2; this.targetY = h/2;
+      this.shakeIntensity = 0;
     }
+    shake(intensity) { this.shakeIntensity = intensity; }
     update(dt) {
       this.zoom += (this.targetZoom - this.zoom) * 3 * dt;
       this.x += (this.targetX - this.x) * 3 * dt;
       this.y += (this.targetY - this.y) * 3 * dt;
+      // Decay shake
+      if (this.shakeIntensity > 0.1) {
+        this.shakeX = (Math.random() - 0.5) * this.shakeIntensity * 2;
+        this.shakeY = (Math.random() - 0.5) * this.shakeIntensity * 2;
+        this.shakeIntensity *= 0.95;
+      } else {
+        this.shakeX = this.shakeY = 0;
+        this.shakeIntensity = 0;
+      }
     }
     apply(ctx, w, h) {
-      ctx.translate(w/2, h/2);
+      ctx.translate(w/2 + this.shakeX, h/2 + this.shakeY);
       ctx.scale(this.zoom, this.zoom);
       ctx.translate(-this.x, -this.y);
     }
   }
 
   // ═══════════════════════════════════════════════
-  //  11. BACKGROUND
+  //  14. BACKGROUND
   // ═══════════════════════════════════════════════
   class Background {
-    constructor(w, h) { this.w = w; this.h = h; this.progress = 0; }
+    constructor(w, h) {
+      this.w = w; this.h = h; this.progress = 0;
+      // Parallax star layers
+      this.stars = [];
+      for (let layer = 0; layer < 3; layer++) {
+        const stars = [];
+        const count = 40 + layer * 20;
+        for (let i = 0; i < count; i++) {
+          stars.push({
+            x: Math.random() * w,
+            y: Math.random() * h,
+            size: 0.3 + Math.random() * (0.3 + layer * 0.3),
+            brightness: 0.1 + layer * 0.1 + Math.random() * 0.15,
+            twinklePhase: Math.random() * Math.PI * 2,
+            twinkleSpeed: 0.5 + Math.random() * 2,
+          });
+        }
+        this.stars.push({ points: stars, parallax: (layer + 1) * 0.5 });
+      }
+    }
     setProgress(p) { this.progress = p; }
     draw(ctx, time, theme) {
       // Gradient that shifts with progress
@@ -789,8 +1089,8 @@
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       ctx.fillRect(0, 0, this.w, this.h);
 
-      // Subtle grid
-      ctx.strokeStyle = `rgba(140,100,255,${0.03 + this.progress * 0.02})`;
+      // Faint grid (even fainter)
+      ctx.strokeStyle = `rgba(140,100,255,${0.015 + this.progress * 0.01})`;
       ctx.lineWidth = 0.5;
       const spacing = 80;
       for (let x = 0; x < this.w; x += spacing) {
@@ -799,6 +1099,32 @@
       for (let y = 0; y < this.h; y += spacing) {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(this.w, y); ctx.stroke();
       }
+
+      // Parallax star layers
+      const shiftX = this.progress * 30; // Shift opposite to progress
+      for (const layer of this.stars) {
+        for (const star of layer.points) {
+          const sx = ((star.x - shiftX * layer.parallax) % this.w + this.w) % this.w;
+          const twinkle = 0.5 + 0.5 * Math.sin(time * star.twinkleSpeed + star.twinklePhase);
+          ctx.globalAlpha = star.brightness * twinkle;
+          ctx.fillStyle = '#fff';
+          ctx.beginPath();
+          ctx.arc(sx, star.y, star.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
+
+      // Sacred geometry — Flower of Life (layer 1, slow rotation)
+      const geoSize = Math.min(this.w, this.h) * 0.4;
+      SacredGeo.flowerOfLife(ctx, this.w / 2, this.h / 2, geoSize * 0.2, 3, time * 0.02, 0.03 + this.progress * 0.02);
+
+      // Sacred geometry — Metatron's Cube (layer 2, different speed)
+      SacredGeo.metatronsCube(ctx, this.w / 2, this.h / 2, geoSize, time * -0.015, 0.025 + this.progress * 0.015);
+
+      // Second Flower of Life offset (layer 3)
+      SacredGeo.flowerOfLife(ctx, this.w * 0.35, this.h * 0.45, geoSize * 0.15, 2, time * 0.03, 0.02);
+      SacredGeo.flowerOfLife(ctx, this.w * 0.65, this.h * 0.55, geoSize * 0.12, 2, -time * 0.025, 0.02);
 
       // Ambient glow based on progress
       const grad = ctx.createRadialGradient(this.w/2, this.h/2, 0, this.w/2, this.h/2, this.w * 0.6);
@@ -811,7 +1137,7 @@
   }
 
   // ═══════════════════════════════════════════════
-  //  12. AUDIO
+  //  15. AUDIO
   // ═══════════════════════════════════════════════
   class Audio {
     constructor() {
@@ -852,7 +1178,6 @@
     }
     launch() {
       this._ensure();
-      // Whoosh via noise
       if (this.muted || !this.ctx) return;
       const bufferSize = this.ctx.sampleRate * 0.15;
       const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
@@ -896,7 +1221,7 @@
   }
 
   // ═══════════════════════════════════════════════
-  //  13. GAME
+  //  16. GAME
   // ═══════════════════════════════════════════════
   class Game {
     constructor() {
@@ -910,8 +1235,10 @@
       this.camera = new Camera(this.canvas.width, this.canvas.height);
       this.background = new Background(this.canvas.width, this.canvas.height);
       this.audio = new Audio();
+      this.ambientParticles = new AmbientParticles(25);
+      this.floatingGeo = new FloatingGeometry(this.canvas.width, this.canvas.height);
 
-      this.state = 'idle'; // idle, aiming, shooting, fever, levelComplete, gameOver
+      this.state = 'idle';
       this.level = 1;
       this.score = 0;
       this.highScore = parseInt(localStorage.getItem('peggle_high') || '0');
@@ -930,11 +1257,15 @@
       this.pegsHitThisShot = 0;
       this.pegHitsThisShot = [];
 
+      // Cascade state for level complete
+      this.cascadeActive = false;
+      this.cascadeTimer = 0;
+      this.cascadeCenter = { x: 0, y: 0 };
+
       this._resize();
       window.addEventListener('resize', () => this._resize());
       this.input.bind();
 
-      // Start render loop
       requestAnimationFrame(t => this._loop(t));
     }
 
@@ -951,6 +1282,8 @@
       this.camera.reset(this.W, this.H);
       this.background.w = this.W;
       this.background.h = this.H;
+      this.ambientParticles.resize(this.W, this.H);
+      this.floatingGeo = new FloatingGeometry(this.W, this.H);
     }
 
     start() {
@@ -985,22 +1318,20 @@
       this.feverTimer = 0;
       this.guideActive = false;
       this.levelScore = 0;
+      this.cascadeActive = false;
       this.aimColor = this.theme.randomColor();
       if (window._peggleJourney) window._peggleJourney.check('level' + this.level, '🌀', `Entered <strong>Level ${this.level}</strong> — ${Config.LEVEL_TYPES[(this.level-1) % Config.LEVEL_TYPES.length]}`);
     }
 
     setMuted(m) { this.audio.muted = m; }
 
-    // ── Main loop ──
     _loop(timestamp) {
       if (!this.lastTime) this.lastTime = timestamp;
       let dt = (timestamp - this.lastTime) / 1000;
       this.lastTime = timestamp;
-      dt = Math.min(dt, 0.05); // Cap delta
-
+      dt = Math.min(dt, 0.05);
       this.time += dt;
 
-      // Slow-mo during fever
       let gameDt = dt;
       if (this.state === 'fever') {
         gameDt = dt * Config.FEVER_SPEED;
@@ -1015,7 +1346,6 @@
     }
 
     _update(dt, realDt) {
-      // Input
       if (this.state === 'aiming') {
         this.launcher.updateAngle(this.input.aimX, this.input.aimY, this.input.pointerX, this.input.pointerY);
         if (this.input.shotRequested) {
@@ -1027,47 +1357,64 @@
         this.input.shotRequested = false;
       }
 
-      // Guide timer
       if (this.guideActive) {
         this.guideTimer -= realDt;
         if (this.guideTimer <= 0) this.guideActive = false;
       }
 
-      // Bucket
       if (this.state === 'shooting' || this.state === 'fever') {
         this.bucket.x += this.bucket.dir * Config.BUCKET_SPEED * dt;
         if (this.bucket.x > this.W - this.bucket.w/2) this.bucket.dir = -1;
         if (this.bucket.x < this.bucket.w/2) this.bucket.dir = 1;
       }
 
-      // Ball physics
       if (this.ball && this.ball.active && (this.state === 'shooting' || this.state === 'fever')) {
         this.ball.update(dt);
         this._checkCollisions();
         this._checkBounds();
 
-        // Camera follow during fever
         if (this.state === 'fever' && this.ball) {
           this.camera.follow(this.ball.x, this.ball.y);
           this.camera.setZoom(Config.FEVER_ZOOM);
         }
       }
 
-      // Pegs
+      // Ball sparkle particles
+      if (this.ball && this.ball.active && this.ball.sparkleTimer > 0.05) {
+        this.ball.sparkleTimer = 0;
+        const isFever = this.state === 'fever';
+        const sparkColor = isFever ? this.theme.randomColor() : this.aimColor;
+        this.particles.burst(this.ball.x, this.ball.y, sparkColor, 1, 30, 0.3, 1.5);
+      }
+
       for (const peg of this.pegs) peg.update(dt);
-
-      // Particles
       this.particles.update(dt);
-
-      // Camera
       this.camera.update(dt);
 
-      // Background progress
+      // Ambient systems
+      this.ambientParticles.update(dt, this.W, this.H, this.time);
+      this.floatingGeo.update(dt, this.W, this.H);
+
       const activeTotal = this.pegs.filter(p => p.type === PEG_TYPES.ACTIVE).length;
       const activeHit = this.pegs.filter(p => p.type === PEG_TYPES.ACTIVE && p.hit).length;
       this.background.setProgress(activeTotal > 0 ? activeHit / activeTotal : 0);
 
-      // Check if all hit pegs should cascade (fever end)
+      // Cascade update for level complete
+      if (this.cascadeActive) {
+        this.cascadeTimer += realDt;
+        const remaining = this.pegs.filter(p => p.active && !p.hit);
+        for (const peg of remaining) {
+          const dx = peg.x - this.cascadeCenter.x;
+          const dy = peg.y - this.cascadeCenter.y;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          const delay = dist / 500; // Stagger based on distance
+          if (this.cascadeTimer >= delay && !peg.hit) {
+            peg.hit = true;
+            this.particles.burst(peg.x, peg.y, peg.getColor(), 8, 100, 0.5, 2);
+          }
+        }
+      }
+
       if (this.state === 'fever_end') {
         this.feverTimer -= realDt;
         if (this.feverTimer <= 0) {
@@ -1098,37 +1445,40 @@
         const dist = Math.sqrt(dx*dx + dy*dy);
         const minDist = this.ball.radius + Config.PEG_HIT_RADIUS;
         if (dist < minDist) {
-          // Separate
           const nx = dx / dist, ny = dy / dist;
           const overlap = minDist - dist;
           this.ball.x += nx * overlap;
           this.ball.y += ny * overlap;
-          // Bounce
           const dot = this.ball.vx * nx + this.ball.vy * ny;
           this.ball.vx -= 2 * dot * nx * Config.BOUNCE;
           this.ball.vy -= 2 * dot * ny * Config.BOUNCE;
-          // Mark hit
           peg.hit = true;
           this.pegsHitThisShot++;
           this.pegHitsThisShot.push(peg);
           this.score += peg.score;
           this.levelScore += peg.score;
-          // Particles
           const burstCount = peg.type === PEG_TYPES.ACTIVE ? Config.PARTICLE_BURST_ACTIVE : Config.PARTICLE_BURST_PEG;
-          this.particles.burst(peg.x, peg.y, peg.getColor(), burstCount, 150, 0.6, 3);
-          // Audio
+          const isFever = this.state === 'fever';
+          if (isFever) {
+            // Multi-coloured fever particles
+            for (let i = 0; i < burstCount; i++) {
+              const c = this.theme.color(Math.floor(Math.random() * this.theme.colors.length));
+              this.particles.burst(peg.x, peg.y, c, 1, 200, 1.0, 3 + Math.random() * 2);
+            }
+          } else {
+            // Normal burst: peg colour + white sparkles
+            this.particles.burst(peg.x, peg.y, peg.getColor(), burstCount, 150, 0.6, 3);
+            this.particles.burst(peg.x, peg.y, '#ffffff', 4, 80, 0.4, 1.5); // White sparkles
+          }
           this.audio.pegHit(peg.type);
-          // Green power
           if (peg.type === PEG_TYPES.GREEN) {
             this.guideActive = true;
             this.guideTimer = Config.GUIDE_POWER_DURATION;
             if (window._peggleJourney) window._peggleJourney.check('guide', '🟢', 'Activated <strong>trajectory guide</strong>');
           }
-          // Purple milestone
           if (peg.type === PEG_TYPES.PURPLE) {
             if (window._peggleJourney) window._peggleJourney.check('purple', '🟣', 'Hit a <strong>purple bonus</strong> peg!');
           }
-          // Check if this is the last active peg
           const activePegs = this.pegs.filter(p => p.type === PEG_TYPES.ACTIVE && p.active && !p.hit);
           if (activePegs.length === 0) {
             this._startFever(peg);
@@ -1141,21 +1491,16 @@
     _checkBounds() {
       if (!this.ball) return;
       const b = this.ball;
-      // Side walls — bounce
       if (b.x < b.radius) { b.x = b.radius; b.vx = Math.abs(b.vx); }
       if (b.x > this.W - b.radius) { b.x = this.W - b.radius; b.vx = -Math.abs(b.vx); }
-      // Top wall
       if (b.y < b.radius) { b.y = b.radius; b.vy = Math.abs(b.vy); }
-      // Bottom — check bucket, then consume
       if (b.y > this.H - 20) {
-        // Bucket check
         if (Math.abs(b.x - this.bucket.x) < this.bucket.w / 2 && b.y > this.bucket.y - 10) {
           this.ballsLeft++;
           this.audio.bucketChime();
           if (window._peggleJourney) window._peggleJourney.check('bucket', '🪣', 'Ball caught in the <strong>bucket</strong>!');
         }
         b.active = false;
-        // After ball dies, wait then go to aiming or game over
         setTimeout(() => this._afterShot(), 500);
       }
     }
@@ -1180,6 +1525,7 @@
       this.feverTimer = 0;
       this.audio.feverChord();
       this.feverTarget = triggerPeg;
+      this.camera.shake(3);
       if (window._peggleJourney) window._peggleJourney.check('fever', '🔥', 'Triggered <strong>Fever Time!</strong>');
     }
 
@@ -1187,13 +1533,11 @@
       this.state = 'fever_end';
       this.feverTimer = 1.5;
       this.camera.reset(this.W, this.H);
-      // Massive burst on the last active peg
       for (const peg of this.pegs) {
         if (peg.hit && peg.type === PEG_TYPES.ACTIVE) {
           this.particles.burst(peg.x, peg.y, peg.getColor(), Config.PARTICLE_BURST_FEVER, 300, 1.2, 4);
         }
       }
-      // Bonus
       this.score += Config.SCORE_FEVER_BONUS;
       this.levelScore += Config.SCORE_FEVER_BONUS;
       this.audio.levelComplete();
@@ -1201,14 +1545,15 @@
 
     _showLevelComplete() {
       this.state = 'levelComplete';
-      // Cascade remaining pegs
-      for (const peg of this.pegs) {
-        if (peg.active && !peg.hit) {
-          peg.hit = true;
-          this.particles.burst(peg.x, peg.y, peg.getColor(), 8, 100, 0.5, 2);
-        }
-      }
-      // High score
+      // Wave cascade from center outward
+      this.cascadeActive = true;
+      this.cascadeTimer = 0;
+      this.cascadeCenter = { x: this.W / 2, y: this.H / 2 };
+
+      // Brief white flash
+      this._flashAlpha = 0.3;
+      this._flashTimer = 0.1;
+
       if (this.score > this.highScore) {
         this.highScore = this.score;
         localStorage.setItem('peggle_high', String(this.highScore));
@@ -1234,15 +1579,22 @@
     _draw() {
       const ctx = this.ctx;
       ctx.clearRect(0, 0, this.W, this.H);
+      const isFever = this.state === 'fever';
 
       // Background
       this.background.draw(ctx, this.time, this.theme);
 
+      // Floating geometry (behind everything)
+      this.floatingGeo.draw(ctx);
+
+      // Ambient particles
+      this.ambientParticles.draw(ctx, this.time);
+
       ctx.save();
       this.camera.apply(ctx, this.W, this.H);
 
-      // Pegs
-      for (const peg of this.pegs) peg.draw(ctx, this.time);
+      // Pegs — pass fever state for enhanced glow
+      for (const peg of this.pegs) peg.draw(ctx, this.time, isFever);
 
       // Bucket
       if (this.state === 'shooting' || this.state === 'fever') {
@@ -1251,7 +1603,7 @@
 
       // Ball
       if (this.ball && this.ball.active) {
-        this.ball.draw(ctx, this.aimColor);
+        this.ball.draw(ctx, this.aimColor, this.theme, this.time, isFever);
       }
 
       // Particles
@@ -1260,9 +1612,30 @@
       ctx.restore();
 
       // Fever overlay
-      if (this.state === 'fever') {
-        ctx.fillStyle = 'rgba(140,60,255,0.08)';
+      if (isFever) {
+        // Background flash with theme colour
+        const flashA = 0.06 + Math.sin(this.time * 6) * 0.03;
+        ctx.fillStyle = this.theme.hexToRGBA(this.theme.color(0), flashA);
         ctx.fillRect(0, 0, this.W, this.H);
+
+        // Radial light rays from last hit peg
+        if (this.feverTarget) {
+          ctx.save();
+          ctx.translate(this.feverTarget.x, this.feverTarget.y);
+          const rayCount = 12;
+          for (let i = 0; i < rayCount; i++) {
+            const a = (i / rayCount) * Math.PI * 2 + this.time * 0.5;
+            const len = 200 + Math.sin(this.time * 3 + i) * 50;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(a) * len, Math.sin(a) * len);
+            ctx.strokeStyle = this.theme.hexToRGBA(this.theme.color(i % this.theme.colors.length), 0.08);
+            ctx.lineWidth = 3;
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
         // Radial glow around ball
         if (this.ball) {
           const grad = ctx.createRadialGradient(this.ball.x, this.ball.y, 0, this.ball.x, this.ball.y, 120);
@@ -1271,9 +1644,24 @@
           ctx.fillStyle = grad;
           ctx.fillRect(0, 0, this.W, this.H);
         }
+
+        // Vignette glow
+        const vigGrad = ctx.createRadialGradient(this.W/2, this.H/2, this.W * 0.3, this.W/2, this.H/2, this.W * 0.7);
+        vigGrad.addColorStop(0, 'rgba(0,0,0,0)');
+        vigGrad.addColorStop(1, this.theme.hexToRGBA(this.theme.color(0), 0.12));
+        ctx.fillStyle = vigGrad;
+        ctx.fillRect(0, 0, this.W, this.H);
       }
 
-      // Guide line (trajectory prediction)
+      // White flash (level complete cascade start)
+      if (this._flashAlpha > 0) {
+        ctx.fillStyle = `rgba(255,255,255,${this._flashAlpha})`;
+        ctx.fillRect(0, 0, this.W, this.H);
+        this._flashAlpha -= 0.03;
+        if (this._flashAlpha < 0) this._flashAlpha = 0;
+      }
+
+      // Guide line
       if (this.guideActive && this.state === 'aiming') {
         this._drawGuide(ctx);
       }
@@ -1281,7 +1669,7 @@
       // HUD
       this._drawHUD(ctx);
 
-      // Launcher (on top)
+      // Launcher
       if (this.state === 'aiming') {
         this.launcher.draw(ctx, this.aimColor, this.time);
       }
@@ -1289,21 +1677,41 @@
 
     _drawBucket(ctx) {
       const b = this.bucket;
-      ctx.fillStyle = 'rgba(66,255,136,0.3)';
-      ctx.strokeStyle = 'rgba(66,255,136,0.6)';
-      ctx.lineWidth = 2;
+      const pulse = 1 + Math.sin(this.time * 4) * 0.1;
+
+      // Glowing crescent/arc shape
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.scale(pulse, pulse);
+
+      // Arc shape
       ctx.beginPath();
-      ctx.moveTo(b.x - b.w/2, b.y);
-      ctx.lineTo(b.x - b.w/2 + 10, b.y + b.h);
-      ctx.lineTo(b.x + b.w/2 - 10, b.y + b.h);
-      ctx.lineTo(b.x + b.w/2, b.y);
-      ctx.closePath();
-      ctx.fill();
+      ctx.arc(0, 0, b.w / 2, 0, Math.PI);
+      ctx.strokeStyle = 'rgba(66,255,136,0.7)';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = 'rgba(66,255,136,0.5)';
+      ctx.shadowBlur = 15;
       ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Inner glow
+      ctx.beginPath();
+      ctx.arc(0, 0, b.w / 2 - 5, 0.2, Math.PI - 0.2);
+      ctx.strokeStyle = 'rgba(66,255,136,0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.restore();
+
+      // Sparkle particles around bucket
+      if (Math.random() < 0.3) {
+        const sx = b.x + (Math.random() - 0.5) * b.w;
+        const sy = b.y + Math.random() * 10 - 5;
+        this.particles.burst(sx, sy, 'rgba(66,255,136,0.8)', 1, 20, 0.4, 1);
+      }
     }
 
     _drawGuide(ctx) {
-      // Simulate trajectory
       let x = this.launcher.x, y = this.launcher.y + this.launcher.faceSize * 0.5 + 16;
       let vx = Math.cos(this.launcher.angle) * Config.BALL_SPEED;
       let vy = Math.sin(this.launcher.angle) * Config.BALL_SPEED;
@@ -1313,11 +1721,9 @@
         vy += Config.GRAVITY * simDt;
         x += vx * simDt;
         y += vy * simDt;
-        // Bounce off walls
         if (x < Config.BALL_RADIUS) { x = Config.BALL_RADIUS; vx = Math.abs(vx); }
         if (x > this.W - Config.BALL_RADIUS) { x = this.W - Config.BALL_RADIUS; vx = -Math.abs(vx); }
         if (y < Config.BALL_RADIUS) { y = Config.BALL_RADIUS; vy = Math.abs(vy); }
-        // Check peg collisions (simplified)
         for (const peg of this.pegs) {
           if (!peg.active || peg.hit) continue;
           const dx = x - peg.x, dy = y - peg.y;
@@ -1334,7 +1740,6 @@
         if (i % 3 === 0) points.push({ x, y });
         if (y > this.H) break;
       }
-      // Draw dotted guide
       for (let i = 0; i < points.length; i++) {
         const a = (1 - i/points.length) * 0.5;
         ctx.beginPath();
@@ -1350,13 +1755,11 @@
       ctx.save();
       ctx.resetTransform();
 
-      // Level
       ctx.font = '200 0.8rem sans-serif';
       ctx.fillStyle = 'rgba(255,255,255,0.4)';
       ctx.textAlign = 'center';
       ctx.fillText('LEVEL ' + this.level, this.W / 2, 30);
 
-      // Balls remaining
       ctx.textAlign = 'left';
       ctx.font = '200 0.7rem sans-serif';
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
@@ -1368,19 +1771,16 @@
         ctx.fill();
       }
 
-      // Score
       ctx.textAlign = 'right';
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
       ctx.font = '100 1.4rem sans-serif';
       ctx.fillText(this.score, this.W - 16, 80);
 
-      // Active pegs remaining
       const activeRem = this.pegs.filter(p => p.type === PEG_TYPES.ACTIVE && p.active && !p.hit).length;
       ctx.font = '200 0.7rem sans-serif';
       ctx.fillStyle = 'rgba(255,140,66,0.6)';
       ctx.fillText(activeRem + ' remaining', this.W - 16, 98);
 
-      // Guide indicator
       if (this.guideActive) {
         ctx.textAlign = 'center';
         ctx.font = '200 0.65rem sans-serif';
