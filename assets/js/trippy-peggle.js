@@ -66,11 +66,10 @@
       this.canvas = canvas;
       this.aimX = 0;
       this.aimY = 1;
+      this.pointerX = 0; // raw screen position of finger/cursor
+      this.pointerY = 0;
       this.shotRequested = false;
       this._aimAngle = Math.PI / 2;
-      this._touchStart = null;
-      this._mouseX = 0;
-      this._mouseY = 0;
       this._bound = false;
     }
     bind() {
@@ -79,33 +78,33 @@
       const c = this.canvas;
       // Mouse
       c.addEventListener('mousemove', e => {
-        this._mouseX = e.clientX;
-        this._mouseY = e.clientY;
-        this._updateAimFromMouse();
+        this.pointerX = e.clientX;
+        this.pointerY = e.clientY;
+        this._updateAimFromPointer();
       });
-      c.addEventListener('click', e => {
+      c.addEventListener('click', () => {
         this.shotRequested = true;
       });
       // Touch
       c.addEventListener('touchstart', e => {
         e.preventDefault();
         const t = e.touches[0];
-        this._mouseX = t.clientX;
-        this._mouseY = t.clientY;
-        this._updateAimFromMouse();
+        this.pointerX = t.clientX;
+        this.pointerY = t.clientY;
+        this._updateAimFromPointer();
       }, { passive: false });
       c.addEventListener('touchmove', e => {
         e.preventDefault();
         const t = e.touches[0];
-        this._mouseX = t.clientX;
-        this._mouseY = t.clientY;
-        this._updateAimFromMouse();
+        this.pointerX = t.clientX;
+        this.pointerY = t.clientY;
+        this._updateAimFromPointer();
       }, { passive: false });
       c.addEventListener('touchend', e => {
         e.preventDefault();
         this.shotRequested = true;
       }, { passive: false });
-      // Keyboard
+      // Keyboard fallback
       document.addEventListener('keydown', e => {
         if (e.key === 'ArrowLeft') this._aimAngle = Math.max(0.1, this._aimAngle - 0.04);
         if (e.key === 'ArrowRight') this._aimAngle = Math.min(Math.PI - 0.1, this._aimAngle + 0.04);
@@ -114,11 +113,11 @@
         this.aimY = Math.sin(this._aimAngle);
       });
     }
-    _updateAimFromMouse() {
-      const lx = this.canvas.width / 2;
-      const ly = 50;
-      const dx = this._mouseX - lx;
-      const dy = this._mouseY - ly;
+    _updateAimFromPointer() {
+      const lx = this.canvas.width / (window.devicePixelRatio || 1) / 2;
+      const ly = 70; // face center Y
+      const dx = this.pointerX - lx;
+      const dy = this.pointerY - ly;
       const len = Math.sqrt(dx*dx + dy*dy) || 1;
       this.aimX = dx / len;
       this.aimY = dy / len;
@@ -501,60 +500,251 @@
   class Launcher {
     constructor(canvas) {
       this.x = canvas.width / 2;
-      this.y = 50;
+      this.y = 70; // face center
       this.angle = Math.PI / 2;
       this.canvas = canvas;
+      this.faceSize = 36;
+      this._eyeTrackX = 0;
+      this._eyeTrackY = 0.4;
     }
-    updateAngle(ax, ay) {
-      if (ay < 0.1) return; // Don't aim upward
+    updateAngle(ax, ay, pointerX, pointerY) {
+      if (ay < 0.05) return;
       this.angle = Math.atan2(ay, ax);
-      if (this.angle < 0.15) this.angle = 0.15;
-      if (this.angle > Math.PI - 0.15) this.angle = Math.PI - 0.15;
+      if (this.angle < 0.1) this.angle = 0.1;
+      if (this.angle > Math.PI - 0.1) this.angle = Math.PI - 0.1;
+      // Smooth eye tracking toward pointer
+      const lx = this.x, ly = this.y;
+      const dx = pointerX - lx, dy = pointerY - ly;
+      const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+      const maxOffset = 4;
+      const tx = (dx / dist) * Math.min(maxOffset, dist * 0.02);
+      const ty = (dy / dist) * Math.min(maxOffset, dist * 0.02);
+      this._eyeTrackX += (tx - this._eyeTrackX) * 0.15;
+      this._eyeTrackY += (ty - this._eyeTrackY) * 0.15;
     }
     draw(ctx, color, time) {
+      const x = this.x, y = this.y, s = this.faceSize;
       ctx.save();
-      ctx.translate(this.x, this.y);
-      ctx.rotate(this.angle - Math.PI / 2);
 
-      // Launcher body — triangle
-      const size = 18;
-      ctx.beginPath();
-      ctx.moveTo(0, -size);
-      ctx.lineTo(-size * 0.6, size * 0.4);
-      ctx.lineTo(size * 0.6, size * 0.4);
-      ctx.closePath();
-      ctx.fillStyle = color;
+      // ── Outer aura / halo ──
+      const auraR = s * 1.6 + Math.sin(time * 1.5) * 3;
+      const auraGrad = ctx.createRadialGradient(x, y, s * 0.5, x, y, auraR);
+      auraGrad.addColorStop(0, color.replace(')', ',0.08)').replace('rgb', 'rgba'));
+      auraGrad.addColorStop(0.6, color.replace(')', ',0.03)').replace('rgb', 'rgba'));
+      auraGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = auraGrad;
+      ctx.beginPath(); ctx.arc(x, y, auraR, 0, Math.PI * 2); ctx.fill();
+
+      // ── Rotating outer ring (sacred geometry) ──
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(time * 0.3);
+      ctx.strokeStyle = color.replace(')', ',0.2)').replace('rgb', 'rgba');
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(0, 0, s * 1.15, 0, Math.PI * 2); ctx.stroke();
+      // Small dots on ring
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * s * 1.15, Math.sin(a) * s * 1.15, 2, 0, Math.PI * 2);
+        ctx.fillStyle = color.replace(')', ',0.4)').replace('rgb', 'rgba');
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // ── Face outline — large almond/eye shape ──
+      ctx.save();
+      ctx.translate(x, y);
       ctx.shadowColor = color;
-      ctx.shadowBlur = 20;
+      ctx.shadowBlur = 18;
+
+      // Head: rounded hexagonal shape
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+        const r = s * (0.85 + Math.sin(time * 2 + i) * 0.03);
+        const px = Math.cos(a) * r, py = Math.sin(a) * r;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      const headGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, s);
+      headGrad.addColorStop(0, color.replace(')', ',0.15)').replace('rgb', 'rgba'));
+      headGrad.addColorStop(0.7, color.replace(')', ',0.08)').replace('rgb', 'rgba'));
+      headGrad.addColorStop(1, color.replace(')', ',0.03)').replace('rgb', 'rgba'));
+      ctx.fillStyle = headGrad;
       ctx.fill();
+      ctx.strokeStyle = color.replace(')', ',0.5)').replace('rgb', 'rgba');
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // Inner highlight
+      // ── Third eye (center forehead) ──
+      const thirdY = -s * 0.35;
+      const thirdPulse = 1 + Math.sin(time * 3) * 0.15;
       ctx.beginPath();
-      ctx.moveTo(0, -size * 0.6);
-      ctx.lineTo(-size * 0.25, size * 0.1);
-      ctx.lineTo(size * 0.25, size * 0.1);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.arc(0, thirdY, 4 * thirdPulse, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 12;
       ctx.fill();
+      ctx.shadowBlur = 0;
+      // Third eye inner ring
+      ctx.beginPath();
+      ctx.arc(0, thirdY, 6 * thirdPulse, 0, Math.PI * 2);
+      ctx.strokeStyle = color.replace(')', ',0.3)').replace('rgb', 'rgba');
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+
+      // ── Eyes (two large alien eyes that track the pointer) ──
+      const eyeSpacing = s * 0.38;
+      const eyeY = -s * 0.05;
+      const eyeW = s * 0.32;
+      const eyeH = s * 0.4;
+      const pupilR = s * 0.13;
+
+      for (const side of [-1, 1]) {
+        const ex = side * eyeSpacing;
+        // Eye socket — almond shape
+        ctx.beginPath();
+        ctx.ellipse(ex, eyeY, eyeW, eyeH, 0, 0, Math.PI * 2);
+        const eyeGrad = ctx.createRadialGradient(ex, eyeY, 0, ex, eyeY, eyeH);
+        eyeGrad.addColorStop(0, 'rgba(20,10,40,0.9)');
+        eyeGrad.addColorStop(0.8, color.replace(')', ',0.2)').replace('rgb', 'rgba'));
+        eyeGrad.addColorStop(1, color.replace(')', ',0.1)').replace('rgb', 'rgba'));
+        ctx.fillStyle = eyeGrad;
+        ctx.fill();
+        ctx.strokeStyle = color.replace(')', ',0.5)').replace('rgb', 'rgba');
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        // Iris
+        const ix = ex + this._eyeTrackX;
+        const iy = eyeY + this._eyeTrackY;
+        ctx.beginPath();
+        ctx.arc(ix, iy, pupilR * 1.3, 0, Math.PI * 2);
+        ctx.fillStyle = color.replace(')', ',0.4)').replace('rgb', 'rgba');
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Pupil
+        ctx.beginPath();
+        ctx.arc(ix, iy, pupilR, 0, Math.PI * 2);
+        ctx.fillStyle = '#0a0a0f';
+        ctx.fill();
+
+        // Pupil highlight
+        ctx.beginPath();
+        ctx.arc(ix - pupilR * 0.3, iy - pupilR * 0.3, pupilR * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.fill();
+
+        // Inner geometry ring in eye
+        ctx.beginPath();
+        ctx.arc(ix, iy, pupilR * 1.8, 0, Math.PI * 2);
+        ctx.strokeStyle = color.replace(')', ',0.15)').replace('rgb', 'rgba');
+        ctx.lineWidth = 0.6;
+        ctx.stroke();
+      }
+
+      // ── Mouth — subtle serene line ──
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.15, s * 0.35);
+      ctx.quadraticCurveTo(0, s * 0.42, s * 0.15, s * 0.35);
+      ctx.strokeStyle = color.replace(')', ',0.25)').replace('rgb', 'rgba');
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // ── Sacred geometry lines inside face ──
+      ctx.strokeStyle = color.replace(')', ',0.06)').replace('rgb', 'rgba');
+      ctx.lineWidth = 0.5;
+      // Inner triangle
+      ctx.beginPath();
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2 - Math.PI / 2 + time * 0.2;
+        const px = Math.cos(a) * s * 0.6, py = Math.sin(a) * s * 0.6;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.closePath(); ctx.stroke();
+      // Inverted triangle
+      ctx.beginPath();
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2 + Math.PI / 2 + time * 0.2;
+        const px = Math.cos(a) * s * 0.5, py = Math.sin(a) * s * 0.5;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.closePath(); ctx.stroke();
 
       ctx.restore();
 
-      // Aiming line
+      // ── Nozzle (points at finger, comes from chin area) ──
+      this._drawNozzle(ctx, color, time);
+
+      // ── Aiming line ──
       this._drawAimLine(ctx, color, time);
     }
+    _drawNozzle(ctx, color, time) {
+      const x = this.x, y = this.y;
+      const nozzleStartY = y + this.faceSize * 0.5; // chin
+      const nozzleLen = 16;
+      const nx = x + Math.cos(this.angle) * nozzleLen;
+      const ny = nozzleStartY + Math.sin(this.angle) * nozzleLen;
+
+      // Nozzle line from chin in aim direction
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.moveTo(x, nozzleStartY);
+      ctx.lineTo(nx, ny);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Nozzle tip — small diamond
+      ctx.save();
+      ctx.translate(nx, ny);
+      ctx.rotate(this.angle);
+      ctx.beginPath();
+      ctx.moveTo(5, 0);
+      ctx.lineTo(0, -3);
+      ctx.lineTo(-3, 0);
+      ctx.lineTo(0, 3);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 8;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+      ctx.restore();
+    }
     _drawAimLine(ctx, color, time) {
-      const len = 120;
-      const segments = 12;
+      const x = this.x, y = this.y + this.faceSize * 0.5;
+      const len = 100;
+      const segments = 10;
       for (let i = 1; i <= segments; i++) {
         const t = i / segments;
-        const x = this.x + Math.cos(this.angle) * len * t;
-        const y = this.y + Math.sin(this.angle) * len * t;
-        const a = (1 - t) * 0.4;
-        ctx.beginPath();
-        ctx.arc(x, y, 2, 0, Math.PI * 2);
+        const px = x + Math.cos(this.angle) * (20 + len * t);
+        const py = y + Math.sin(this.angle) * (20 + len * t);
+        const a = (1 - t) * 0.3;
+        const sz = 2 - t * 1;
+        // Diamond shapes along aim line
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(time * 2 + i);
         ctx.fillStyle = color.replace(')', `,${a})`).replace('rgb', 'rgba');
+        ctx.beginPath();
+        ctx.moveTo(0, -sz);
+        ctx.lineTo(sz * 0.7, 0);
+        ctx.lineTo(0, sz);
+        ctx.lineTo(-sz * 0.7, 0);
+        ctx.closePath();
         ctx.fill();
+        ctx.restore();
       }
     }
   }
@@ -827,7 +1017,7 @@
     _update(dt, realDt) {
       // Input
       if (this.state === 'aiming') {
-        this.launcher.updateAngle(this.input.aimX, this.input.aimY);
+        this.launcher.updateAngle(this.input.aimX, this.input.aimY, this.input.pointerX, this.input.pointerY);
         if (this.input.shotRequested) {
           this.input.shotRequested = false;
           this._shoot();
@@ -892,7 +1082,7 @@
       const speed = Config.BALL_SPEED;
       const vx = Math.cos(this.launcher.angle) * speed;
       const vy = Math.sin(this.launcher.angle) * speed;
-      this.ball = new Ball(this.launcher.x, this.launcher.y + 20, vx, vy);
+      this.ball = new Ball(this.launcher.x, this.launcher.y + this.launcher.faceSize * 0.5 + 16, vx, vy);
       this.state = 'shooting';
       this.pegsHitThisShot = 0;
       this.pegHitsThisShot = [];
@@ -1114,7 +1304,7 @@
 
     _drawGuide(ctx) {
       // Simulate trajectory
-      let x = this.launcher.x, y = this.launcher.y + 20;
+      let x = this.launcher.x, y = this.launcher.y + this.launcher.faceSize * 0.5 + 16;
       let vx = Math.cos(this.launcher.angle) * Config.BALL_SPEED;
       let vy = Math.sin(this.launcher.angle) * Config.BALL_SPEED;
       const simDt = 1/60;
