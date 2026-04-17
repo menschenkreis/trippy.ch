@@ -37,13 +37,17 @@ function hexToRgb(hex){
 
 // ── § 1. Internationalisation ────────────────────────────────────────────
 // FE_CONTENT is declared in falling-emy-content.js, loaded before this file.
-// Language order of preference: localStorage override → browser language → 'en'.
+// Language order of preference: site-wide trippy-lang → fe-lang → browser → 'en'.
 {
   const _avail  = Object.keys(window.FE_CONTENT || { en: 1 });
+  const _siteLang = localStorage.getItem('trippy-lang') || '';
   const _stored = localStorage.getItem('fe-lang') || '';
   const _browser = (navigator.language || '').slice(0, 2).toLowerCase();
-  window.FE_LANG = _avail.includes(_stored)  ? _stored  :
+  window.FE_LANG = _avail.includes(_siteLang) ? _siteLang :
+                   _avail.includes(_stored)  ? _stored  :
                    _avail.includes(_browser) ? _browser : 'en';
+  // Sync fe-lang to whatever we resolved (including site-wide)
+  localStorage.setItem('fe-lang', window.FE_LANG);
 }
 
 // Resolve a dot-path key from the current language's ui table.
@@ -277,8 +281,8 @@ function restoreFromSave(data){
 
   // Re-calculate which chapters have already fired
   const depthMeters = cameraY / 100;
-  for(let ci = 0; ci < lifeChapters.length; ci++){
-    const ch = lifeChapters[ci];
+  for(let ci = 0; ci < getLifeChapters().length; ci++){
+    const ch = getLifeChapters()[ci];
     const triggerDepth = ch.depth !== undefined ? ch.depth : ch.age * 1000;
     if(depthMeters >= triggerDepth) firedChapters.add(ci);
   }
@@ -517,7 +521,7 @@ let firedChapters = new Set();
 
 // Chapters are sourced from the content file (falling-emy-content.js).
 // Falls back to an empty array only if the content file failed to load.
-const lifeChapters = (window.FE_CONTENT?.[window.FE_LANG]?.chapters) ||
+function getLifeChapters() { return (window.FE_CONTENT?.[window.FE_LANG]?.chapters) ||
                      (window.FE_CONTENT?.en?.chapters) || [];
 
 // ── Accelerometer ────────────────────────────────────────────────────────
@@ -2030,11 +2034,27 @@ tiltBtn.onclick = () => {
     const next = avail[(avail.indexOf(cur) + 1) % avail.length];
     window.FE_LANG = next;
     localStorage.setItem('fe-lang', next);
+    localStorage.setItem('trippy-lang', next);
     applyI18n();
-    _resumeChecked = false; // allow checkResume to re-apply translated text
+    _resumeChecked = false;
     checkResume();
     updateBtn();
   };
+
+  // Sync with site-wide trippy-lang changes
+  function syncFromSite() {
+    const siteLang = localStorage.getItem('trippy-lang') || '';
+    if (siteLang && avail.includes(siteLang) && siteLang !== window.FE_LANG) {
+      window.FE_LANG = siteLang;
+      localStorage.setItem('fe-lang', siteLang);
+      applyI18n();
+      _resumeChecked = false;
+      checkResume();
+      updateBtn();
+    }
+  }
+  window.addEventListener('storage', e => { if (e.key === 'trippy-lang') syncFromSite(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) syncFromSite(); });
 })();
 
 // ── Soul name input ───────────────────────────────────────────────────────
@@ -4372,8 +4392,8 @@ function frame(now){
   // updateJourneyPanel defined at IIFE scope (see above)
 
   // ── Chapter Logic (unified) ──
-  for(let ci = 0; ci < lifeChapters.length; ci++){
-    const ch = lifeChapters[ci];
+  for(let ci = 0; ci < getLifeChapters().length; ci++){
+    const ch = getLifeChapters()[ci];
     const triggerDepth = ch.depth !== undefined ? ch.depth : ch.age * 1000;
     if(depthMeters >= triggerDepth && !firedChapters.has(ci)){
       if(!chapterDisplay){
