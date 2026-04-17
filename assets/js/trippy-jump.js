@@ -213,11 +213,11 @@
     } catch(e) {}
 
     masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0.55; // slightly lower for smoothness
+    masterGain.gain.value = 0.50;
     // Soft low-pass to tame high frequencies — warm, never harsh
     const masterFilter = audioCtx.createBiquadFilter();
     masterFilter.type = 'lowpass';
-    masterFilter.frequency.value = 3500;
+    masterFilter.frequency.value = 2200; // lower ceiling keeps high notes smooth
     masterFilter.Q.value = 0.5;
     masterGain.connect(masterFilter);
     masterFilter.connect(audioCtx.destination);
@@ -226,10 +226,10 @@
     delayNode = audioCtx.createDelay();
     delayNode.delayTime.value = 0.35;
     const feedback1 = audioCtx.createGain();
-    feedback1.gain.value = 0.35;
+    feedback1.gain.value = 0.28; // less feedback = echo fades faster, less buildup
     const delayFilter = audioCtx.createBiquadFilter();
     delayFilter.type = 'lowpass';
-    delayFilter.frequency.value = 1200; // warmer cutoff
+    delayFilter.frequency.value = 1000;
     delayNode.connect(delayFilter);
     delayFilter.connect(feedback1);
     feedback1.connect(delayNode);
@@ -242,7 +242,7 @@
     feedback2.gain.value = 0.3;
     const reverbFilter = audioCtx.createBiquadFilter();
     reverbFilter.type = 'lowpass';
-    reverbFilter.frequency.value = 900; // even warmer
+    reverbFilter.frequency.value = 750; // deeper warmth
     reverbNode.connect(reverbFilter);
     reverbFilter.connect(feedback2);
     feedback2.connect(reverbNode);
@@ -278,8 +278,8 @@
     const octaveRange = Math.min(Math.floor(melodyStep / pentatonicScale.length), 1);
     const octaveShift = octaveRange * 12;
 
-    // ~15 % chance: drop an octave for tonal colour / keeps things warm
-    const colorShift = Math.random() < 0.15 ? -12 : 0;
+    // ~35 % chance: drop an octave for tonal colour / keeps notes in a warmer register
+    const colorShift = Math.random() < 0.35 ? -12 : 0;
 
     const freq = BASE_FREQ * Math.pow(2, (semitone + octaveShift + colorShift) / 12);
     return { idx: idx % 5, freq, pitchClass: idx % 5 };
@@ -350,7 +350,7 @@
         osc.type = 'sine';
         osc.frequency.setValueAtTime(f, startT);
         g.gain.setValueAtTime(0, startT);
-        g.gain.linearRampToValueAtTime(0.22 - i * 0.03, startT + 0.04);
+        g.gain.linearRampToValueAtTime(0.22 - i * 0.05, startT + 0.04); // upper notes quieter
         g.gain.exponentialRampToValueAtTime(0.001, startT + 1.4);
         osc.connect(g);
         routeToOutput(g, panner);
@@ -843,26 +843,25 @@
       const difficultyProgress = Math.min(score / 2000, 1);
       const currentMaxGap = baseGap + difficultyProgress * maxDifficultyGap;
 
-      // Desktop gets denser platforms: a 28 % smaller gap means ~39 % more
-      // platforms in view at any time, giving the player more path options.
-      const gapMult = isTouch ? 1.0 : 0.72;
+      // On wider screens, shrink the vertical gap proportionally so the total
+      // platform count scales with screen area, keeping horizontal dead zones small.
+      const gapMult = isTouch ? 1.0 : Math.max(0.45, 0.72 * Math.sqrt(900 / Math.max(W, 900)));
       y -= gapMult * (50 + Math.random() * (currentMaxGap - 50));
 
       const w = (65 + Math.random() * 25) * sphereSizeScale;
       let x = Math.random() * (W - w);
 
       // ── Reachability guarantee ──
-      // Physics: after landing on prevP the player launches with vy = JUMP_VEL (-11).
-      // The time to fall back down to height dy above prevP:
-      //   0.16t² - 11t + dy = 0  →  t_land = (11 + √(121 - 0.64·dy)) / 0.32
-      // Maximum horizontal travel in that time at peak vx ≈ 5 px/frame.
+      // Physics: JUMP_VEL = 8.8 px/frame upward, GRAVITY = 0.26 px/frame².
+      // Solve 0.13t² − 8.8t + dy = 0  →  disc = 77.44 − 0.52·dy
+      //   t_land = (8.8 + √disc) / 0.26,  terminal vx ≈ 5.5 px/frame.
       // If the randomly-placed platform is outside that cone, reposition it.
       if (prevP) {
         const dy = prevP.y - y; // px gap upward (always positive here)
-        const disc = 121 - 0.64 * dy;
+        const disc = 77.44 - 0.52 * dy;
         if (disc >= 0) {
-          const tLand    = (11 + Math.sqrt(disc)) / 0.32;       // frames in air
-          const maxHoriz = Math.min(tLand * 5.0, W * 0.49);     // cap at wrap distance
+          const tLand    = (8.8 + Math.sqrt(disc)) / 0.26;      // frames in air
+          const maxHoriz = Math.min(tLand * 5.5, W * 0.49);     // cap at wrap distance
 
           const srcCx   = prevP.x + prevP.w * 0.5;
           const dstCx   = x + w * 0.5;
@@ -873,8 +872,8 @@
           const reachable  = horizDist <= maxHoriz + (prevP.w + w) * 0.5;
 
           if (!reachable) {
-            // Place within a comfortable 75 % of max reach so it never feels borderline.
-            const safeR = Math.min(maxHoriz * 0.75, W * 0.44 - w * 0.5);
+            // Place within 65 % of max reach — conservative enough to avoid borderline cases.
+            const safeR = Math.min(maxHoriz * 0.65, W * 0.44 - w * 0.5);
             x = srcCx + (Math.random() * 2 - 1) * safeR - w * 0.5;
             x = Math.max(0, Math.min(W - w, x));
           }
@@ -1598,7 +1597,7 @@
       fallHistory.push(now);
       // Filter for last 60 seconds
       fallHistory = fallHistory.filter(t => now - t < 60000);
-      if (fallHistory.length > 4) {
+      if (fallHistory.length > 2) {
         // Show chill mode suggestion modal
         document.getElementById('chill-suggestion').classList.add('is-active');
         fallHistory = []; // Reset so it doesn't nag every single fall thereafter
