@@ -128,14 +128,8 @@
       this.x = x; this.y = y; this.vx = vx; this.vy = vy;
       this.color = color; this.life = this.maxLife = life;
       this.size = size; this.active = true;
-      // Trail positions for particle trails
-      this.trail = [];
-      this.trailMax = 3;
     }
     update(dt) {
-      // Store trail position
-      this.trail.unshift({ x: this.x, y: this.y });
-      if (this.trail.length > this.trailMax) this.trail.pop();
       this.x += this.vx * dt;
       this.y += this.vy * dt;
       this.vy += 200 * dt;
@@ -145,26 +139,11 @@
     draw(ctx) {
       const a = Math.max(0, this.life / this.maxLife);
       const sz = this.size * a;
-      // Draw trail
-      for (let i = 0; i < this.trail.length; i++) {
-        const ta = a * (1 - i / this.trail.length) * 0.3;
-        const ts = sz * (1 - i / this.trail.length);
-        if (ts < 0.3) continue;
-        ctx.globalAlpha = ta;
-        ctx.beginPath();
-        ctx.arc(this.trail[i].x, this.trail[i].y, ts, 0, Math.PI * 2);
-        ctx.fillStyle = this.color;
-        ctx.fill();
-      }
-      // Draw particle with glow
       ctx.globalAlpha = a;
-      ctx.shadowColor = this.color;
-      ctx.shadowBlur = Math.min(sz * 3, 12);
       ctx.fillStyle = this.color;
       ctx.beginPath();
       ctx.arc(this.x, this.y, sz, 0, Math.PI * 2);
       ctx.fill();
-      ctx.shadowBlur = 0;
       ctx.globalAlpha = 1;
     }
   }
@@ -187,7 +166,6 @@
             p.vy = Math.sin(angle) * spd;
             p.color = color; p.life = life * (0.5 + Math.random() * 0.5);
             p.maxLife = p.life; p.size = size; p.active = true;
-            p.trail = [];
           }
           continue;
         }
@@ -211,124 +189,8 @@
   }
 
   // ═══════════════════════════════════════════════
-  //  6. AMBIENT PARTICLES (fireflies / dust motes)
+  //  6. SACRED GEOMETRY DRAWING HELPERS
   // ═══════════════════════════════════════════════
-  class AmbientParticles {
-    constructor(count) {
-      this.particles = [];
-      this.count = Math.min(count, 25); // Cap for mobile perf
-      this._init();
-    }
-    _init() {
-      // Lazy init — positions set on first resize
-    }
-    resize(w, h) {
-      if (this.particles.length === 0) {
-        for (let i = 0; i < this.count; i++) {
-          this.particles.push({
-            x: Math.random() * w,
-            y: Math.random() * h,
-            vx: (Math.random() - 0.5) * 15,
-            vy: (Math.random() - 0.5) * 10 - 5,
-            size: 0.5 + Math.random() * 1.5,
-            alpha: 0.1 + Math.random() * 0.2,
-            phase: Math.random() * Math.PI * 2,
-            speed: 0.5 + Math.random() * 1.5,
-          });
-        }
-      }
-    }
-    update(dt, w, h, time) {
-      for (const p of this.particles) {
-        p.x += p.vx * dt + Math.sin(time * p.speed + p.phase) * 0.3;
-        p.y += p.vy * dt;
-        // Wrap around
-        if (p.x < -10) p.x = w + 10;
-        if (p.x > w + 10) p.x = -10;
-        if (p.y < -10) p.y = h + 10;
-        if (p.y > h + 10) p.y = -10;
-      }
-    }
-    draw(ctx, time) {
-      for (const p of this.particles) {
-        const flicker = 0.5 + 0.5 * Math.sin(time * p.speed * 2 + p.phase);
-        ctx.globalAlpha = p.alpha * flicker;
-        ctx.shadowColor = '#fff';
-        ctx.shadowBlur = 4;
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
-    }
-  }
-
-  // ═══════════════════════════════════════════════
-  //  7. FLOATING GEOMETRY (ambient background shapes)
-  // ═══════════════════════════════════════════════
-  class FloatingGeometry {
-    constructor(w, h) {
-      this.shapes = [];
-      const types = ['circle', 'hexagon', 'triangle'];
-      for (let i = 0; i < 7; i++) {
-        this.shapes.push({
-          type: types[i % types.length],
-          x: Math.random() * w,
-          y: Math.random() * h,
-          size: 80 + Math.random() * 200,
-          rotation: Math.random() * Math.PI * 2,
-          rotSpeed: (Math.random() - 0.5) * 0.1,
-          vx: (Math.random() - 0.5) * 8,
-          vy: (Math.random() - 0.5) * 5,
-          alpha: 0.02 + Math.random() * 0.02,
-          sides: [0, 6, 3][i % 3], // 0 = circle
-        });
-      }
-    }
-    update(dt, w, h) {
-      for (const s of this.shapes) {
-        s.x += s.vx * dt;
-        s.y += s.vy * dt;
-        s.rotation += s.rotSpeed * dt;
-        // Wrap
-        if (s.x < -s.size * 2) s.x = w + s.size * 2;
-        if (s.x > w + s.size * 2) s.x = -s.size * 2;
-        if (s.y < -s.size * 2) s.y = h + s.size * 2;
-        if (s.y > h + s.size * 2) s.y = -s.size * 2;
-      }
-    }
-    draw(ctx) {
-      for (const s of this.shapes) {
-        ctx.save();
-        ctx.translate(s.x, s.y);
-        ctx.rotate(s.rotation);
-        ctx.globalAlpha = s.alpha;
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 0.5;
-        if (s.sides === 0) {
-          // Circle
-          ctx.beginPath();
-          ctx.arc(0, 0, s.size, 0, Math.PI * 2);
-          ctx.stroke();
-        } else {
-          // Polygon
-          ctx.beginPath();
-          for (let i = 0; i < s.sides; i++) {
-            const a = (i / s.sides) * Math.PI * 2;
-            const px = Math.cos(a) * s.size;
-            const py = Math.sin(a) * s.size;
-            i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-          }
-          ctx.closePath();
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
-      ctx.globalAlpha = 1;
-    }
-  }
 
   // ═══════════════════════════════════════════════
   //  8. SACRED GEOMETRY DRAWING HELPERS
@@ -386,43 +248,6 @@
       ctx.globalAlpha = 1;
     },
 
-    // Metatron's Cube — 13 circles + connecting lines
-    metatronsCube(ctx, cx, cy, radius, rotation, opacity) {
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(rotation);
-      ctx.globalAlpha = opacity;
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 0.4;
-      // 13 points: center + 2 rings
-      const points = [{ x: 0, y: 0 }];
-      for (let ring = 1; ring <= 2; ring++) {
-        const count = ring === 1 ? 6 : 12;
-        const r = radius * ring * 0.5;
-        for (let i = 0; i < count; i++) {
-          const a = (i / count) * Math.PI * 2 + (ring === 2 ? Math.PI / 6 : 0);
-          points.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
-        }
-      }
-      // Draw circles at each point
-      const circR = radius * 0.3;
-      for (const p of points) {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, circR, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      // Connect all points with lines
-      for (let i = 0; i < points.length; i++) {
-        for (let j = i + 1; j < points.length; j++) {
-          ctx.beginPath();
-          ctx.moveTo(points[i].x, points[i].y);
-          ctx.lineTo(points[j].x, points[j].y);
-          ctx.stroke();
-        }
-      }
-      ctx.restore();
-      ctx.globalAlpha = 1;
-    },
   };
 
   // ═══════════════════════════════════════════════
@@ -468,154 +293,53 @@
     draw(ctx, time, isFever) {
       if (!this.active) return;
       const color = this.getColor();
-      const glow = this.getGlow();
-      let scale = 1;
-      let alpha = 1;
+      let scale = 1, alpha = 1;
       if (this.hit) {
         const t = this.hitTime / this.clearDelay;
-        scale = 1 - t * 0.5;
-        alpha = 1 - t;
+        scale = 1 - t * 0.5; alpha = 1 - t;
       }
-      const pulseSize = 1 + Math.sin(this.pulse) * 0.15;
-      const feverPulse = isFever ? (1 + Math.sin(time * 8) * 0.1) : 1;
-
+      const pulseSize = 1 + Math.sin(this.pulse) * 0.1;
+      const feverPulse = isFever ? (1 + Math.sin(time * 8) * 0.08) : 1;
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.translate(this.x, this.y);
       ctx.scale(scale * pulseSize * feverPulse, scale * pulseSize * feverPulse);
-
-      // Outer glow ring (all pegs)
-      ctx.shadowColor = glow;
-      ctx.shadowBlur = this.type === PEG_TYPES.PURPLE ? 20 : (isFever ? 18 : 12);
+      // Outer ring
       ctx.beginPath();
-      ctx.arc(0, 0, this.radius + 4, 0, Math.PI * 2);
-      ctx.strokeStyle = glow;
-      ctx.lineWidth = 1;
+      ctx.arc(0, 0, this.radius + 3, 0, Math.PI * 2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 0.6;
+      ctx.globalAlpha = alpha * 0.3;
       ctx.stroke();
-      ctx.shadowBlur = 0;
-
-      // Draw shape based on type
+      ctx.globalAlpha = alpha;
+      // Shape — wireframe only
       switch (this.type) {
         case PEG_TYPES.BLUE:
-          this._drawBlue(ctx, color, glow, time);
+          ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+          ctx.strokeStyle = color; ctx.lineWidth = 0.8; ctx.stroke();
+          ctx.beginPath(); ctx.arc(0, 0, this.radius * 0.4, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.4; ctx.stroke();
           break;
         case PEG_TYPES.ACTIVE:
-          this._drawActive(ctx, color, glow, time);
+          SacredGeo.polygon(ctx, 0, 0, this.radius, 6, time * 0.5);
+          ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.stroke();
+          SacredGeo.polygon(ctx, 0, 0, this.radius * 0.45, 6, -time * 0.5);
+          ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 0.5; ctx.stroke();
           break;
         case PEG_TYPES.GREEN:
-          this._drawGreen(ctx, color, glow, time);
+          SacredGeo.polygon(ctx, 0, 0, this.radius, 3, time * 0.7);
+          ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.stroke();
+          SacredGeo.polygon(ctx, 0, 0, this.radius * 0.4, 3, -time * 0.7);
+          ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 0.5; ctx.stroke();
           break;
         case PEG_TYPES.PURPLE:
-          this._drawPurple(ctx, color, glow, time);
+          SacredGeo.star(ctx, 0, 0, this.radius, this.radius * 0.5, 6, time * 0.4);
+          ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.stroke();
+          SacredGeo.star(ctx, 0, 0, this.radius * 0.35, this.radius * 0.18, 6, -time * 0.4);
+          ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 0.5; ctx.stroke();
           break;
       }
-
       ctx.restore();
-    }
-
-    _drawBlue(ctx, color, glow, time) {
-      // Circle with outer ring
-      ctx.shadowColor = glow;
-      ctx.shadowBlur = 10;
-      ctx.beginPath();
-      ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-      ctx.fillStyle = color;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      // Inner ring
-      ctx.beginPath();
-      ctx.arc(0, 0, this.radius * 0.5, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
-      // Highlight
-      ctx.beginPath();
-      ctx.arc(-2, -2, this.radius * 0.35, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.fill();
-    }
-
-    _drawActive(ctx, color, glow, time) {
-      const rot = time * 0.5;
-      // Hexagon shape
-      ctx.shadowColor = glow;
-      ctx.shadowBlur = 16;
-      SacredGeo.polygon(ctx, 0, 0, this.radius, 6, rot);
-      ctx.fillStyle = color;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      // Inner hexagon (rotated)
-      SacredGeo.polygon(ctx, 0, 0, this.radius * 0.5, 6, -rot);
-      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
-      // Highlight
-      ctx.beginPath();
-      ctx.arc(-2, -2, this.radius * 0.3, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.fill();
-    }
-
-    _drawGreen(ctx, color, glow, time) {
-      const rot = time * 0.7;
-      // Triangle shape
-      ctx.shadowColor = glow;
-      ctx.shadowBlur = 14;
-      SacredGeo.polygon(ctx, 0, 0, this.radius, 3, rot);
-      ctx.fillStyle = color;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      // Inner triangle (opposite rotation)
-      SacredGeo.polygon(ctx, 0, 0, this.radius * 0.45, 3, -rot);
-      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
-      // Shimmer trail arc
-      if (!this.hit) {
-        const shimA = time * 4;
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius + 3, shimA, shimA + 1);
-        ctx.strokeStyle = 'rgba(66,255,136,0.5)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
-      // Highlight
-      ctx.beginPath();
-      ctx.arc(-1, -2, this.radius * 0.25, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.fill();
-    }
-
-    _drawPurple(ctx, color, glow, time) {
-      const rot = time * 0.4;
-      // Star shape (6 pointed)
-      ctx.shadowColor = glow;
-      ctx.shadowBlur = 20;
-      SacredGeo.star(ctx, 0, 0, this.radius, this.radius * 0.5, 6, rot);
-      ctx.fillStyle = color;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      // Inner star
-      SacredGeo.star(ctx, 0, 0, this.radius * 0.4, this.radius * 0.2, 6, -rot);
-      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
-      // Orbiting sparkles
-      if (!this.hit) {
-        for (let i = 0; i < 5; i++) {
-          const a = time * 2.5 + i * (Math.PI * 2 / 5);
-          const r = this.radius + 6 + Math.sin(time * 3 + i) * 2;
-          ctx.beginPath();
-          ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 1.5, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(200,66,255,0.6)';
-          ctx.fill();
-        }
-      }
-      // Highlight
-      ctx.beginPath();
-      ctx.arc(-1, -2, this.radius * 0.25, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,255,255,0.3)';
-      ctx.fill();
     }
   }
 
@@ -778,7 +502,6 @@
       this.active = true;
       this.trail = [];
       this.offscreen = false;
-      this.sparkleTimer = 0;
     }
     update(dt) {
       this.vy += Config.GRAVITY * dt;
@@ -788,71 +511,35 @@
       this.y += this.vy * dt;
       this.trail.unshift({ x: this.x, y: this.y });
       if (this.trail.length > Config.TRAIL_LENGTH) this.trail.pop();
-      this.sparkleTimer += dt;
     }
     draw(ctx, color, theme, time, isFever) {
-      const glowSize = isFever ? 25 : 15;
-      const trailMaxWidth = isFever ? 14 : 10;
-
-      // Trail with hue shift and glow
+      // Trail — simple line
       if (this.trail.length > 1) {
         for (let i = 1; i < this.trail.length; i++) {
           const a = 1 - i / this.trail.length;
-          const width = trailMaxWidth * a;
+          const width = 6 * a;
           if (width < 0.5) continue;
-          // Shift color through theme along the trail
-          const colorIdx = Math.floor((i / this.trail.length) * 3);
-          const trailColor = isFever ? theme.color(colorIdx) : color;
-          const rgb = this._colorToRgb(trailColor);
+          const trailColor = isFever ? theme.color(Math.floor((i / this.trail.length) * 3)) : color;
           ctx.beginPath();
           ctx.moveTo(this.trail[i-1].x, this.trail[i-1].y);
           ctx.lineTo(this.trail[i].x, this.trail[i].y);
-          ctx.strokeStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},${a * 0.7})`;
+          ctx.strokeStyle = trailColor;
+          ctx.globalAlpha = a * 0.6;
           ctx.lineWidth = width;
           ctx.lineCap = 'round';
-          ctx.shadowColor = trailColor;
-          ctx.shadowBlur = isFever ? 12 : 6;
           ctx.stroke();
-          ctx.shadowBlur = 0;
+          ctx.globalAlpha = 1;
         }
       }
-
       // Ball
-      ctx.shadowColor = isFever ? '#fff' : color;
-      ctx.shadowBlur = glowSize;
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
       ctx.fillStyle = '#fff';
       ctx.fill();
-      ctx.shadowBlur = 0;
-
-      // Inner glow
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.radius * 0.6, 0, Math.PI * 2);
       ctx.fillStyle = color;
       ctx.fill();
-
-      // Rainbow ring during fever
-      if (isFever) {
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius + 3, 0, Math.PI * 2);
-        const hue = (time * 360) % 360;
-        ctx.strokeStyle = `hsla(${hue}, 100%, 70%, 0.6)`;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
-    }
-
-    _colorToRgb(color) {
-      // Handle both rgb() and hex formats
-      if (color.startsWith('#')) {
-        const r = parseInt(color.slice(1,3),16);
-        const g = parseInt(color.slice(3,5),16);
-        const b = parseInt(color.slice(5,7),16);
-        return { r, g, b };
-      }
-      const m = color.match(/(\d+)/g);
-      return m ? { r: +m[0], g: +m[1], b: +m[2] } : { r: 255, g: 255, b: 255 };
     }
   }
 
@@ -862,157 +549,122 @@
   class Launcher {
     constructor(canvas) {
       this.x = canvas.width / 2;
-      this.y = 70;
+      this.y = 65;
       this.angle = Math.PI / 2;
       this.canvas = canvas;
-      this.faceSize = 36;
+      this.s = 32;
       this._eyeTrackX = 0;
-      this._eyeTrackY = 0.4;
+      this._eyeTrackY = 0.3;
     }
     updateAngle(ax, ay, pointerX, pointerY) {
       if (ay < 0.05) return;
       this.angle = Math.atan2(ay, ax);
       if (this.angle < 0.1) this.angle = 0.1;
       if (this.angle > Math.PI - 0.1) this.angle = Math.PI - 0.1;
-      const lx = this.x, ly = this.y;
-      const dx = pointerX - lx, dy = pointerY - ly;
+      const dx = pointerX - this.x, dy = pointerY - this.y;
       const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-      const maxOff = 4;
-      const tx = (dx / dist) * Math.min(maxOff, dist * 0.02);
-      const ty = (dy / dist) * Math.min(maxOff, dist * 0.02);
-      this._eyeTrackX += (tx - this._eyeTrackX) * 0.15;
-      this._eyeTrackY += (ty - this._eyeTrackY) * 0.15;
+      const maxOff = 3.5;
+      const tx = (dx / dist) * Math.min(maxOff, dist * 0.015);
+      const ty = (dy / dist) * Math.min(maxOff, dist * 0.015);
+      this._eyeTrackX += (tx - this._eyeTrackX) * 0.12;
+      this._eyeTrackY += (ty - this._eyeTrackY) * 0.12;
     }
     draw(ctx, color, time) {
-      const x = this.x, y = this.y, s = this.faceSize;
+      const x = this.x, y = this.y, s = this.s;
       ctx.save();
-      // Outer aura
-      const auraR = s * 1.6 + Math.sin(time * 1.5) * 3;
-      const auraGrad = ctx.createRadialGradient(x, y, s * 0.5, x, y, auraR);
-      auraGrad.addColorStop(0, color.replace(')', ',0.08)').replace('rgb', 'rgba'));
-      auraGrad.addColorStop(0.6, color.replace(')', ',0.03)').replace('rgb', 'rgba'));
-      auraGrad.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = auraGrad;
-      ctx.beginPath(); ctx.arc(x, y, auraR, 0, Math.PI * 2); ctx.fill();
       // Rotating outer ring
       ctx.save(); ctx.translate(x, y); ctx.rotate(time * 0.3);
-      ctx.strokeStyle = color.replace(')', ',0.2)').replace('rgb', 'rgba');
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(0, 0, s * 1.15, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = color; ctx.globalAlpha = 0.15; ctx.lineWidth = 0.6;
+      ctx.beginPath(); ctx.arc(0, 0, s * 1.2, 0, Math.PI * 2); ctx.stroke();
       for (let i = 0; i < 6; i++) {
         const a = (i / 6) * Math.PI * 2;
-        ctx.beginPath(); ctx.arc(Math.cos(a) * s * 1.15, Math.sin(a) * s * 1.15, 2, 0, Math.PI * 2);
-        ctx.fillStyle = color.replace(')', ',0.4)').replace('rgb', 'rgba'); ctx.fill();
+        ctx.beginPath(); ctx.arc(Math.cos(a) * s * 1.2, Math.sin(a) * s * 1.2, 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = color; ctx.fill();
       }
       ctx.restore();
-      // Face outline — rounded hexagonal head
-      ctx.save(); ctx.translate(x, y);
-      ctx.shadowColor = color; ctx.shadowBlur = 18;
-      ctx.beginPath();
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
-        const r = s * (0.85 + Math.sin(time * 2 + i) * 0.03);
-        i === 0 ? ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r) : ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-      }
-      ctx.closePath();
-      const headGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, s);
-      headGrad.addColorStop(0, color.replace(')', ',0.15)').replace('rgb', 'rgba'));
-      headGrad.addColorStop(0.7, color.replace(')', ',0.08)').replace('rgb', 'rgba'));
-      headGrad.addColorStop(1, color.replace(')', ',0.03)').replace('rgb', 'rgba'));
-      ctx.fillStyle = headGrad; ctx.fill();
-      ctx.strokeStyle = color.replace(')', ',0.5)').replace('rgb', 'rgba');
-      ctx.lineWidth = 1.5; ctx.stroke();
-      ctx.shadowBlur = 0;
-      // Third eye
-      const thirdPulse = 1 + Math.sin(time * 3) * 0.15;
-      ctx.beginPath(); ctx.arc(0, -s * 0.35, 4 * thirdPulse, 0, Math.PI * 2);
-      ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 12; ctx.fill(); ctx.shadowBlur = 0;
-      ctx.beginPath(); ctx.arc(0, -s * 0.35, 6 * thirdPulse, 0, Math.PI * 2);
-      ctx.strokeStyle = color.replace(')', ',0.3)').replace('rgb', 'rgba');
-      ctx.lineWidth = 0.8; ctx.stroke();
-      // Eyes
-      const eyeSpacing = s * 0.38, eyeY = -s * 0.05, eyeW = s * 0.32, eyeH = s * 0.4, pupilR = s * 0.13;
+      // Head — wireframe hexagon
+      ctx.save(); ctx.translate(x, y); ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = color; ctx.lineWidth = 1;
+      SacredGeo.polygon(ctx, 0, 0, s * 0.9, 6, -Math.PI / 2 + time * 0.1);
+      ctx.stroke();
+      // Inner hexagon (counter-rotate)
+      ctx.globalAlpha = 0.12;
+      SacredGeo.polygon(ctx, 0, 0, s * 0.55, 6, Math.PI / 6 - time * 0.15);
+      ctx.stroke();
+      // Third eye — dot + ring
+      ctx.globalAlpha = 0.7;
+      const tp = 1 + Math.sin(time * 3) * 0.2;
+      ctx.beginPath(); ctx.arc(0, -s * 0.32, 2.5 * tp, 0, Math.PI * 2);
+      ctx.fillStyle = color; ctx.fill();
+      ctx.globalAlpha = 0.25;
+      ctx.beginPath(); ctx.arc(0, -s * 0.32, 5 * tp, 0, Math.PI * 2);
+      ctx.strokeStyle = color; ctx.lineWidth = 0.5; ctx.stroke();
+      // Eyes — wireframe circles with tracked pupils
+      const eyeSpacing = s * 0.35, eyeY = -s * 0.02;
       for (const side of [-1, 1]) {
         const ex = side * eyeSpacing;
-        ctx.beginPath(); ctx.ellipse(ex, eyeY, eyeW, eyeH, 0, 0, Math.PI * 2);
-        const eyeGrad = ctx.createRadialGradient(ex, eyeY, 0, ex, eyeY, eyeH);
-        eyeGrad.addColorStop(0, 'rgba(20,10,40,0.9)');
-        eyeGrad.addColorStop(0.8, color.replace(')', ',0.2)').replace('rgb', 'rgba'));
-        eyeGrad.addColorStop(1, color.replace(')', ',0.1)').replace('rgb', 'rgba'));
-        ctx.fillStyle = eyeGrad; ctx.fill();
-        ctx.strokeStyle = color.replace(')', ',0.5)').replace('rgb', 'rgba');
-        ctx.lineWidth = 1.2; ctx.stroke();
+        // Eye outline
+        ctx.globalAlpha = 0.45;
+        ctx.beginPath(); ctx.arc(ex, eyeY, s * 0.25, 0, Math.PI * 2);
+        ctx.strokeStyle = color; ctx.lineWidth = 0.8; ctx.stroke();
+        // Iris ring
         const ix = ex + this._eyeTrackX, iy = eyeY + this._eyeTrackY;
-        ctx.beginPath(); ctx.arc(ix, iy, pupilR * 1.3, 0, Math.PI * 2);
-        ctx.fillStyle = color.replace(')', ',0.4)').replace('rgb', 'rgba');
-        ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.fill(); ctx.shadowBlur = 0;
-        ctx.beginPath(); ctx.arc(ix, iy, pupilR, 0, Math.PI * 2);
-        ctx.fillStyle = '#0a0a0f'; ctx.fill();
-        ctx.beginPath(); ctx.arc(ix - pupilR * 0.3, iy - pupilR * 0.3, pupilR * 0.3, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fill();
-        ctx.beginPath(); ctx.arc(ix, iy, pupilR * 1.8, 0, Math.PI * 2);
-        ctx.strokeStyle = color.replace(')', ',0.15)').replace('rgb', 'rgba');
-        ctx.lineWidth = 0.6; ctx.stroke();
+        ctx.globalAlpha = 0.3;
+        ctx.beginPath(); ctx.arc(ix, iy, s * 0.13, 0, Math.PI * 2);
+        ctx.strokeStyle = color; ctx.lineWidth = 0.6; ctx.stroke();
+        // Pupil — filled dot
+        ctx.globalAlpha = 0.8;
+        ctx.beginPath(); ctx.arc(ix, iy, 2, 0, Math.PI * 2);
+        ctx.fillStyle = color; ctx.fill();
+        // Crosshair in eye
+        ctx.globalAlpha = 0.1;
+        ctx.beginPath(); ctx.moveTo(ex - s * 0.2, eyeY); ctx.lineTo(ex + s * 0.2, eyeY);
+        ctx.moveTo(ex, eyeY - s * 0.2); ctx.lineTo(ex, eyeY + s * 0.2);
+        ctx.strokeStyle = color; ctx.lineWidth = 0.3; ctx.stroke();
       }
-      // Mouth — serene curve
-      ctx.beginPath(); ctx.moveTo(-s * 0.15, s * 0.35);
-      ctx.quadraticCurveTo(0, s * 0.42, s * 0.15, s * 0.35);
-      ctx.strokeStyle = color.replace(')', ',0.25)').replace('rgb', 'rgba');
-      ctx.lineWidth = 1; ctx.stroke();
-      // Inner sacred geometry — Star of David
-      ctx.strokeStyle = color.replace(')', ',0.06)').replace('rgb', 'rgba');
-      ctx.lineWidth = 0.5;
-      ctx.beginPath();
-      for (let i = 0; i < 3; i++) {
-        const a = (i / 3) * Math.PI * 2 - Math.PI / 2 + time * 0.2;
-        i === 0 ? ctx.moveTo(Math.cos(a) * s * 0.6, Math.sin(a) * s * 0.6) : ctx.lineTo(Math.cos(a) * s * 0.6, Math.sin(a) * s * 0.6);
-      } ctx.closePath(); ctx.stroke();
-      ctx.beginPath();
-      for (let i = 0; i < 3; i++) {
-        const a = (i / 3) * Math.PI * 2 + Math.PI / 2 + time * 0.2;
-        i === 0 ? ctx.moveTo(Math.cos(a) * s * 0.5, Math.sin(a) * s * 0.5) : ctx.lineTo(Math.cos(a) * s * 0.5, Math.sin(a) * s * 0.5);
-      } ctx.closePath(); ctx.stroke();
+      // Mouth — thin line
+      ctx.globalAlpha = 0.2;
+      ctx.beginPath(); ctx.moveTo(-s * 0.12, s * 0.32);
+      ctx.lineTo(s * 0.12, s * 0.32);
+      ctx.strokeStyle = color; ctx.lineWidth = 0.6; ctx.stroke();
+      // Connecting lines from third eye to each eye
+      ctx.globalAlpha = 0.06;
+      ctx.beginPath(); ctx.moveTo(0, -s * 0.32); ctx.lineTo(-eyeSpacing, eyeY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -s * 0.32); ctx.lineTo(eyeSpacing, eyeY); ctx.stroke();
       ctx.restore();
-      // Nozzle from chin
-      this._drawNozzle(ctx, color, time);
+      // Nozzle
+      this._drawNozzle(ctx, color);
       // Aim line
       this._drawAimLine(ctx, color, time);
     }
-    _drawNozzle(ctx, color, time) {
-      const x = this.x, nozzleStartY = this.y + this.faceSize * 0.5;
-      const nozzleLen = 16;
-      const nx = x + Math.cos(this.angle) * nozzleLen;
+    _drawNozzle(ctx, color) {
+      const nozzleStartY = this.y + this.s * 0.4;
+      const nozzleLen = 14;
+      const nx = this.x + Math.cos(this.angle) * nozzleLen;
       const ny = nozzleStartY + Math.sin(this.angle) * nozzleLen;
-      ctx.save();
-      ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.lineCap = 'round';
-      ctx.shadowColor = color; ctx.shadowBlur = 12;
-      ctx.beginPath(); ctx.moveTo(x, nozzleStartY); ctx.lineTo(nx, ny); ctx.stroke();
-      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 0.6;
+      ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(this.x, nozzleStartY); ctx.lineTo(nx, ny); ctx.stroke();
+      // Tip diamond
       ctx.save(); ctx.translate(nx, ny); ctx.rotate(this.angle);
-      ctx.beginPath(); ctx.moveTo(5, 0); ctx.lineTo(0, -3); ctx.lineTo(-3, 0); ctx.lineTo(0, 3); ctx.closePath();
-      ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.fill(); ctx.shadowBlur = 0;
-      ctx.restore(); ctx.restore();
+      ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(0, -2.5); ctx.lineTo(-2, 0); ctx.lineTo(0, 2.5); ctx.closePath();
+      ctx.fillStyle = color; ctx.globalAlpha = 0.5; ctx.fill();
+      ctx.restore();
+      ctx.globalAlpha = 1;
     }
     _drawAimLine(ctx, color, time) {
-      const x = this.x, y = this.y + this.faceSize * 0.5;
-      const len = 100, segments = 10;
-      for (let i = 1; i <= segments; i++) {
-        const t = i / segments;
-        const px = x + Math.cos(this.angle) * (20 + len * t);
-        const py = y + Math.sin(this.angle) * (20 + len * t);
-        const a = (1 - t) * 0.3;
-        const pulse = 1 + Math.sin(time * 4 - i * 0.5) * 0.3;
-        ctx.save(); ctx.translate(px, py); ctx.rotate(time * 2 + i);
-        ctx.fillStyle = color.replace(')', `,${a})`).replace('rgb', 'rgba');
-        if (i % 2 === 0) {
-          const sz = 2 * pulse;
-          ctx.beginPath(); ctx.moveTo(0, -sz); ctx.lineTo(sz, 0); ctx.lineTo(0, sz); ctx.lineTo(-sz, 0);
-          ctx.closePath(); ctx.fill();
-        } else {
-          ctx.beginPath(); ctx.arc(0, 0, 1.5 * pulse, 0, Math.PI * 2); ctx.fill();
-        }
-        ctx.restore();
+      const startX = this.x, startY = this.y + this.s * 0.4;
+      for (let i = 1; i <= 8; i++) {
+        const t = i / 8;
+        const px = startX + Math.cos(this.angle) * (18 + 90 * t);
+        const py = startY + Math.sin(this.angle) * (18 + 90 * t);
+        ctx.globalAlpha = (1 - t) * 0.2;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(px, py, 1.2, 0, Math.PI * 2);
+        ctx.fill();
       }
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -1115,24 +767,15 @@
       }
       ctx.globalAlpha = 1;
 
-      // Sacred geometry — Flower of Life (layer 1, slow rotation)
+      // Sacred geometry — single Flower of Life layer
       const geoSize = Math.min(this.w, this.h) * 0.4;
-      SacredGeo.flowerOfLife(ctx, this.w / 2, this.h / 2, geoSize * 0.2, 3, time * 0.02, 0.03 + this.progress * 0.02);
+      SacredGeo.flowerOfLife(ctx, this.w / 2, this.h / 2, geoSize * 0.18, 2, time * 0.02, 0.025);
 
-      // Sacred geometry — Metatron's Cube (layer 2, different speed)
-      SacredGeo.metatronsCube(ctx, this.w / 2, this.h / 2, geoSize, time * -0.015, 0.025 + this.progress * 0.015);
-
-      // Second Flower of Life offset (layer 3)
-      SacredGeo.flowerOfLife(ctx, this.w * 0.35, this.h * 0.45, geoSize * 0.15, 2, time * 0.03, 0.02);
-      SacredGeo.flowerOfLife(ctx, this.w * 0.65, this.h * 0.55, geoSize * 0.12, 2, -time * 0.025, 0.02);
-
-      // Ambient glow based on progress
-      const grad = ctx.createRadialGradient(this.w/2, this.h/2, 0, this.w/2, this.h/2, this.w * 0.6);
-      const c = theme.color(0);
-      grad.addColorStop(0, theme.hexToRGBA(c, 0.03 + this.progress * 0.05));
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = grad;
+      // Subtle center glow
+      ctx.globalAlpha = 0.04 + this.progress * 0.04;
+      ctx.fillStyle = theme.color(0);
       ctx.fillRect(0, 0, this.w, this.h);
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -1235,8 +878,6 @@
       this.camera = new Camera(this.canvas.width, this.canvas.height);
       this.background = new Background(this.canvas.width, this.canvas.height);
       this.audio = new Audio();
-      this.ambientParticles = new AmbientParticles(25);
-      this.floatingGeo = new FloatingGeometry(this.canvas.width, this.canvas.height);
 
       this.state = 'idle';
       this.level = 1;
@@ -1277,13 +918,11 @@
       this.W = window.innerWidth;
       this.H = window.innerHeight;
       this.launcher.x = this.W / 2;
-      this.launcher.y = 50;
+      this.launcher.y = 65;
       this.bucket.y = this.H - 40;
       this.camera.reset(this.W, this.H);
       this.background.w = this.W;
       this.background.h = this.H;
-      this.ambientParticles.resize(this.W, this.H);
-      this.floatingGeo = new FloatingGeometry(this.W, this.H);
     }
 
     start() {
@@ -1379,21 +1018,9 @@
         }
       }
 
-      // Ball sparkle particles
-      if (this.ball && this.ball.active && this.ball.sparkleTimer > 0.05) {
-        this.ball.sparkleTimer = 0;
-        const isFever = this.state === 'fever';
-        const sparkColor = isFever ? this.theme.randomColor() : this.aimColor;
-        this.particles.burst(this.ball.x, this.ball.y, sparkColor, 1, 30, 0.3, 1.5);
-      }
-
       for (const peg of this.pegs) peg.update(dt);
       this.particles.update(dt);
       this.camera.update(dt);
-
-      // Ambient systems
-      this.ambientParticles.update(dt, this.W, this.H, this.time);
-      this.floatingGeo.update(dt, this.W, this.H);
 
       const activeTotal = this.pegs.filter(p => p.type === PEG_TYPES.ACTIVE).length;
       const activeHit = this.pegs.filter(p => p.type === PEG_TYPES.ACTIVE && p.hit).length;
@@ -1429,7 +1056,7 @@
       const speed = Config.BALL_SPEED;
       const vx = Math.cos(this.launcher.angle) * speed;
       const vy = Math.sin(this.launcher.angle) * speed;
-      this.ball = new Ball(this.launcher.x, this.launcher.y + this.launcher.faceSize * 0.5 + 16, vx, vy);
+      this.ball = new Ball(this.launcher.x, this.launcher.y + this.launcher.s * 0.5 + 16, vx, vy);
       this.state = 'shooting';
       this.pegsHitThisShot = 0;
       this.pegHitsThisShot = [];
@@ -1584,12 +1211,6 @@
       // Background
       this.background.draw(ctx, this.time, this.theme);
 
-      // Floating geometry (behind everything)
-      this.floatingGeo.draw(ctx);
-
-      // Ambient particles
-      this.ambientParticles.draw(ctx, this.time);
-
       ctx.save();
       this.camera.apply(ctx, this.W, this.H);
 
@@ -1638,19 +1259,13 @@
 
         // Radial glow around ball
         if (this.ball) {
-          const grad = ctx.createRadialGradient(this.ball.x, this.ball.y, 0, this.ball.x, this.ball.y, 120);
-          grad.addColorStop(0, 'rgba(255,180,80,0.15)');
-          grad.addColorStop(1, 'rgba(0,0,0,0)');
-          ctx.fillStyle = grad;
-          ctx.fillRect(0, 0, this.W, this.H);
+          ctx.globalAlpha = 0.1;
+          ctx.fillStyle = '#ffb450';
+          ctx.beginPath();
+          ctx.arc(this.ball.x, this.ball.y, 40, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
         }
-
-        // Vignette glow
-        const vigGrad = ctx.createRadialGradient(this.W/2, this.H/2, this.W * 0.3, this.W/2, this.H/2, this.W * 0.7);
-        vigGrad.addColorStop(0, 'rgba(0,0,0,0)');
-        vigGrad.addColorStop(1, this.theme.hexToRGBA(this.theme.color(0), 0.12));
-        ctx.fillStyle = vigGrad;
-        ctx.fillRect(0, 0, this.W, this.H);
       }
 
       // White flash (level complete cascade start)
@@ -1677,42 +1292,15 @@
 
     _drawBucket(ctx) {
       const b = this.bucket;
-      const pulse = 1 + Math.sin(this.time * 4) * 0.1;
-
-      // Glowing crescent/arc shape
-      ctx.save();
-      ctx.translate(b.x, b.y);
-      ctx.scale(pulse, pulse);
-
-      // Arc shape
       ctx.beginPath();
-      ctx.arc(0, 0, b.w / 2, 0, Math.PI);
-      ctx.strokeStyle = 'rgba(66,255,136,0.7)';
-      ctx.lineWidth = 3;
-      ctx.shadowColor = 'rgba(66,255,136,0.5)';
-      ctx.shadowBlur = 15;
+      ctx.arc(b.x, b.y, b.w / 2, 0, Math.PI);
+      ctx.strokeStyle = 'rgba(66,255,136,0.5)';
+      ctx.lineWidth = 2;
       ctx.stroke();
-      ctx.shadowBlur = 0;
-
-      // Inner glow
-      ctx.beginPath();
-      ctx.arc(0, 0, b.w / 2 - 5, 0.2, Math.PI - 0.2);
-      ctx.strokeStyle = 'rgba(66,255,136,0.3)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      ctx.restore();
-
-      // Sparkle particles around bucket
-      if (Math.random() < 0.3) {
-        const sx = b.x + (Math.random() - 0.5) * b.w;
-        const sy = b.y + Math.random() * 10 - 5;
-        this.particles.burst(sx, sy, 'rgba(66,255,136,0.8)', 1, 20, 0.4, 1);
-      }
     }
 
     _drawGuide(ctx) {
-      let x = this.launcher.x, y = this.launcher.y + this.launcher.faceSize * 0.5 + 16;
+      let x = this.launcher.x, y = this.launcher.y + this.launcher.s * 0.5 + 16;
       let vx = Math.cos(this.launcher.angle) * Config.BALL_SPEED;
       let vy = Math.sin(this.launcher.angle) * Config.BALL_SPEED;
       const simDt = 1/60;
