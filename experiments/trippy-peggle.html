@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/jpeg" href="../assets/favicon.jpg">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Trippy Peggle — Psychedelic Pachinko Game — trippy.ch</title>
+  <meta name="description" content="A psychedelic pachinko-style peg-clearing game. Aim, shoot, and clear the void with neon physics and particle explosions.">
+
+  <!-- Open Graph -->
+  <meta property="og:type"        content="website">
+  <meta property="og:url"         content="https://trippy.ch/experiments/trippy-peggle.html">
+  <meta property="og:title"       content="Trippy Peggle — Psychedelic Pachinko Game">
+  <meta property="og:description" content="A psychedelic pachinko-style peg-clearing game. Aim, shoot, and clear the void with neon physics and particle explosions.">
+  <meta property="og:image"       content="https://trippy.ch/assets/og-preview.jpg">
+
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <style>
+    html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#0a0a0f;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+    *{-webkit-tap-highlight-color:transparent;tap-highlight-color:transparent}
+    button,a{outline:none}
+    #c{position:fixed;inset:0;width:100%;height:100%;display:block}
+    .top-controls{position:fixed;top:1rem;right:1rem;z-index:200;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:0.5rem;align-items:center;max-width:calc(100vw - 2rem)}
+    .ctrl-btn{width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.4);color:rgba(255,255,255,0.5);font-size:0.9rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color 0.3s,color 0.3s,box-shadow 0.3s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-family:inherit;user-select:none;outline:none;-webkit-tap-highlight-color:transparent}
+    .ctrl-btn:hover{border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.8)}
+    .ctrl-btn.is-on{color:rgba(180,140,255,0.9);border-color:rgba(180,140,255,0.4);box-shadow:0 0 15px rgba(140,100,255,0.2)}
+    .ctrl-btn-sound{width:48px!important;height:48px!important;font-size:1.2rem!important;border-color:rgba(180,140,255,0.3)!important;color:rgba(200,180,255,0.85)!important;box-shadow:0 0 12px rgba(140,100,255,0.15)!important}
+    #theme-btn,#mute-btn,#info-btn{position:static!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;width:44px!important;height:44px!important;border-radius:50%!important;font-size:0.9rem!important;animation:none!important}
+    .back-link{position:fixed;top:1rem;left:1rem;z-index:200;font-size:0.85rem;color:rgba(255,255,255,0.3);text-decoration:none;letter-spacing:0.05em;transition:color 0.25s;backdrop-filter:blur(6px);background:rgba(0,0,0,0.3);padding:0.6rem 1rem;border-radius:20px;border:1px solid rgba(255,255,255,0.06);min-height:44px;min-width:44px;display:inline-flex;align-items:center}
+    .back-link:hover{color:rgba(180,140,255,0.8)}
+    .bottom-left{position:fixed;bottom:1.5rem;left:1.5rem;z-index:200;pointer-events:none}
+    .exp-tag{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.18em;color:rgba(140,100,255,0.5);margin-bottom:0.15rem}
+    .exp-title{font-size:1.1rem;font-weight:200;letter-spacing:0.12em;color:rgba(255,255,255,0.6);text-shadow:0 0 20px rgba(140,100,255,0.2);margin:0}
+    .info-panel{position:fixed;top:0;right:0;width:min(420px,100vw);height:100%;background:rgba(8,8,14,0.96);backdrop-filter:blur(25px);border-left:1px solid rgba(140,100,255,0.15);z-index:500;transform:translateX(100%);transition:transform 0.4s cubic-bezier(0.25,0,0,1);overflow-y:auto;padding:2rem 1.75rem;box-sizing:border-box}
+    .info-panel.is-open{transform:translateX(0)}
+    .info-panel h2{font-size:0.75rem;text-transform:uppercase;letter-spacing:0.15em;color:rgba(140,100,255,0.7);margin:1.8rem 0 0.8rem;font-weight:400;border-bottom:1px solid rgba(140,100,255,0.1);padding-bottom:0.3rem}
+    .info-panel h2:first-of-type{margin-top:0.5rem}
+    .info-panel p{font-size:0.88rem;line-height:1.7;color:rgba(255,255,255,0.45);margin:0 0 1rem}
+    .panel-title{font-size:1.5rem;font-weight:200;letter-spacing:0.1em;color:rgba(255,255,255,0.8);margin-bottom:0.2rem}
+    .panel-tag{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.15em;color:rgba(140,100,255,0.6);margin-bottom:1.2rem;display:block}
+    .close-panel{position:absolute;top:1rem;right:1rem;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(255,255,255,0.3);font-size:1.2rem;border:none;background:none;transition:color 0.2s}
+    .close-panel:hover{color:rgba(255,255,255,0.7)}
+    .hint-row{display:flex;align-items:baseline;gap:0.5rem;margin-bottom:0.4rem}
+    .hint-icon{font-size:1rem;flex-shrink:0;width:1.4rem;text-align:center}
+    .hint-text{font-size:0.82rem;color:rgba(255,255,255,0.4);line-height:1.5}
+    .peg-legend{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.35rem}
+    .peg-legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+    .peg-legend-text{font-size:0.8rem;color:rgba(255,255,255,0.4);line-height:1.5}
+    .source-link{display:inline-block;font-size:0.75rem;color:rgba(255,255,255,0.2);text-decoration:none;margin-top:0.5rem;transition:color 0.25s}
+    .source-link:hover{color:rgba(140,100,255,0.6)}
+    .panel-overlay{position:fixed;inset:0;z-index:499;display:none}
+    .panel-overlay.is-active{display:block}
+    .journey-entry{display:flex;gap:0.75rem;margin-bottom:0.65rem;align-items:flex-start}
+    .journey-icon{width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:rgba(140,100,255,0.5);margin-top:2px}
+    .journey-entry-text{font-size:0.8rem;line-height:1.55;color:rgba(255,255,255,0.38)}
+    .journey-entry-text strong{color:rgba(255,255,255,0.6);font-weight:400}
+
+    /* Screen overlays */
+    .screen-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.8s;
+    }
+    .screen-overlay.is-active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    /* Start screen */
+    #start-screen{z-index:250;background:rgba(8,6,15,0.9);backdrop-filter:blur(8px)}
+    #start-screen h2{font-size:clamp(1.6rem,6vw,2.2rem);font-weight:200;letter-spacing:0.2em;color:rgba(255,255,255,0.8);margin:0 0 0.3rem;text-shadow:0 0 30px rgba(140,100,255,0.3)}
+    #start-screen .sub{font-size:clamp(0.65rem,2vw,0.75rem);color:rgba(140,100,255,0.5);letter-spacing:0.15em;text-transform:uppercase;margin-bottom:2rem}
+    #start-btn{padding:1rem 2.5rem;border:1px solid rgba(140,100,255,0.4);border-radius:30px;background:rgba(140,100,255,0.1);color:rgba(200,180,255,0.9);font-size:clamp(0.9rem,2.5vw,1rem);cursor:pointer;letter-spacing:0.12em;transition:all 0.3s;font-family:inherit;backdrop-filter:blur(8px);min-height:52px}
+    #start-btn:hover{background:rgba(140,100,255,0.2);box-shadow:0 0 25px rgba(140,100,255,0.3);color:#fff}
+    #start-hint{margin-top:1rem;font-size:clamp(0.65rem,2vw,0.7rem);color:rgba(255,255,255,0.25);letter-spacing:0.1em}
+
+    /* Game over overlay */
+    #game-over{z-index:300;background:rgba(8,6,15,0.85);backdrop-filter:blur(12px)}
+    #game-over h2{font-size:clamp(1.4rem,5vw,2rem);font-weight:200;letter-spacing:0.15em;color:rgba(255,255,255,0.8);margin:0 0 0.5rem}
+    #game-over .score-display{font-size:clamp(2.5rem,10vw,3.5rem);font-weight:100;letter-spacing:0.1em;margin:0.5rem 0;text-shadow:0 0 30px rgba(140,100,255,0.4)}
+    #game-over .high-score{font-size:clamp(0.75rem,2.5vw,0.85rem);color:rgba(140,100,255,0.6);margin-bottom:1.5rem;letter-spacing:0.1em}
+    #play-again{padding:0.85rem 2.2rem;border:1px solid rgba(140,100,255,0.6);border-radius:30px;background:rgba(140,100,255,0.2);color:rgba(220,200,255,0.95);font-size:clamp(0.85rem,2.5vw,0.9rem);cursor:pointer;letter-spacing:0.1em;transition:all 0.3s;font-family:inherit;backdrop-filter:blur(8px);min-height:48px}
+    #play-again:hover{background:rgba(140,100,255,0.35);box-shadow:0 0 25px rgba(140,100,255,0.4);color:#fff}
+
+    /* Level complete overlay */
+    #level-complete{z-index:300;background:rgba(8,6,15,0.85);backdrop-filter:blur(12px)}
+    #level-complete h2{font-size:clamp(1.4rem,5vw,2rem);font-weight:200;letter-spacing:0.15em;color:rgba(255,255,255,0.8);margin:0 0 0.3rem}
+    #level-complete .level-num{font-size:clamp(0.75rem,2.5vw,0.85rem);color:rgba(140,100,255,0.6);margin-bottom:0.5rem;letter-spacing:0.1em}
+    #level-complete .score-display{font-size:clamp(2.5rem,10vw,3.5rem);font-weight:100;letter-spacing:0.1em;margin:0.5rem 0;text-shadow:0 0 30px rgba(140,100,255,0.4)}
+    #level-complete .score-breakdown{font-size:0.82rem;color:rgba(255,255,255,0.4);margin-bottom:1.5rem;letter-spacing:0.05em}
+    #next-level-btn{padding:0.85rem 2.2rem;border:1px solid rgba(140,100,255,0.6);border-radius:30px;background:rgba(140,100,255,0.2);color:rgba(220,200,255,0.95);font-size:clamp(0.85rem,2.5vw,0.9rem);cursor:pointer;letter-spacing:0.1em;transition:all 0.3s;font-family:inherit;backdrop-filter:blur(8px);min-height:48px}
+    #next-level-btn:hover{background:rgba(140,100,255,0.35);box-shadow:0 0 25px rgba(140,100,255,0.4);color:#fff}
+  </style>
+</head>
+<body class="experiment-view">
+  <div id="page-transition" class="page-transition"></div>
+  <canvas id="c"></canvas>
+
+  <a href="../experiments.html" class="back-link">↞</a>
+
+  <div class="top-controls">
+    <button id="theme-btn" class="ctrl-btn" title="Theme">✦</button>
+    <button id="mute-btn" class="ctrl-btn ctrl-btn-sound" title="Toggle sound">🔇</button>
+    <button id="info-btn" class="ctrl-btn" title="Info">i</button>
+  </div>
+
+  <div class="bottom-left">
+    <div class="exp-tag">canvas · game · pachinko</div>
+    <h1 class="exp-title">Trippy Peggle</h1>
+  </div>
+
+  <div class="panel-overlay" id="panel-overlay"></div>
+  <div class="info-panel" id="info-panel">
+    <button class="close-panel" id="close-panel">×</button>
+    <p class="panel-title">Trippy Peggle</p>
+    <span class="panel-tag">Canvas 2D · Game · Pachinko</span>
+
+    <h2>How to Play</h2>
+    <div class="hint-row"><span class="hint-icon">🎯</span><span class="hint-text"><strong>Aim</strong> with your mouse or touch, then <strong>click/tap</strong> to shoot.</span></div>
+    <div class="hint-row"><span class="hint-icon">⌨️</span><span class="hint-text"><strong>Arrow keys</strong> to aim, <strong>Space</strong> to fire.</span></div>
+    <div class="hint-row"><span class="hint-icon">🟠</span><span class="hint-text">Clear all <strong>orange (active)</strong> pegs to complete the level.</span></div>
+    <div class="hint-row"><span class="hint-icon">🪣</span><span class="hint-text">Land the ball in the <strong>moving bucket</strong> for a free ball.</span></div>
+    <div class="hint-row"><span class="hint-icon">🐢</span><span class="hint-text">Hit the last active peg to trigger <strong>Fever Time!</strong></span></div>
+
+    <h2>Peg Types</h2>
+    <div class="peg-legend"><div class="peg-legend-dot" style="background:#ff8c42;box-shadow:0 0 6px #ff8c42"></div><span class="peg-legend-text"><strong>Active</strong> — Clear all of these to win! 100 pts</span></div>
+    <div class="peg-legend"><div class="peg-legend-dot" style="background:#4466aa;box-shadow:0 0 4px #4466aa"></div><span class="peg-legend-text"><strong>Blue</strong> — Bounce pegs. 10 pts</span></div>
+    <div class="peg-legend"><div class="peg-legend-dot" style="background:#42ff88;box-shadow:0 0 6px #42ff88"></div><span class="peg-legend-text"><strong>Green</strong> — Shows trajectory guide for next shot</span></div>
+    <div class="peg-legend"><div class="peg-legend-dot" style="background:#c842ff;box-shadow:0 0 6px #c842ff"></div><span class="peg-legend-text"><strong>Purple</strong> — Bonus! 10 000 pts</span></div>
+
+    <h2>Your Journey</h2>
+    <div id="journey-log">
+      <p id="journey-empty" style="font-size:0.82rem;color:rgba(255,255,255,0.2);font-style:italic;margin:0">The void awaits…</p>
+    </div>
+
+    <hr style="border:none;border-top:1px solid rgba(140,100,255,0.1);margin:1.5rem 0">
+    <a class="source-link" href="https://github.com/menschenkreis/trippy.ch" target="_blank">view source on github</a>
+  </div>
+
+  <div id="start-screen" class="screen-overlay is-active">
+    <h2>TRIPPY PEGGLE</h2>
+    <p class="sub">clear the void</p>
+    <button id="start-btn">LAUNCH</button>
+    <p id="start-hint">aim &amp; click to shoot</p>
+  </div>
+
+  <div id="level-complete" class="screen-overlay">
+    <h2>VOID CLEARED</h2>
+    <div class="level-num" id="lc-level">LEVEL 1</div>
+    <div class="score-display" id="lc-score">0</div>
+    <div class="score-breakdown" id="lc-breakdown"></div>
+    <button id="next-level-btn">NEXT LEVEL</button>
+  </div>
+
+  <div id="game-over" class="screen-overlay">
+    <h2>VOID COLLAPSED</h2>
+    <div class="score-display" id="final-score">0</div>
+    <div class="high-score" id="final-high">BEST: 0</div>
+    <button id="play-again">TRY AGAIN</button>
+  </div>
+
+<script src="../assets/js/trippy-peggle-content.js"></script>
+<script src="../assets/js/trippy-peggle.js"></script>
+<script src="../assets/js/main.js"></script>
+</body>
+</html>
