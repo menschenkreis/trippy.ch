@@ -522,7 +522,7 @@ let firedChapters = new Set();
 // Chapters are sourced from the content file (falling-emy-content.js).
 // Falls back to an empty array only if the content file failed to load.
 function getLifeChapters() { return (window.FE_CONTENT?.[window.FE_LANG]?.chapters) ||
-                     (window.FE_CONTENT?.en?.chapters) || [];
+                     (window.FE_CONTENT?.en?.chapters) || []; }
 
 // ── Accelerometer ────────────────────────────────────────────────────────
 let accelInited = false;
