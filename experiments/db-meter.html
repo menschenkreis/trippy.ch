@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/jpeg" href="../assets/favicon.jpg">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>dB Meter — trippy.ch</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #000;
+      overflow: hidden;
+      font-family: 'Courier New', monospace;
+      color: #fff;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    canvas { display: block; }
+    #overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .panel {
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 14px 18px;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .panel h2 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: rgba(255,255,255,0.4);
+      margin-bottom: 8px;
+    }
+    .big-db {
+      font-size: 52px;
+      font-weight: bold;
+      line-height: 1;
+      margin-bottom: 4px;
+      transition: color 0.15s;
+    }
+    .stat-label { color: rgba(255,255,255,0.45); }
+    .stat-val { font-weight: bold; }
+    .peak-val { color: #ff3366; }
+    .avg-val { color: #33ff99; }
+    .rms-val { color: #3399ff; }
+    .clip-val { color: #ffaa00; }
+    #startBtn {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 20;
+      background: radial-gradient(circle, rgba(120,0,255,0.5), rgba(0,0,0,0.8));
+      border: 2px solid rgba(180,0,255,0.4);
+      color: #fff;
+      font-size: 18px;
+      padding: 24px 48px;
+      border-radius: 60px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: all 0.3s;
+    }
+    #startBtn:hover { background: radial-gradient(circle, rgba(160,0,255,0.6), rgba(0,0,0,0.9)); border-color: #b040ff; }
+    #startBtn.hidden { display: none; }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="startBtn">🎤 tap to listen</div>
+  <div id="overlay" class="hidden">
+    <div class="panel">
+      <h2>Level</h2>
+      <div class="big-db" id="bigDb">--</div>
+      <div><span class="stat-label">Peak </span><span class="stat-val peak-val" id="peakVal">--</span></div>
+      <div><span class="stat-label">Avg  </span><span class="stat-val avg-val" id="avgVal">--</span></div>
+      <div><span class="stat-label">RMS  </span><span class="stat-val rms-val" id="rmsVal">--</span></div>
+      <div><span class="stat-label">Crest </span><span class="stat-val clip-val" id="crestVal">--</span></div>
+    </div>
+    <div class="panel" style="text-align:right;">
+      <h2>Session</h2>
+      <div><span class="stat-label">Peak hold </span><span class="stat-val peak-val" id="peakHold">--</span></div>
+      <div><span class="stat-label">Min dB    </span><span class="stat-val rms-val" id="minDb">--</span></div>
+      <div><span class="stat-label">Clips     </span><span class="stat-val clip-val" id="clips">0</span></div>
+      <div><span class="stat-label">Time      </span><span class="stat-val" id="elapsed">0:00</span></div>
+      <div style="margin-top:10px; font-size:11px; color:rgba(255,255,255,0.25);" id="noteInfo">A4 = 440 Hz</div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    let W, H;
+
+    function resize() {
+      W = canvas.width = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Audio
+    let audioCtx, analyser, freqData, timeData, micStream;
+    const FFT_SIZE = 4096;
+    let running = false;
+
+    // Stats
+    let sessionPeakDb = -Infinity;
+    let sessionMinDb = Infinity;
+    let clipCount = 0;
+    let dbHistory = []; // for rolling avg
+    let peakHoldDecay = -Infinity;
+    let startTime = 0;
+    let lastPeakTime = 0;
+
+    // Flow spectrogram
+    const specW = 256;
+    const specH = 256;
+    let specCanvas, specCtx, specImageData;
+
+    // Particles for the visualizer
+    let particles = [];
+    const MAX_PARTICLES = 300;
+
+    function initSpectrogram() {
+      specCanvas = document.createElement('canvas');
+      specCanvas.width = specW;
+      specCanvas.height = specH;
+      specCtx = specCanvas.getContext('2d');
+      specImageData = specCtx.createImageData(specW, specH);
+    }
+
+    async function startMic() {
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioCtx.createMediaStreamSource(micStream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = FFT_SIZE;
+        analyser.smoothingTimeConstant = 0.8;
+        source.connect(analyser);
+        freqData = new Uint8Array(analyser.frequencyBinCount);
+        timeData = new Float32Array(analyser.fftSize);
+        running = true;
+        startTime = Date.now();
+        document.getElementById('startBtn').classList.add('hidden');
+        document.getElementById('overlay').classList.remove('hidden');
+        initSpectrogram();
+        loop();
+      } catch(e) {
+        alert('Microphone access denied');
+      }
+    }
+
+    document.getElementById('startBtn').addEventListener('click', startMic);
+
+    // Psychedelic colour helpers
+    function hsl(h, s, l) { return `hsl(${h % 360},${s}%,${l}%)`; }
+
+    function dbToColor(db, t) {
+      // Map -80..0 dB to hue cycling
+      const norm = Math.max(0, Math.min(1, (db + 80) / 80));
+      const hue = (norm * 300 + t * 40) % 360;
+      const sat = 80 + norm * 20;
+      const light = 15 + norm * 55;
+      return `hsl(${hue},${sat}%,${light}%)`;
+    }
+
+    function freqToHue(freq) {
+      return (Math.log2(freq / 20) / Math.log2(20000 / 20)) * 360;
+    }
+
+    // Particle system
+    function spawnParticle(x, y, energy, hue) {
+      if (particles.length >= MAX_PARTICLES) return;
+      const angle = Math.random() * Math.PI * 2;
+      const speed = energy * 4 + 1;
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 1,
+        decay: 0.005 + Math.random() * 0.02,
+        size: energy * 8 + 2,
+        hue: hue + Math.random() * 30 - 15
+      });
+    }
+
+    function updateParticles() {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.98;
+        p.vy *= 0.98;
+        p.life -= p.decay;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+    }
+
+    function drawParticles() {
+      for (const p of particles) {
+        const alpha = p.life * 0.7;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${p.hue},100%,60%,${alpha})`;
+        ctx.fill();
+        // Glow
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * p.life * 2, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${p.hue},100%,50%,${alpha * 0.15})`;
+        ctx.fill();
+      }
+    }
+
+    function updateSpectrogram(t) {
+      // Shift down by 1 pixel
+      const data = specImageData.data;
+      // Copy rows up (shift down visually)
+      for (let y = 0; y < specH - 1; y++) {
+        const srcOff = y * specW * 4;
+        const dstOff = (y + 1) * specW * 4;
+        data.set(data.subarray(srcOff, srcOff + specW * 4), dstOff);
+      }
+      // Write new top row
+      const binCount = analyser.frequencyBinCount;
+      const binsPerPx = binCount / specW;
+      for (let x = 0; x < specW; x++) {
+        const binStart = Math.floor(x * binsPerPx);
+        const binEnd = Math.floor((x + 1) * binsPerPx);
+        let sum = 0;
+        for (let b = binStart; b < binEnd && b < binCount; b++) sum += freqData[b];
+        const avg = sum / (binEnd - binStart);
+        const norm = avg / 255;
+        const hue = (x / specW * 280 + t * 20) % 360;
+        const off = x * 4;
+        // HSL-ish to RGB (fast approximation)
+        const h6 = hue / 60;
+        const sat = 0.9;
+        const lum = norm * 0.6;
+        const c = (1 - Math.abs(2 * lum - 1)) * sat;
+        const xc = c * (1 - Math.abs(h6 % 2 - 1));
+        let r = 0, g = 0, b = 0;
+        if (h6 < 1) { r = c; g = xc; }
+        else if (h6 < 2) { r = xc; g = c; }
+        else if (h6 < 3) { g = c; b = xc; }
+        else if (h6 < 4) { g = xc; b = c; }
+        else if (h6 < 5) { r = xc; b = c; }
+        else { r = c; b = xc; }
+        const m = lum - c / 2;
+        data[off]     = Math.floor((r + m) * 255);
+        data[off + 1] = Math.floor((g + m) * 255);
+        data[off + 2] = Math.floor((b + m) * 255);
+        data[off + 3] = 255;
+      }
+      specCtx.putImageData(specImageData, 0, 0);
+    }
+
+    function drawSpectrogram() {
+      const size = Math.min(W, H) * 0.55;
+      const sx = (W - size) / 2;
+      const sy = H * 0.55;
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      // Rounded rect clip
+      const rad = 16;
+      ctx.beginPath();
+      ctx.moveTo(sx + rad, sy);
+      ctx.lineTo(sx + size - rad, sy);
+      ctx.quadraticCurveTo(sx + size, sy, sx + size, sy + rad);
+      ctx.lineTo(sx + size, sy + size - rad);
+      ctx.quadraticCurveTo(sx + size, sy + size, sx + size - rad, sy + size);
+      ctx.lineTo(sx + rad, sy + size);
+      ctx.quadraticCurveTo(sx, sy + size, sx, sy + size - rad);
+      ctx.lineTo(sx, sy + rad);
+      ctx.quadraticCurveTo(sx, sy, sx + rad, sy);
+      ctx.clip();
+      ctx.drawImage(specCanvas, sx, sy, size, size);
+      // Border glow
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(160,0,255,0.3)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(sx + rad, sy);
+      ctx.lineTo(sx + size - rad, sy);
+      ctx.quadraticCurveTo(sx + size, sy, sx + size, sy + rad);
+      ctx.lineTo(sx + size, sy + size - rad);
+      ctx.quadraticCurveTo(sx + size, sy + size, sx + size - rad, sy + size);
+      ctx.lineTo(sx + rad, sy + size);
+      ctx.quadraticCurveTo(sx, sy + size, sx, sy + size - rad);
+      ctx.lineTo(sx, sy + rad);
+      ctx.quadraticCurveTo(sx, sy, sx + rad, sy);
+      ctx.stroke();
+      // Label
+      ctx.fillStyle = 'rgba(255,255,255,0.2)';
+      ctx.font = '10px Courier New';
+      ctx.fillText('SPECTROGRAM', sx + 8, sy + 14);
+      ctx.fillText('20 Hz', sx + 8, sy + size - 6);
+      ctx.textAlign = 'right';
+      ctx.fillText(`${(audioCtx ? audioCtx.sampleRate / 2 : 22050).toFixed(0)} Hz`, sx + size - 8, sy + size - 6);
+      ctx.textAlign = 'left';
+    }
+
+    function drawCircularViz(db, peakDb, rmsDb, t) {
+      const cx = W / 2;
+      const cy = H * 0.32;
+      const baseR = Math.min(W, H) * 0.14;
+
+      // Outer glow ring
+      const norm = (db + 60) / 60;
+      const energy = Math.max(0, norm);
+
+      // Radial bars
+      const binCount = analyser.frequencyBinCount;
+      const barCount = 128;
+      const binsPerBar = Math.floor(binCount / barCount);
+
+      for (let i = 0; i < barCount; i++) {
+        let sum = 0;
+        for (let j = 0; j < binsPerBar; j++) sum += freqData[i * binsPerBar + j];
+        const val = sum / binsPerBar / 255;
+        const angle = (i / barCount) * Math.PI * 2 - Math.PI / 2;
+        const barLen = val * baseR * 0.8 + 2;
+
+        const hue = (i / barCount * 360 + t * 30) % 360;
+        const innerR = baseR + 4;
+        const x1 = cx + Math.cos(angle) * innerR;
+        const y1 = cy + Math.sin(angle) * innerR;
+        const x2 = cx + Math.cos(angle) * (innerR + barLen);
+        const y2 = cy + Math.sin(angle) * (innerR + barLen);
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = `hsla(${hue},100%,${40 + val * 40}%,${0.5 + val * 0.5})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Spawn particles on loud bars
+        if (val > 0.7 && Math.random() < 0.1) {
+          spawnParticle(x2, y2, val, hue);
+        }
+      }
+
+      // Inner circle — waveform
+      analyser.getFloatTimeDomainData(timeData);
+      ctx.beginPath();
+      const waveR = baseR * 0.8;
+      for (let i = 0; i < timeData.length; i += 4) {
+        const angle = (i / timeData.length) * Math.PI * 2 - Math.PI / 2;
+        const amp = timeData[i];
+        const r = waveR + amp * waveR * 0.5;
+        const x = cx + Math.cos(angle) * r;
+        const y = cy + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      const waveHue = (t * 25) % 360;
+      ctx.strokeStyle = `hsla(${waveHue},100%,70%,0.7)`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = `hsla(${waveHue},80%,15%,0.4)`;
+      ctx.fill();
+
+      // Centre dB text glow
+      const glowHue = (energy * 280 + t * 40) % 360;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseR);
+      grad.addColorStop(0, `hsla(${glowHue},100%,60%,${energy * 0.15})`);
+      grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, baseR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawBg(t, energy) {
+      // Dark with subtle trippy gradient
+      ctx.fillStyle = `rgba(0,0,0,0.15)`;
+      ctx.fillRect(0, 0, W, H);
+
+      // Subtle moving gradient blobs
+      const blobCount = 3;
+      for (let i = 0; i < blobCount; i++) {
+        const x = W * 0.5 + Math.sin(t * 0.3 + i * 2.1) * W * 0.3;
+        const y = H * 0.4 + Math.cos(t * 0.2 + i * 1.7) * H * 0.2;
+        const r = 200 + energy * 300;
+        const hue = (t * 15 + i * 120) % 360;
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+        grad.addColorStop(0, `hsla(${hue},80%,30%,${0.02 + energy * 0.04})`);
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+      }
+    }
+
+    function computeStats() {
+      analyser.getFloatTimeDomainData(timeData);
+      let sumSq = 0, peak = 0;
+      for (let i = 0; i < timeData.length; i++) {
+        const v = Math.abs(timeData[i]);
+        sumSq += timeData[i] * timeData[i];
+        if (v > peak) peak = v;
+      }
+      const rms = Math.sqrt(sumSq / timeData.length);
+      const rmsDb = rms > 0 ? 20 * Math.log10(rms) : -100;
+      const peakDb = peak > 0 ? 20 * Math.log10(peak) : -100;
+      const avgDb = dbHistory.length > 0 ? dbHistory.reduce((a, b) => a + b, 0) / dbHistory.length : rmsDb;
+      const crest = rms > 0 ? 20 * Math.log10(peak / rms) : 0;
+
+      // Rolling average (last ~2 seconds at 60fps)
+      dbHistory.push(rmsDb);
+      if (dbHistory.length > 120) dbHistory.shift();
+
+      // Peak hold (decays over 3 seconds)
+      if (peakDb > peakHoldDecay) {
+        peakHoldDecay = peakDb;
+        lastPeakTime = performance.now();
+      } else {
+        const elapsed = (performance.now() - lastPeakTime) / 1000;
+        if (elapsed > 3) peakHoldDecay -= 0.5;
+      }
+
+      // Session stats
+      if (peakDb > sessionPeakDb) sessionPeakDb = peakDb;
+      if (rmsDb < sessionMinDb && dbHistory.length > 30) sessionMinDb = rmsDb;
+      if (peak > 0.999) clipCount++;
+
+      return { rmsDb, peakDb, avgDb, crest, currentDb: peakDb };
+    }
+
+    function updateUI(stats) {
+      const { rmsDb, peakDb, avgDb, crest } = stats;
+      const el = (id, val) => document.getElementById(id).textContent = val;
+
+      const bigDb = document.getElementById('bigDb');
+      bigDb.textContent = Math.round(rmsDb);
+      const norm = Math.max(0, (rmsDb + 60) / 60);
+      if (norm > 0.85) bigDb.style.color = '#ff3366';
+      else if (norm > 0.6) bigDb.style.color = '#ffaa00';
+      else if (norm > 0.3) bigDb.style.color = '#33ff99';
+      else bigDb.style.color = '#3399ff';
+
+      el('peakVal', peakHoldDecay.toFixed(1) + ' dB');
+      el('avgVal', avgDb.toFixed(1) + ' dB');
+      el('rmsVal', rmsDb.toFixed(1) + ' dB');
+      el('crestVal', crest.toFixed(1) + ' dB');
+      el('peakHold', sessionPeakDb.toFixed(1) + ' dB');
+      el('minDb', sessionMinDb === Infinity ? '--' : sessionMinDb.toFixed(1) + ' dB');
+      el('clips', clipCount);
+      const sec = Math.floor((Date.now() - startTime) / 1000);
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      el('elapsed', `${m}:${s.toString().padStart(2, '0')}`);
+    }
+
+    function loop() {
+      if (!running) return;
+      requestAnimationFrame(loop);
+
+      const t = performance.now() / 1000;
+      analyser.getByteFrequencyData(freqData);
+      const stats = computeStats();
+      const energy = Math.max(0, (stats.rmsDb + 60) / 60);
+
+      drawBg(t, energy);
+      drawCircularViz(stats.rmsDb, stats.peakDb, stats.rmsDb, t);
+      updateParticles();
+      drawParticles();
+      updateSpectrogram(t);
+      drawSpectrogram();
+      updateUI(stats);
+    }
+  </script>
+</body>
+</html>
