@@ -406,6 +406,9 @@
       }
     }
 
+    // Map raw dBFS (-100..0) to display SPL (20..120)
+    function toSPL(dbFS) { return Math.max(20, dbFS + 120); }
+
     function computeStats() {
       analyser.getFloatTimeDomainData(timeData);
       let sumSq = 0, peak = 0;
@@ -415,8 +418,10 @@
         if (v > peak) peak = v;
       }
       const rms = Math.sqrt(sumSq / timeData.length);
-      const rmsDb = rms > 0 ? 20 * Math.log10(rms) : -100;
-      const peakDb = peak > 0 ? 20 * Math.log10(peak) : -100;
+      const rmsDbFS = rms > 0 ? 20 * Math.log10(rms) : -100;
+      const peakDbFS = peak > 0 ? 20 * Math.log10(peak) : -100;
+      const rmsDb = toSPL(rmsDbFS);
+      const peakDb = toSPL(peakDbFS);
       const avgDb = dbHistory.length > 0 ? dbHistory.reduce((a, b) => a + b, 0) / dbHistory.length : rmsDb;
       const crest = rms > 0 ? 20 * Math.log10(peak / rms) : 0;
 
@@ -447,7 +452,7 @@
 
       const bigDb = document.getElementById('bigDb');
       bigDb.textContent = Math.round(rmsDb);
-      const norm = Math.max(0, (rmsDb + 60) / 60);
+      const norm = Math.max(0, Math.min(1, (rmsDb - 20) / 100));
       if (norm > 0.85) bigDb.style.color = '#ff3366';
       else if (norm > 0.6) bigDb.style.color = '#ffaa00';
       else if (norm > 0.3) bigDb.style.color = '#33ff99';
@@ -473,7 +478,7 @@
       const t = performance.now() / 1000;
       analyser.getByteFrequencyData(freqData);
       const stats = computeStats();
-      const energy = Math.max(0, (stats.rmsDb + 60) / 60);
+      const energy = Math.max(0, Math.min(1, (stats.rmsDb - 20) / 100));
 
       drawBg(t, energy);
       drawCircularViz(stats.rmsDb, stats.peakDb, stats.rmsDb, t);
