@@ -574,25 +574,26 @@ footer a:hover { color: var(--pink); }
 
 .exp-subcategory {
   margin-top: 4rem;
-  padding-top: 2rem;
+  padding-top: 3rem;
   border-top: 1px solid rgba(107, 33, 168, 0.15);
+  text-align: center;
 }
 .exp-subcategory h2 {
-  font-size: clamp(1.2rem, 3vw, 1.6rem);
+  font-size: clamp(1.3rem, 3.5vw, 1.8rem);
   font-weight: 300;
-  letter-spacing: 0.1em;
-  text-shadow: 0 0 20px var(--purple-glow);
-  color: var(--fg-muted);
-  margin-bottom: 0.5rem;
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 25px var(--purple-glow);
+  color: var(--fg);
+  margin-bottom: 1rem;
   transition: var(--transition-colors);
 }
 .exp-subcategory-desc {
   color: var(--fg-muted);
   font-size: 0.9rem;
-  line-height: 1.7;
-  max-width: 700px;
-  margin: 0 auto 2rem;
-  opacity: 0.8;
+  line-height: 1.8;
+  max-width: 600px;
+  margin: 0 auto 2.5rem;
+  opacity: 0.7;
   transition: var(--transition-colors);
 }
 
