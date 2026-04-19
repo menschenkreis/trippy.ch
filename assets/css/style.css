@@ -423,7 +423,7 @@ footer a:hover { color: var(--pink); }
 .blog-list {
   max-width: 700px;
   margin: 0 auto;
-  padding: 3rem 2rem;
+  padding: 6rem 2rem 3rem;
 }
 
 .blog-list h1 {
@@ -542,7 +542,7 @@ footer a:hover { color: var(--pink); }
 .experiments-page {
   max-width: 900px;
   margin: 0 auto;
-  padding: 4rem 2rem;
+  padding: 6rem 2rem 4rem;
 }
 
 .experiments-page h1 {
@@ -1325,10 +1325,10 @@ footer a:hover { color: var(--pink); }
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.5rem;
-  background: rgba(26, 10, 46, 0.6);
+  background: rgba(26, 10, 46, 0.95);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(107, 33, 168, 0.12);
+  border-bottom: 1px solid rgba(107, 33, 168, 0.25);
   transition: opacity 0.4s, transform 0.4s;
   opacity: 0;
   transform: translateY(-100%);
@@ -1402,8 +1402,8 @@ footer a:hover { color: var(--pink); }
   .sticky-nav {
     opacity: 1;
     transform: none;
-    background: var(--bg);
-    border-bottom: 1px solid rgba(107, 33, 168, 0.2);
+    background: rgba(26, 10, 46, 0.95);
+    border-bottom: 1px solid rgba(107, 33, 168, 0.25);
   }
   .nav-hamburger { display: block; }
   .nav-hamburger span { height: 2.5px; }
@@ -1414,9 +1414,6 @@ footer a:hover { color: var(--pink); }
     justify-content: center;
     gap: 2.5rem;
     background: var(--bg);
-    background-image:
-      radial-gradient(ellipse at 30% 50%, var(--purple-glow) 0%, transparent 60%),
-      radial-gradient(ellipse at 70% 50%, var(--teal-glow) 0%, transparent 60%);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
