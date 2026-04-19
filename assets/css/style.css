@@ -401,6 +401,23 @@ footer {
 
 footer a { color: var(--purple); }
 footer a:hover { color: var(--pink); }
+.footer-socials {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+.footer-socials a {
+  color: var(--fg-muted);
+  transition: color 0.3s, transform 0.3s, filter 0.3s;
+  display: flex;
+  align-items: center;
+}
+.footer-socials a:hover {
+  color: var(--teal);
+  transform: translateY(-2px);
+  filter: drop-shadow(0 0 8px var(--teal-glow));
+}
 
 /* Blog */
 .blog-list {
