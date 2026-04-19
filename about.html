@@ -147,9 +147,9 @@
     }
     .about-avatar-wrap canvas {
       position: absolute;
-      inset: -14px;
-      width: calc(100% + 28px);
-      height: calc(100% + 28px);
+      inset: -30px;
+      width: calc(100% + 60px);
+      height: calc(100% + 60px);
       z-index: 0;
     }
     .about-avatar {
@@ -177,7 +177,9 @@
     }
     @media (max-width: 480px) {
       .about-bio { flex-direction: column; align-items: center; text-align: center; }
-      .about-avatar { width: 120px; height: 120px; }
+      .about-avatar-wrap { width: 160px; height: 160px; }
+      .about-avatar { width: 160px; height: 160px; }
+      .about-avatar-wrap canvas { inset: -25px; width: calc(100% + 50px); height: calc(100% + 50px); }
     }
 
     /* ── Dopamine Coffee Button ── */
@@ -692,7 +694,7 @@
         }
         ctx.closePath();
         ctx.strokeStyle = `rgba(124, 58, 237, ${alpha})`;
-        ctx.lineWidth = 0.6;
+        ctx.lineWidth = 0.8;
         ctx.stroke();
       }
 
@@ -700,7 +702,7 @@
         ctx.beginPath();
         ctx.arc(cx, cy, Math.max(0.1, r), 0, Math.PI * 2);
         ctx.strokeStyle = `rgba(45, 212, 191, ${alpha})`;
-        ctx.lineWidth = 0.4;
+        ctx.lineWidth = 0.6;
         ctx.stroke();
       }
 
@@ -714,7 +716,7 @@
         }
         ctx.closePath();
         ctx.strokeStyle = `rgba(236, 72, 153, ${alpha})`;
-        ctx.lineWidth = 0.4;
+        ctx.lineWidth = 0.6;
         ctx.stroke();
       }
 
