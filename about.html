@@ -393,7 +393,7 @@
       100% { transform: translate(-20px, 30px) scale(0.95); }
     }
 
-    /* ── Trippy Photo Frame ── */
+    /* ── About Photo ── */
     .about-photo-wrapper {
       position: relative;
       display: inline-block;
@@ -415,32 +415,6 @@
       letter-spacing: 0.03em;
       margin-top: 0.8rem;
       opacity: 0.8;
-    }
-    .about-photo-wrapper::before {
-      content: '';
-      position: absolute;
-      inset: -3px;
-      border-radius: 18px;
-      background: linear-gradient(135deg, var(--purple), var(--teal), var(--pink), var(--purple));
-      background-size: 300% 300%;
-      animation: borderGlow 6s ease infinite;
-      z-index: -1;
-    }
-    .about-photo-wrapper::after {
-      content: '';
-      position: absolute;
-      inset: -20px;
-      border-radius: 28px;
-      background: linear-gradient(135deg, var(--purple-glow), var(--teal-glow), var(--pink-glow));
-      filter: blur(20px);
-      opacity: 0.6;
-      z-index: -2;
-      animation: borderGlow 6s ease infinite reverse;
-    }
-    @keyframes borderGlow {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
     }
 
     /* ── Floating particles ── */
