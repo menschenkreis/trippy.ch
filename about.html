@@ -26,7 +26,7 @@
       top: 0;
       left: 0;
       right: 0;
-      z-index: 100;
+      z-index: 101;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -40,6 +40,9 @@
       transform: translateY(-100%);
     }
     .sticky-nav.is-visible { opacity: 1; transform: translateY(0); }
+    @media (max-width: 640px) {
+      .sticky-nav { opacity: 1; transform: none; }
+    }
     .sticky-nav .nav-logo {
       font-size: 1.1rem; font-weight: 300; letter-spacing: 0.12em;
       color: var(--fg); text-decoration: none; transition: color 0.3s;
@@ -59,7 +62,7 @@
 
     .nav-hamburger {
       display: none; background: none; border: none; cursor: pointer;
-      padding: 4px; width: 28px; height: 20px; position: relative; z-index: 110;
+      padding: 4px; width: 28px; height: 20px; position: relative; z-index: 200;
     }
     .nav-hamburger span {
       display: block; width: 100%; height: 2px; background: var(--fg);
@@ -78,7 +81,7 @@
       .sticky-nav .nav-links {
         position: fixed; top: 0; left: 0; right: 0; bottom: 0;
         flex-direction: column; justify-content: center; gap: 2rem;
-        background: rgba(10, 4, 26, 0.95); backdrop-filter: blur(24px);
+        background: rgba(10, 4, 26, 0.97); backdrop-filter: blur(24px);
         opacity: 0; pointer-events: none; transition: opacity 0.3s;
       }
       .sticky-nav .nav-links.is-open { opacity: 1; pointer-events: all; }
