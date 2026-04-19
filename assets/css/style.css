@@ -1252,10 +1252,10 @@ footer a:hover { color: var(--pink); }
 .support-link .mandala-bg {
   position: absolute;
   inset: 50%;
-  width: 140px;
-  height: 140px;
-  margin-left: -70px;
-  margin-top: -70px;
+  width: 180px;
+  height: 180px;
+  margin-left: -90px;
+  margin-top: -90px;
   z-index: -1;
   color: var(--teal);
   opacity: 0.25;
@@ -1267,7 +1267,7 @@ footer a:hover { color: var(--pink); }
 .support-link:hover .mandala-bg {
   opacity: 0.6;
   animation: geoRotate 8s linear infinite;
-  transform: scale(1.15);
+  transform: scale(1.2);
   color: var(--pink);
   filter: blur(0px) drop-shadow(0 0 20px var(--pink-glow));
 }
