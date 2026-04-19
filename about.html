@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/jpeg" href="assets/favicon.jpg">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — trippy.ch</title>
+
+  <meta property="og:type"        content="website">
+  <meta property="og:url"         content="https://trippy.ch/about.html">
+  <meta property="og:title"       content="About — trippy.ch">
+  <meta property="og:description" content="Emanuel Malacarne's psychedelic playground — visual experiments, musical explorations, and generative art.">
+  <meta property="og:image"       content="https://trippy.ch/assets/og-preview.jpg">
+
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:url"         content="https://trippy.ch/about.html">
+  <meta name="twitter:title"       content="About — trippy.ch">
+  <meta name="twitter:description" content="Emanuel Malacarne's psychedelic playground — visual experiments, musical explorations, and generative art.">
+  <meta name="twitter:image"       content="https://trippy.ch/assets/og-preview.jpg">
+
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    /* ── Sticky Nav ── */
+    .sticky-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+      background: rgba(26, 10, 46, 0.6);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(107, 33, 168, 0.12);
+      transition: opacity 0.4s, transform 0.4s;
+      opacity: 0;
+      transform: translateY(-100%);
+    }
+    .sticky-nav.is-visible { opacity: 1; transform: translateY(0); }
+    .sticky-nav .nav-logo {
+      font-size: 1.1rem; font-weight: 300; letter-spacing: 0.12em;
+      color: var(--fg); text-decoration: none; transition: color 0.3s;
+    }
+    .sticky-nav .nav-logo:hover { color: var(--teal); }
+    .sticky-nav .nav-links { display: flex; gap: 1.5rem; align-items: center; }
+    .sticky-nav .nav-links a {
+      color: var(--fg-muted); font-size: 0.85rem; letter-spacing: 0.08em;
+      text-decoration: none; transition: color 0.3s; position: relative;
+    }
+    .sticky-nav .nav-links a:hover { color: var(--fg); }
+    .sticky-nav .nav-links a::after {
+      content: ''; position: absolute; bottom: -4px; left: 0;
+      width: 0; height: 1px; background: var(--teal); transition: width 0.3s;
+    }
+    .sticky-nav .nav-links a:hover::after { width: 100%; }
+
+    .nav-hamburger {
+      display: none; background: none; border: none; cursor: pointer;
+      padding: 4px; width: 28px; height: 20px; position: relative; z-index: 110;
+    }
+    .nav-hamburger span {
+      display: block; width: 100%; height: 2px; background: var(--fg);
+      border-radius: 2px; transition: transform 0.3s, opacity 0.3s;
+      position: absolute; left: 0;
+    }
+    .nav-hamburger span:nth-child(1) { top: 0; }
+    .nav-hamburger span:nth-child(2) { top: 9px; }
+    .nav-hamburger span:nth-child(3) { top: 18px; }
+    .nav-hamburger.is-open span:nth-child(1) { transform: translateY(9px) rotate(45deg); }
+    .nav-hamburger.is-open span:nth-child(2) { opacity: 0; }
+    .nav-hamburger.is-open span:nth-child(3) { transform: translateY(-9px) rotate(-45deg); }
+
+    @media (max-width: 640px) {
+      .nav-hamburger { display: block; }
+      .sticky-nav .nav-links {
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        flex-direction: column; justify-content: center; gap: 2rem;
+        background: rgba(10, 4, 26, 0.95); backdrop-filter: blur(24px);
+        opacity: 0; pointer-events: none; transition: opacity 0.3s;
+      }
+      .sticky-nav .nav-links.is-open { opacity: 1; pointer-events: all; }
+      .sticky-nav .nav-links a { font-size: 1.2rem; letter-spacing: 0.12em; }
+      .sticky-nav .nav-links a::after { display: none; }
+    }
+
+    /* ── Page Content ── */
+    .page-wrapper {
+      padding-top: 5rem;
+      min-height: 100vh;
+    }
+
+    .about-hero {
+      text-align: center;
+      padding: 4rem 2rem 3rem;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .about-hero h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 300;
+      letter-spacing: 0.1em;
+      text-shadow: 0 0 40px var(--purple-glow);
+      margin-bottom: 1.5rem;
+      transition: var(--transition-colors);
+    }
+    .about-hero .divider {
+      width: 60px;
+      height: 2px;
+      background: linear-gradient(90deg, var(--purple), var(--teal));
+      margin: 0 auto 2rem;
+      border-radius: 2px;
+    }
+    .about-hero p {
+      color: var(--fg-muted);
+      font-size: 1.05rem;
+      line-height: 1.8;
+      max-width: 600px;
+      margin: 0 auto;
+      transition: var(--transition-colors);
+    }
+
+    /* ── Music Section ── */
+    .music-section {
+      padding: 3rem 2rem 5rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .music-section .section-header {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+    .music-section .section-header h2 {
+      font-size: clamp(1.5rem, 4vw, 2.2rem);
+      font-weight: 300;
+      letter-spacing: 0.1em;
+      text-shadow: 0 0 30px var(--purple-glow);
+      margin-bottom: 0.5rem;
+      transition: var(--transition-colors);
+    }
+    .music-section .section-header p {
+      color: var(--fg-muted);
+      font-size: 0.95rem;
+      letter-spacing: 0.05em;
+    }
+
+    .video-gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+    .video-card {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(107, 33, 168, 0.18);
+      transition: transform 0.4s ease, box-shadow 0.4s ease, border-color 0.4s ease;
+      cursor: pointer;
+    }
+    .video-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 40px var(--purple-glow);
+      border-color: var(--purple);
+    }
+    .video-card iframe {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      border: none;
+    }
+    .video-card .play-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(10, 4, 26, 0.55);
+      transition: opacity 0.3s;
+      z-index: 2;
+    }
+    .video-card .play-overlay.is-hidden { opacity: 0; pointer-events: none; }
+    .video-card .play-overlay .play-btn {
+      width: 56px; height: 56px;
+      background: rgba(124, 58, 237, 0.7);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.3s, background 0.3s;
+    }
+    .video-card:hover .play-overlay .play-btn {
+      transform: scale(1.1);
+      background: rgba(124, 58, 237, 0.9);
+    }
+    .video-card .play-overlay .play-btn svg {
+      fill: #fff;
+      width: 22px; height: 22px;
+      margin-left: 3px;
+    }
+    .video-card .video-thumb {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      transition: transform 0.5s ease;
+    }
+    .video-card:hover .video-thumb { transform: scale(1.05); }
+    .video-card .video-title {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      padding: 2.5rem 1rem 0.8rem;
+      background: linear-gradient(transparent, rgba(10, 4, 26, 0.85));
+      color: var(--fg);
+      font-size: 0.85rem;
+      font-weight: 400;
+      letter-spacing: 0.03em;
+      z-index: 1;
+      transition: var(--transition-colors);
+    }
+
+    @media (max-width: 640px) {
+      .video-gallery {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ── Background Ambience ── */
+    .bg-orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(100px);
+      opacity: 0.15;
+      pointer-events: none;
+      z-index: -1;
+    }
+    .bg-orb--1 {
+      width: 500px; height: 500px;
+      background: var(--purple);
+      top: -10%; left: -10%;
+      animation: orbFloat 20s ease-in-out infinite alternate;
+    }
+    .bg-orb--2 {
+      width: 400px; height: 400px;
+      background: var(--teal);
+      bottom: -10%; right: -10%;
+      animation: orbFloat 25s ease-in-out infinite alternate-reverse;
+    }
+    @keyframes orbFloat {
+      0% { transform: translate(0, 0); }
+      100% { transform: translate(40px, 30px); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Background Ambience -->
+  <div class="bg-orb bg-orb--1"></div>
+  <div class="bg-orb bg-orb--2"></div>
+
+  <!-- Page Transition -->
+  <div class="page-transition" id="page-transition"></div>
+
+  <!-- Nav -->
+  <nav class="sticky-nav" id="sticky-nav">
+    <a href="index.html" class="nav-logo">trippy</a>
+    <div class="nav-links" id="nav-links">
+      <a href="index.html#experiments">Experiments</a>
+      <a href="experiments/db-meter.html">dB Meter</a>
+      <a href="about.html" style="color: var(--teal);">About</a>
+      <a href="blog.html">Insights</a>
+      <a href="https://github.com/menschenkreis/trippy.ch" target="_blank" rel="noopener">Source</a>
+    </div>
+    <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+
+  <div class="page-wrapper">
+
+    <!-- About Hero -->
+    <section class="about-hero">
+      <h1>About</h1>
+      <div class="divider"></div>
+      <p>
+        Hey, I'm <strong style="color: var(--fg);">Emanuel Malacarne</strong> — a creative coder and musician based in Switzerland.
+        trippy.ch is my digital playground: part psychedelic blog, part experimental lab.
+        Here I explore the intersection of <em>generative art</em>, <em>interactive shaders</em>, <em>sound</em> and <em>visual storytelling</em>.
+        Think of it as a trippy version of a personal blog — less prose, more portals.
+      </p>
+    </section>
+
+    <!-- Musical Experiments -->
+    <section class="music-section">
+      <div class="section-header">
+        <h2>Musical Experiments</h2>
+        <p>Sounds, sessions, and sonic explorations</p>
+      </div>
+
+      <div class="video-gallery" id="video-gallery"></div>
+    </section>
+
+  </div>
+
+  <!-- Theme randomizer -->
+  <button id="theme-btn" title="Shuffle theme">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6"/><path d="M21.34 15.57a10 10 0 1 1-.57-8.38L21.5 8"/></svg>
+  </button>
+
+  <script src="assets/js/theme.js"></script>
+  <script>
+    // ── Nav scroll ──
+    const nav = document.getElementById('sticky-nav');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('is-visible', window.scrollY > 40);
+    });
+
+    // ── Hamburger ──
+    const hamburger = document.getElementById('nav-hamburger');
+    const navLinks = document.getElementById('nav-links');
+    hamburger.addEventListener('click', () => {
+      hamburger.classList.toggle('is-open');
+      navLinks.classList.toggle('is-open');
+    });
+    navLinks.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => {
+        hamburger.classList.remove('is-open');
+        navLinks.classList.remove('is-open');
+      });
+    });
+
+    // ── Video Gallery ──
+    const videos = [
+      { id: '5z1Lio8-ET0', title: 'Chunnt scho guet' },
+      { id: '7ua06c4As2s', title: 'Nonno' },
+      { id: 'uvAwYIoOw1k', title: 'Sound Session 01' },
+      { id: '1CbKvLn1Vc0', title: 'Seafarer (feat. demklanglang.ch)' },
+      { id: 'Wc0mFIWtfaQ', title: 'Mono Power V0.2' },
+      { id: 'Tbgf_7iL0Cw', title: 'Song Night' },
+      { id: 'NOYPC5R6BLE', title: 'Both Hands' },
+      { id: 'EKQYc4c7-Wc', title: 'Arp Ex 02' },
+      { id: 'rNb0lrJsZ34', title: 'Flirty Bird' },
+      { id: 'FhIa4ZRxttQ', title: 'Seilmeister — Nightly Snippets' },
+      { id: 'a3-Wz8UimmY', title: 'Thank You, Mother' },
+      { id: 'O5ReGIc2HyM', title: 'Nightly Snippets 2.1' },
+    ];
+
+    const gallery = document.getElementById('video-gallery');
+
+    videos.forEach(v => {
+      const card = document.createElement('div');
+      card.className = 'video-card';
+      card.innerHTML = `
+        <img class="video-thumb" src="https://img.youtube.com/vi/${v.id}/hqdefault.jpg" alt="${v.title}" loading="lazy">
+        <div class="play-overlay">
+          <div class="play-btn">
+            <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+          </div>
+        </div>
+        <div class="video-title">${v.title}</div>
+      `;
+
+      card.addEventListener('click', () => {
+        const overlay = card.querySelector('.play-overlay');
+        const thumb = card.querySelector('.video-thumb');
+        overlay.classList.add('is-hidden');
+        thumb.style.display = 'none';
+        const iframe = document.createElement('iframe');
+        iframe.src = `https://www.youtube.com/embed/${v.id}?autoplay=1&rel=0`;
+        iframe.allow = 'autoplay; encrypted-media';
+        iframe.allowFullscreen = true;
+        card.appendChild(iframe);
+      });
+
+      gallery.appendChild(card);
+    });
+  </script>
+
+</body>
+</html>
