@@ -446,7 +446,25 @@
 
   <script src="assets/js/nav.js"></script>
   <script src="assets/js/main.js"></script>
+  <script src="assets/js/i18n.js"></script>
   <script>document.getElementById('page-transition').classList.add('is-active');requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('page-transition').classList.remove('is-active')));</script>
+
+  <script type="application/json" id="i18n-data">
+{
+  "de": {
+    "nav.portal": "Portal",
+    "nav.experiments": "Experimente",
+    "nav.about": "Über",
+    "nav.insights": "Einblicke"
+  },
+  "en": {
+    "nav.portal": "Portal",
+    "nav.experiments": "Experiments",
+    "nav.about": "About",
+    "nav.insights": "Insights"
+  }
+}
+</script>
   <script>
     // ── Coffee Button Dopamine Burst ──
     const coffeeBtn = document.getElementById('coffee-btn');
