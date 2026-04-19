@@ -113,7 +113,101 @@
       margin: 0 auto 2rem;
       border-radius: 2px;
     }
-    .about-hero .about-photo {
+    .about-hero .about-photo-wrapper {
+      position: relative;
+      display: inline-block;
+      margin-bottom: 2.5rem;
+    }
+    .about-bio {
+      display: flex;
+      align-items: flex-start;
+      gap: 1.5rem;
+      max-width: 600px;
+      margin: 0 auto 2.5rem;
+      text-align: left;
+    }
+    .about-avatar {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid var(--purple);
+      box-shadow: 0 0 20px var(--purple-glow), 0 0 40px var(--teal-glow);
+      flex-shrink: 0;
+      animation: avatarPulse 4s ease-in-out infinite;
+    }
+    @keyframes avatarPulse {
+      0%, 100% { box-shadow: 0 0 20px var(--purple-glow), 0 0 40px var(--teal-glow); }
+      50% { box-shadow: 0 0 30px var(--purple-glow), 0 0 60px var(--pink-glow); }
+    }
+    .about-bio p {
+      color: var(--fg-muted);
+      font-size: 1.05rem;
+      line-height: 1.8;
+      transition: var(--transition-colors);
+      margin: 0;
+    }
+    @media (max-width: 480px) {
+      .about-bio { flex-direction: column; align-items: center; text-align: center; }
+      .about-avatar { width: 120px; height: 120px; }
+    }
+
+    /* ── Dopamine Coffee Button ── */
+    .coffee-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.85rem 2rem;
+      border-radius: 50px;
+      background: linear-gradient(135deg, #FF8C00, #FFD700, #FF6347);
+      background-size: 200% 200%;
+      color: #1a0a2e;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-decoration: none;
+      letter-spacing: 0.03em;
+      box-shadow: 0 4px 20px rgba(255, 140, 0, 0.4), 0 0 0 0 rgba(255, 140, 0, 0.3);
+      transition: transform 0.3s, box-shadow 0.3s, background-position 0.5s;
+      animation: coffeeShimmer 3s ease infinite;
+      position: relative;
+      overflow: visible;
+      cursor: pointer;
+    }
+    @keyframes coffeeShimmer {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    .coffee-btn:hover {
+      transform: translateY(-3px) scale(1.05);
+      box-shadow: 0 8px 35px rgba(255, 140, 0, 0.6), 0 0 0 6px rgba(255, 140, 0, 0.15);
+    }
+    .coffee-btn:active {
+      transform: translateY(0) scale(0.97);
+    }
+    .coffee-btn.is-clicked {
+      animation: coffeeBurst 0.6s ease;
+    }
+    @keyframes coffeeBurst {
+      0% { transform: scale(1); }
+      30% { transform: scale(1.15); box-shadow: 0 0 60px rgba(255, 215, 0, 0.8); }
+      60% { transform: scale(0.95); }
+      100% { transform: scale(1); }
+    }
+    .coffee-icon {
+      display: flex;
+      align-items: center;
+    }
+    .coffee-sparkle {
+      position: absolute;
+      pointer-events: none;
+      font-size: 1.2rem;
+      animation: sparkleFly 0.8s ease-out forwards;
+    }
+    @keyframes sparkleFly {
+      0% { opacity: 1; transform: translate(0, 0) scale(1); }
+      100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(0.3) rotate(var(--sr)); }
+    }
       width: 100%;
       max-width: 600px;
       border-radius: 16px;
@@ -360,12 +454,23 @@
       <div class="about-photo-wrapper">
         <img src="assets/music-corner.jpg" alt="My music corner" class="about-photo">
       </div>
-      <p>
-        Hey, I'm <strong style="color: var(--fg);">Emanuel Malacarne</strong> — a creative coder and musician based in Switzerland.
-        trippy.ch is my digital playground: part psychedelic blog, part experimental lab.
-        Here I explore the intersection of <em>generative art</em>, <em>interactive shaders</em>, <em>sound</em> and <em>visual storytelling</em>.
-        Think of it as a trippy version of a personal blog — less prose, more portals.
-      </p>
+      <div class="about-bio">
+        <img src="assets/emanuel.jpg" alt="Emanuel Malacarne" class="about-avatar">
+        <p>
+          Hey, I'm <strong style="color: var(--fg);">Emanuel Malacarne</strong> — a creative coder and musician based in Switzerland.
+          trippy.ch is my digital playground: part psychedelic blog, part experimental lab.
+          Here I explore the intersection of <em>generative art</em>, <em>interactive shaders</em>, <em>sound</em> and <em>visual storytelling</em>.
+          Think of it as a trippy version of a personal blog — less prose, more portals.
+        </p>
+      </div>
+
+      <a href="https://www.buymeacoffee.com/trippy.ch" target="_blank" rel="noopener" class="coffee-btn" id="coffee-btn">
+        <span class="coffee-icon">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+        </span>
+        <span class="coffee-text">Buy me a coffee</span>
+        <span class="coffee-sparkles" id="coffee-sparkles"></span>
+      </a>
     </section>
 
     <!-- Musical Experiments -->
@@ -420,6 +525,33 @@
         hamburger.classList.remove('is-open');
         navLinks.classList.remove('is-open');
       });
+    });
+
+    // ── Coffee Button Dopamine Burst ──
+    const coffeeBtn = document.getElementById('coffee-btn');
+    const sparkles = ['✨', '🌟', '💫', '⭐', '🔥', '💛', '☕', '⚡'];
+    coffeeBtn.addEventListener('click', (e) => {
+      coffeeBtn.classList.remove('is-clicked');
+      void coffeeBtn.offsetWidth; // reflow
+      coffeeBtn.classList.add('is-clicked');
+      setTimeout(() => coffeeBtn.classList.remove('is-clicked'), 600);
+
+      // Spawn sparkles
+      const rect = coffeeBtn.getBoundingClientRect();
+      for (let i = 0; i < 12; i++) {
+        const s = document.createElement('span');
+        s.className = 'coffee-sparkle';
+        s.textContent = sparkles[Math.floor(Math.random() * sparkles.length)];
+        s.style.position = 'fixed';
+        s.style.left = (rect.left + rect.width / 2) + 'px';
+        s.style.top = (rect.top + rect.height / 2) + 'px';
+        s.style.zIndex = '9999';
+        s.style.setProperty('--sx', (Math.random() - 0.5) * 160 + 'px');
+        s.style.setProperty('--sy', (Math.random() - 0.5) * 160 + 'px');
+        s.style.setProperty('--sr', (Math.random() - 0.5) * 360 + 'deg');
+        document.body.appendChild(s);
+        setTimeout(() => s.remove(), 800);
+      }
     });
 
     // ── Floating Particles ──
