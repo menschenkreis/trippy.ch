@@ -73,7 +73,22 @@
     document.body.appendChild(btn);
   }
 
+  // Show lang toggle after scrolling past hero
+  function initScrollReveal() {
+    const hero = document.querySelector('.hero');
+    const btn = document.getElementById('lang-btn');
+    if (!hero || !btn) return;
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) btn.classList.add('is-visible');
+        else btn.classList.remove('is-visible');
+      });
+    }, { threshold: 0 });
+    observer.observe(hero);
+  }
+
   // Init
   createToggle();
   applyTranslations(currentLang);
+  initScrollReveal();
 })();

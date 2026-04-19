@@ -86,36 +86,32 @@ a:hover { color: var(--pink); }
 /* Language Toggle Button */
 #lang-btn {
   position: fixed;
-  bottom: 2rem;
-  left: 2rem;
+  bottom: 1.5rem;
+  left: 1.5rem;
   z-index: 1000;
-  width: 52px;
-  height: 52px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  border: 2px solid var(--violet);
-  background: linear-gradient(135deg, var(--teal), var(--purple), var(--pink));
-  background-size: 300% 300%;
-  animation: langPulse 3s ease-in-out infinite, themeGradient 4s ease infinite;
+  border: 1px solid rgba(107, 33, 168, 0.3);
+  background: rgba(26, 10, 46, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.4rem;
-  font-weight: 300;
-  letter-spacing: 0.08em;
-  color: #fff;
-  text-shadow: 0 0 8px rgba(255,255,255,0.4);
-  box-shadow: 0 0 20px var(--teal-glow), 0 0 40px rgba(45,212,191,0.15);
-  transition: transform 0.3s, box-shadow 0.3s, var(--transition-colors);
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  color: var(--fg-muted);
+  transition: transform 0.3s, opacity 0.5s ease, color 0.3s, border-color 0.3s, var(--transition-colors);
   overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
-#lang-btn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: conic-gradient(from 0deg, transparent, rgba(255,255,255,0.1), transparent);
-  animation: langSpin 6s linear infinite;
+#lang-btn.is-visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 #lang-btn span {
   position: relative;
@@ -123,16 +119,13 @@ a:hover { color: var(--pink); }
   transition: transform 0.4s cubic-bezier(0.7, 0, 0.3, 1), opacity 0.3s ease;
 }
 #lang-btn:hover {
-  transform: scale(1.12);
-  box-shadow: 0 0 30px var(--teal-glow), 0 0 60px rgba(45,212,191,0.25);
+  color: var(--fg);
+  border-color: var(--purple);
+  transform: scale(1.08);
 }
 #lang-btn:active { transform: scale(0.95); }
 #lang-btn.morphing span {
   animation: textFlip 0.5s cubic-bezier(0.7, 0, 0.3, 1);
-}
-@keyframes langPulse {
-  0%, 100% { box-shadow: 0 0 20px var(--teal-glow), 0 0 40px rgba(45,212,191,0.15); }
-  50% { box-shadow: 0 0 30px var(--teal-glow), 0 0 60px rgba(45,212,191,0.3); }
 }
 @keyframes langSpin {
   from { transform: rotate(0deg); }
