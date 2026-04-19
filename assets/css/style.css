@@ -1398,7 +1398,7 @@ footer a:hover { color: var(--pink); }
 .nav-hamburger.is-open span:nth-child(2) { opacity: 0; }
 .nav-hamburger.is-open span:nth-child(3) { transform: translateY(-9px) rotate(-45deg); }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .sticky-nav {
     opacity: 1;
     transform: none;
