@@ -80,21 +80,22 @@
       .nav-hamburger { display: block; }
       .sticky-nav .nav-links {
         position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-        flex-direction: column; justify-content: center; gap: 2rem;
-        background: rgba(10, 4, 26, 0.97); backdrop-filter: blur(24px);
-        -webkit-backdrop-filter: blur(24px);
-        opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        flex-direction: column; justify-content: center; gap: 2.5rem;
+        background: var(--bg);
+        opacity: 0; visibility: hidden; pointer-events: none;
+        transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.4s;
         z-index: 9998;
       }
-      .sticky-nav .nav-links.is-open { opacity: 1; pointer-events: all; }
+      .sticky-nav .nav-links.is-open { opacity: 1; visibility: visible; pointer-events: all; }
       .sticky-nav .nav-links a {
-        font-size: 1.4rem; letter-spacing: 0.12em;
-        color: var(--fg); font-weight: 400;
-        text-shadow: 0 0 10px var(--purple-glow);
+        font-size: 1.6rem; letter-spacing: 0.15em;
+        color: var(--fg); font-weight: 300;
+        text-transform: uppercase;
+        transition: color 0.3s, transform 0.3s;
       }
-      .sticky-nav .nav-links a:hover {
+      .sticky-nav .nav-links a:active {
+        transform: scale(0.95);
         color: var(--teal);
-        text-shadow: 0 0 15px var(--teal-glow);
       }
       .sticky-nav .nav-links a::after { display: none; }
     }
