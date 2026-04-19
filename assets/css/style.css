@@ -572,6 +572,30 @@ footer a:hover { color: var(--pink); }
 .exp-card .tag { color: var(--teal); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; }
 .exp-card p { color: var(--fg-muted); margin-top: 0.8rem; font-size: 0.95rem; }
 
+.exp-subcategory {
+  margin-top: 4rem;
+  padding-top: 2rem;
+  border-top: 1px solid rgba(107, 33, 168, 0.15);
+}
+.exp-subcategory h2 {
+  font-size: clamp(1.2rem, 3vw, 1.6rem);
+  font-weight: 300;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 20px var(--purple-glow);
+  color: var(--fg-muted);
+  margin-bottom: 0.5rem;
+  transition: var(--transition-colors);
+}
+.exp-subcategory-desc {
+  color: var(--fg-muted);
+  font-size: 0.9rem;
+  line-height: 1.7;
+  max-width: 700px;
+  margin: 0 auto 2rem;
+  opacity: 0.8;
+  transition: var(--transition-colors);
+}
+
 /* Experiment Fullscreen View */
 .experiment-view {
   margin: 0;
