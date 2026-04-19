@@ -73,11 +73,12 @@
     document.body.appendChild(btn);
   }
 
-  // Show lang toggle after scrolling past hero
+  // Show lang toggle after scrolling past hero, or immediately if no hero
   function initScrollReveal() {
     const hero = document.querySelector('.hero');
     const btn = document.getElementById('lang-btn');
-    if (!hero || !btn) return;
+    if (!btn) return;
+    if (!hero) { btn.classList.add('is-visible'); return; }
     const observer = new IntersectionObserver(entries => {
       entries.forEach(e => {
         if (!e.isIntersecting) btn.classList.add('is-visible');
