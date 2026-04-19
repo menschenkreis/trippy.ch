@@ -128,37 +128,6 @@
   }
 })();
 
-// ── Sticky Nav & Hamburger ──
-(function () {
-  const nav = document.getElementById('sticky-nav');
-  const hamburger = document.getElementById('nav-hamburger');
-  const navLinks = document.getElementById('nav-links');
-  if (!nav || !hamburger || !navLinks) return;
-
-  // Scroll visibility — show immediately on non-hero pages, observe hero on index
-  const hero = document.querySelector('.hero');
-  if (hero) {
-    const obs = new IntersectionObserver(([e]) => nav.classList.toggle('is-visible', !e.isIntersecting), { threshold: 0.15 });
-    obs.observe(hero);
-  }
-  // Scroll fallback for pages without hero
-  if (!hero) {
-    nav.classList.add('is-visible');
-  }
-
-  // Hamburger toggle
-  hamburger.addEventListener('click', () => {
-    hamburger.classList.toggle('is-open');
-    navLinks.classList.toggle('is-open');
-  });
-  navLinks.querySelectorAll('a').forEach(a => {
-    a.addEventListener('click', () => {
-      hamburger.classList.remove('is-open');
-      navLinks.classList.remove('is-open');
-    });
-  });
-})();
-
 // ── Smooth Page Transitions & Portal ──
 (function () {
   const overlay = document.getElementById('page-transition');

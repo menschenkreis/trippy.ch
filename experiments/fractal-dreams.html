@@ -144,25 +144,6 @@
       transition: color 0.5s;
     }
 
-    /* ── Back link ─────────────────────────────────────────── */
-    .back-link {
-      position: fixed;
-      top: 1rem;
-      left: 1rem;
-      z-index: 200;
-      font-size: 0.85rem;
-      color: rgba(255,255,255,0.4);
-      text-decoration: none;
-      letter-spacing: 0.05em;
-      transition: color 0.25s;
-      backdrop-filter: blur(6px);
-      background: rgba(0,0,0,0.3);
-      padding: 0.4rem 0.8rem;
-      border-radius: 6px;
-      border: 1px solid rgba(255,255,255,0.08);
-    }
-    .back-link:hover { color: var(--teal, #2dd4bf); }
-
     /* ── Slide-in info panel ───────────────────────────────── */
     .info-panel {
       position: fixed;
@@ -279,7 +260,7 @@
   <canvas id="fractal-canvas"></canvas>
 
   <!-- Back -->
-  <a href="../experiments.html" class="back-link">↞ experiments</a>
+  <a href="../experiments.html" class="back-link is-experiment-back">↞ experiments</a>
 
   <!-- Top-right controls -->
   <div class="top-controls">

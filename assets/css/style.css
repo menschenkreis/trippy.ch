@@ -1443,5 +1443,39 @@ footer a:hover { color: var(--pink); }
   .sticky-nav .nav-links a::after { display: none; }
 }
 
+/* Active nav indicator */
+.sticky-nav .nav-links a.is-active {
+  color: var(--teal);
+}
+.sticky-nav .nav-links a.is-active::after {
+  width: 100%;
+}
+
+/* Fullscreen experiment back-link */
+.back-link.is-experiment-back {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 200;
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.4);
+  text-decoration: none;
+  letter-spacing: 0.05em;
+  transition: color 0.25s;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  background: rgba(0,0,0,0.3);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.08);
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.back-link.is-experiment-back:hover {
+  color: var(--teal, #2dd4bf);
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
