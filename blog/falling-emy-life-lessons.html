@@ -20,6 +20,13 @@
   <div id="page-transition" class="page-transition"></div>
   <button id="contrast-btn" title="Toggle high contrast">LC</button>
   <button id="theme-btn" title="Randomize theme">✦</button>
+  <nav class="sticky-nav" id="sticky-nav">
+    <a href="../index.html" class="nav-logo">trippy</a>
+    <div class="nav-links" id="nav-links"></div>
+    <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
   <article class="blog-post">
     <a href="../blog.html" class="back-link" data-i18n="back">↞ all insights</a>
     <h1 data-i18n="h1">The Descent — What Falling Emy Teaches Us About Life</h1>
@@ -83,6 +90,10 @@
   <script type="application/json" id="i18n-data">
 {
   "de": {
+    "nav.portal": "Portal",
+    "nav.experiments": "Experimente",
+    "nav.about": "Über",
+    "nav.insights": "Einblicke",
     "title": "Der abstieg — Fallende emy & lebensmeditation — trippy.ch",
     "meta.description": "Eine philosophische meditation über die physik von fallender emy und was sie über die natur des lebens und der widerstandsfähigkeit offenbart.",
     "og:title": "Der abstieg — Fallende emy & lebensmeditation",
@@ -161,6 +172,7 @@
 }
 </script>
 
+<script src="../assets/js/nav.js"></script>
 <script src="../assets/js/main.js"></script>
 <script src="../assets/js/i18n.js"></script>
   <script>document.getElementById('page-transition').classList.add('is-active');requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('page-transition').classList.remove('is-active')));</script>

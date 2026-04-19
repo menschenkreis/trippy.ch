@@ -4,21 +4,26 @@
 
   // Page detection
   var path = window.location.pathname;
+
+  // Detect subdirectory depth (blog/ or experiments/ subpages)
+  var isSubdir = /\/(blog|experiments)\//.test(path);
+  var base = isSubdir ? '../' : '';
+
   var isIndex = (path === '/' || path === '/index.html' || path.endsWith('/index.html'));
   var isExperiments = path.includes('/experiments.html') || path.endsWith('/experiments');
-  var isBlog = path.includes('/blog.html') || path.endsWith('/blog');
+  var isBlog = path.includes('/blog.html') || path.endsWith('/blog') || /\/blog\/[^/]+\.html/.test(path);
   var isAbout = path.includes('/about.html');
 
-  // Only inject nav on main pages
+  // Only inject nav on pages with the nav element
   var navEl = document.getElementById('sticky-nav');
   if (!navEl) return;
 
-  // Build nav links
+  // Build nav links (with correct base path for subdirectory pages)
   var links = [
-    { href: isIndex ? '#' : 'index.html', label: isIndex ? 'Portal' : 'Portal', i18n: 'nav.portal', match: isIndex },
-    { href: 'experiments.html', label: 'Experiments', i18n: 'nav.experiments', match: isExperiments },
-    { href: 'about.html', label: 'About', i18n: 'nav.about', match: isAbout },
-    { href: 'blog.html', label: 'Insights', i18n: 'nav.insights', match: isBlog }
+    { href: isIndex ? '#' : base + 'index.html', label: 'Portal', i18n: 'nav.portal', match: isIndex },
+    { href: base + 'experiments.html', label: 'Experiments', i18n: 'nav.experiments', match: isExperiments },
+    { href: base + 'about.html', label: 'About', i18n: 'nav.about', match: isAbout },
+    { href: base + 'blog.html', label: 'Insights', i18n: 'nav.insights', match: isBlog }
   ];
 
   var navLinksContainer = document.getElementById('nav-links');
@@ -37,7 +42,7 @@
   // Update logo link
   var logo = navEl.querySelector('.nav-logo');
   if (logo) {
-    logo.href = isIndex ? '#' : 'index.html';
+    logo.href = isIndex ? '#' : base + 'index.html';
   }
 
   // Scroll visibility — observe hero on index, show immediately otherwise

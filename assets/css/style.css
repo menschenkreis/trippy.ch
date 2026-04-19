@@ -476,7 +476,7 @@ footer a:hover { color: var(--pink); }
 .blog-post {
   max-width: 680px;
   margin: 0 auto;
-  padding: 4rem 2rem;
+  padding: 6rem 2rem 4rem;
 }
 
 .back-link {
@@ -1400,8 +1400,6 @@ footer a:hover { color: var(--pink); }
 
 @media (max-width: 768px) {
   .sticky-nav {
-    opacity: 1;
-    transform: none;
     background: rgba(26, 10, 46, 0.95);
     border-bottom: 1px solid rgba(107, 33, 168, 0.25);
   }
