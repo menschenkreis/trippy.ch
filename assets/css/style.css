@@ -1414,6 +1414,9 @@ footer a:hover { color: var(--pink); }
     justify-content: center;
     gap: 2.5rem;
     background: var(--bg);
+    background-image:
+      radial-gradient(ellipse at 30% 50%, var(--purple-glow) 0%, transparent 60%),
+      radial-gradient(ellipse at 70% 50%, var(--teal-glow) 0%, transparent 60%);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
