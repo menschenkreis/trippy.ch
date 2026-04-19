@@ -503,6 +503,19 @@ footer a:hover { color: var(--pink); }
   transition: var(--transition-colors);
 }
 
+.blog-post .footnote-divider {
+  border: none;
+  border-top: 1px solid var(--fg-muted);
+  opacity: 0.3;
+  margin: 3rem 0 1.5rem;
+}
+
+.blog-post .footnote {
+  color: var(--fg-muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
 /* Experiments */
 .experiments-page {
   max-width: 900px;
