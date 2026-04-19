@@ -680,7 +680,12 @@
       resize();
       window.addEventListener('resize', resize);
 
-      window.addEventListener('scroll', () => { scrollBoost = 0.15; });
+      let lastScrollY = window.scrollY;
+    window.addEventListener('scroll', () => {
+      const delta = Math.abs(window.scrollY - lastScrollY);
+      scrollBoost = Math.min(scrollBoost + delta * 0.003, 0.5);
+      lastScrollY = window.scrollY;
+    });
 
       function drawFlower(cx, cy, radius, petals, rotation, alpha) {
         ctx.beginPath();
@@ -737,8 +742,9 @@
         const cy = h / 2;
         const maxR = Math.min(w, h) / 2;
 
-        scrollBoost *= 0.96;
-        time += 0.003 + scrollBoost * 0.02;
+        scrollBoost *= 0.92;
+        if (scrollBoost < 0.001) scrollBoost = 0;
+        time += 0.003 + scrollBoost * 0.015;
 
         ctx.clearRect(0, 0, w, h);
 
