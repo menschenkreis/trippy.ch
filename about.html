@@ -496,9 +496,11 @@
       <h1>About</h1>
       <div class="divider"></div>
       <div class="about-bio">
-        <img src="assets/emanuel-squared.jpg" alt="Emanuel Malacarne" class="about-avatar">
+      <div class="about-avatar-wrap">
         <canvas class="sacred-canvas" id="sacred-canvas"></canvas>
-        <p>
+        <img src="assets/emanuel-squared.jpg" alt="Emanuel Malacarne" class="about-avatar">
+      </div>
+      <p>
           Hey, I'm <strong style="color: var(--fg);">Emanuel Malacarne</strong> — a creative coder and musician based in Switzerland.
           trippy.ch is my digital playground: part psychedelic blog, part experimental lab.
           Here I explore the intersection of <em>generative art</em>, <em>interactive shaders</em>, <em>sound</em> and <em>visual storytelling</em>.
@@ -663,12 +665,11 @@
 
       gallery.appendChild(card);
     });
-    // ── Sacred Geometry Animation ──
+    // ── Sacred Geometry Animation (gentle clockwork only) ──
     const canvas = document.getElementById('sacred-canvas');
     if (canvas) {
       const ctx = canvas.getContext('2d');
       const dpr = window.devicePixelRatio || 1;
-      let scrollBoost = 0;
       let time = 0;
 
       function resize() {
@@ -679,13 +680,6 @@
       }
       resize();
       window.addEventListener('resize', resize);
-
-      let lastScrollY = window.scrollY;
-    window.addEventListener('scroll', () => {
-      const delta = Math.abs(window.scrollY - lastScrollY);
-      scrollBoost = Math.min(scrollBoost + delta * 0.003, 0.5);
-      lastScrollY = window.scrollY;
-    });
 
       function drawFlower(cx, cy, radius, petals, rotation, alpha) {
         ctx.beginPath();
@@ -724,17 +718,6 @@
         ctx.stroke();
       }
 
-      function drawMetatron(cx, cy, r, rotation, alpha) {
-        for (let ring = 1; ring <= 3; ring++) {
-          const count = ring === 1 ? 6 : ring === 2 ? 6 : 6;
-          const rr = r * (ring / 3);
-          for (let i = 0; i < count; i++) {
-            const a = (i / count) * Math.PI * 2 + rotation * (ring % 2 === 0 ? -1 : 1);
-            drawCircle(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, r * 0.06, alpha);
-          }
-        }
-      }
-
       function animate() {
         const w = canvas.width / dpr;
         const h = canvas.height / dpr;
@@ -742,40 +725,34 @@
         const cy = h / 2;
         const maxR = Math.min(w, h) / 2;
 
-        scrollBoost *= 0.92;
-        if (scrollBoost < 0.001) scrollBoost = 0;
-        time += 0.003 + scrollBoost * 0.015;
+        time += 0.002;
 
         ctx.clearRect(0, 0, w, h);
 
-        // Outer rotating triangles
-        drawPolygon(cx, cy, maxR * 0.92, 3, time * 0.7, 0.3);
-        drawPolygon(cx, cy, maxR * 0.92, 3, -time * 0.5, 0.2);
-
         // Concentric circles
-        for (let i = 1; i <= 5; i++) {
-          drawCircle(cx, cy, maxR * (i / 5.5), 0.15 + (i % 2) * 0.1);
+        for (let i = 1; i <= 4; i++) {
+          drawCircle(cx, cy, maxR * (i / 4.5), 0.15 + (i % 2) * 0.1);
         }
 
-        // Flower of life layers
-        drawFlower(cx, cy, maxR * 0.7, 6, time, 0.35);
-        drawFlower(cx, cy, maxR * 0.45, 8, -time * 0.8, 0.25);
-        drawFlower(cx, cy, maxR * 0.25, 12, time * 1.2, 0.2);
+        // Outer triangles
+        drawPolygon(cx, cy, maxR * 0.9, 3, time * 0.3, 0.25);
+        drawPolygon(cx, cy, maxR * 0.9, 3, -time * 0.2, 0.18);
 
-        // Inner star
-        drawPolygon(cx, cy, maxR * 0.55, 6, time * 0.3, 0.25);
-        drawPolygon(cx, cy, maxR * 0.35, 6, -time * 0.4, 0.3);
+        // Flower of life
+        drawFlower(cx, cy, maxR * 0.65, 6, time * 0.4, 0.3);
+        drawFlower(cx, cy, maxR * 0.4, 8, -time * 0.3, 0.2);
 
-        // Metatron dots
-        drawMetatron(cx, cy, maxR * 0.65, time * 0.2, 0.5);
+        // Inner hexagons
+        drawPolygon(cx, cy, maxR * 0.5, 6, time * 0.15, 0.2);
+        drawPolygon(cx, cy, maxR * 0.3, 6, -time * 0.2, 0.25);
 
-        // Tiny orbiting dots
-        for (let i = 0; i < 12; i++) {
-          const a = (i / 12) * Math.PI * 2 + time * 1.5;
-          const r = maxR * (0.3 + 0.1 * Math.sin(time * 2 + i));
+        // Orbiting dots
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2 + time * 0.6;
+          const r = maxR * 0.7;
           ctx.beginPath();
-          ctx.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 1.2, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(168, 85, 247, ${0.4 + 0.3 * Math.sin(time * 3 + i)})`;
+          ctx.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 1, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(168, 85, 247, 0.4)`;
           ctx.fill();
         }
 
